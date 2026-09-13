@@ -8,6 +8,7 @@ import {promisify} from 'node:util'
 import {execFile} from 'node:child_process'
 import {pipeline} from 'node:stream/promises'
 import {digest} from './artwork.mjs'
+import {runtimeAssetPaths} from './runtime-assets.mjs'
 import {createValidation, fileIdentity, recordCheck, saveValidation} from './validation.mjs'
 const root = resolve(import.meta.dirname, '../..')
 if (!process.argv[2]) throw Error('Usage: npm run creator:verify -- <actual creator.zip>')
@@ -44,7 +45,12 @@ const {stdout} = await exec(process.execPath, [join(skill, 'scripts/creator.mjs'
 const check = JSON.parse(stdout)
 if (check.runtime !== runtime || check.technicalReadiness !== 'runtime-ready' || check.licenseReview.status !== 'pending') throw Error('Standalone runtime or license status incorrect')
 // Input artwork is a separate verification fixture, never part of the creator ZIP.
-await cp(join(root, 'public/characters/gpichan'), join(target, 'input'), {recursive: true})
+for (const file of await runtimeAssetPaths(join(root, 'public/characters'))) {
+  if (!file.startsWith('gpichan/')) continue
+  const destination = join(target, 'input', file.slice('gpichan/'.length))
+  await mkdir(dirname(destination), {recursive: true})
+  await cp(join(root, 'public/characters', file), destination)
+}
 // The built-in legacy dialogue contains three unselected experimental pose IDs.
 // Prepare only this temporary verification copy for the stricter pack validator;
 // keep every original visual and the license notice byte-identical.

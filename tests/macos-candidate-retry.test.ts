@@ -296,7 +296,7 @@ it("preserves unknown legacy output and an orphaned attempt instead of mixing it
   await writeFile(join(orphan, "incomplete-output"), "crash before journal commit")
   const before = await inventory(orphan)
   const result = await createFinalArchive(f.root)
-  expect(result.state.final.path).toContain(`/attempts/${result.state.archiveAttempt}/final/`)
+  expect(result.state.final.path).toContain(join("attempts", result.state.archiveAttempt, "final"))
   for (const name of ["final", "verify-extracted"]) expect(await readFile(join(f.root, name, "unknown-output"), "utf8")).toBe("preserve this manual output")
   expect((await inventory(orphan)).sha256).toBe(before.sha256)
   const record = await readJSON(join(f.root, "attempts", result.state.archiveAttempt, "attempt.json"))
