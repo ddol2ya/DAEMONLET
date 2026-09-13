@@ -8,7 +8,7 @@ import { createHookCommand, HOOK_SYSTEM_PATH } from "../adapter/codex/hooks/Hook
 
 const project = resolve(import.meta.dirname, "..")
 if (process.platform !== "darwin") throw new Error("setup:smoke requires macOS; unit tests and both builds remain cross-platform")
-const evidence = resolve(process.env.SETUP_SMOKE_EVIDENCE_DIRECTORY ?? join(project, "docs/evidence/packaged-hook-setup"))
+const evidence = resolve(process.env.SETUP_SMOKE_EVIDENCE_DIRECTORY ?? join(project, "outputs/evidence/packaged-hook-setup"))
 await mkdir(evidence, { recursive: true })
 
 const runNode = (file, args = []) => new Promise((done, reject) => {
@@ -33,8 +33,7 @@ const waitFor = async (predicate, timeout = 10000) => {
   return false
 }
 
-await runNode(join(project, "node_modules/typescript/bin/tsc"), ["--noEmit"])
-await runNode(join(project, "node_modules/vite/bin/vite.js"), ["build"])
+await runNode(join(project, "scripts/build-renderer.mjs"))
 await runNode(join(project, "electron/build/build-electron.mjs"), ["--production", "--setup-smoke"])
 const forgePackage = JSON.parse(await readFile(join(project, "node_modules/@electron-forge/cli/package.json"), "utf8"))
 const forgeBin = typeof forgePackage.bin === "string" ? forgePackage.bin : forgePackage.bin["electron-forge"]
