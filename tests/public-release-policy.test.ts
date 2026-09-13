@@ -44,6 +44,16 @@ describe('artwork scope and creator rights', () => {
       await expect(verifyArtwork(root)).rejects.toThrow('Embedded icon')
       await writeFile(embeddedPath, embedded)
       const scopePath = join(root, 'distribution/ARTWORK-SCOPE.json'), scope = JSON.parse(await readFile(scopePath, 'utf8'))
+      for (const alter of [
+        (value: typeof scope) => { delete value.licenseScope },
+        (value: typeof scope) => { delete value.characterRights },
+        (value: typeof scope) => { value.characterRights.underlyingMaterials.includedInGrant = true },
+        (value: typeof scope) => { value.characterRights.underlyingMaterials.license = 'CC-BY-4.0' },
+        (value: typeof scope) => { value.characterRights.underlyingMaterials.status = 'verified' },
+      ]) {
+        const altered = structuredClone(scope); alter(altered)
+        await writeFile(scopePath, JSON.stringify(altered)); await expect(verifyArtwork(root)).rejects.toThrow('rights scope')
+      }
       scope.files.push({path: 'public/characters/other/image.png', sha256: '0'.repeat(64)})
       await writeFile(scopePath, JSON.stringify(scope)); await expect(verifyArtwork(root)).rejects.toThrow('scope')
     } finally { await rm(root, {recursive: true, force: true}) }

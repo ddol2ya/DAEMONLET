@@ -1,14 +1,35 @@
 # Gpichan / 지피쨩 and project icon visual asset license
 
-ddol2ya provides the specifically listed Gpichan visual assets and project icons under **Creative
-Commons Attribution 4.0 International (CC BY 4.0)**, to the extent the provider
-holds rights that they have authority to license. The definitive, explicit file
-inventory is `ARTWORK-SCOPE.json` beside this document; paths are source-repository
-paths, with hashes identifying the reviewed artwork. No future character or file
+ddol2ya offers **Creative Commons Attribution 4.0 International (CC BY 4.0)**
+for rights the provider actually holds and is authorized to license in the
+project's additional contributions to the listed Gpichan visual files, and in the
+separately authorized project icons. This is not a blanket license to every
+element of the Gpichan images. The definitive file inventory is
+`ARTWORK-SCOPE.json` beside this document; `licenseScope` and `characterRights`
+qualify its `license` field. Paths are source-repository paths and hashes identify
+files, not ownership or a pixel-level separation of contributions. No future character or file
 is licensed by a wildcard. Production copies of `public/characters/` appear under
 `dist/characters/`; the Gpichan pack uses paths relative to that character folder.
 
-You may share and redistribute original or modified versions, including in other
+## Underlying character materials — terms unverified
+
+The Gpichan character design and reference sheets came from community-shared
+AI character material, according to the provider's corrected account. The
+available collection is https://gall.dcinside.com/mgallery/board/view/?id=thesingularity&no=1150189 .
+The original creators, original post and applicable reuse terms remain
+unverified. See ARTWORK-NOTICE.md for the source chain and its limits.
+The underlying character designs, reference images and sheets are **outside
+this project's CC BY grant**. Where rights exist in those elements, this notice
+does not grant them. A listed file may contain both project contributions and
+underlying material; its hash does not establish clearance of the entire image.
+This grant alone cannot establish permission to reuse all of that file.
+This is not a finding that AI material is necessarily protected, unrestricted
+or prohibited. It does not restrict material or uses already free of applicable
+copyright restrictions.
+
+## Permissions for the rights covered by this grant
+
+For the rights covered above, you may share and redistribute original or modified versions, including in other
 apps, public repositories and character packs, and for commercial purposes.
 Retain appropriate attribution, the license notice and a link or copy of the
 license, supplied warranty disclaimers and reasonably practicable source links.
@@ -21,8 +42,10 @@ that prevent recipients exercising the licensed rights.
 
 Example (adapt the last phrase to actual changes):
 
-> Gpichan / 지피쨩 — ddol2ya (DAEMONLET), AI-generated using OpenAI image generation;
-> CC BY 4.0; modified by …
+> Gpichan / 지피쨩 — DAEMONLET additional artwork contributions: ddol2ya,
+> using OpenAI image generation; CC BY 4.0 for provider-controlled contributions only.
+> Based on community character material; original creators and underlying terms
+> unverified; reference collection: https://gall.dcinside.com/mgallery/board/view/?id=thesingularity&no=1150189 ; modified by …
 
 Source: https://github.com/ddol2ya/DAEMONLET
 
@@ -36,6 +59,8 @@ The unmodified official plain-text legal code is distributed in
 of warranties. This document describes its application; it does not replace or
 amend the legal code. Stopping distribution or changing future terms does not
 terminate the license of existing recipients who comply with it.
+This provenance correction clarifies the rights boundary; it does not revoke
+permissions validly granted for provider-controlled contributions or icons.
 
 This permission does not grant trademark rights or imply official affiliation,
 endorsement or sponsorship by ddol2ya, DAEMONLET or OpenAI. Other rights may apply;
@@ -44,7 +69,8 @@ exclusive ownership or clearance of all third-party rights.
 
 ## Scope boundaries
 
-The inventory's `files` lists Gpichan PNG/PSD artwork and the documentation image;
+The inventory's `files` lists Gpichan PNG/PSD artwork and the documentation image,
+subject to the underlying-material exclusion above;
 `icons` separately lists the authorized project PNG, ICNS and SVG icons.
 Identical embedded copies of the listed tray PNG bytes in
 `electron/main/TrayIconData.ts` are also covered as artwork; the TypeScript code

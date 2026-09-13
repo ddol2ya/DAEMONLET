@@ -51,3 +51,7 @@ address rights between OpenAI and the user to the extent permitted by law and
 exclude others' outputs/third-party output from that assignment. They are not
 proof of global copyright status or clearance of third-party rights. The exact
 account/service contract used to create the images was not inspected.
+The provider's 2026-09-14 correction identifies community character designs and
+sheets as reference material. OpenAI generation records concern the project's
+additional images, not proof of the anonymous originals' generator or rights.
+See [the corrected source notice](../distribution/ARTWORK-NOTICE.md).

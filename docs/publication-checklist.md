@@ -60,6 +60,10 @@ https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/r
   generic-parts provenance. The source inventory is not a whole-code authorship audit.
 - Match every packaged Gpichan visual to `distribution/ARTWORK-SCOPE.json`; the
   original illustrations and user packs must not be changed by license work.
+- Preserve the 2026-09-14 community-source correction in ARTWORK-NOTICE.md and
+  the pack notice. The original creators and underlying reference terms remain
+  unverified; the project's CC BY grant covers only provider-controlled additional
+  contributions. A passing build/hash check does not establish image-wide rights.
 - The provider separately authorized the explicit project icon inventory under
   CC BY 4.0 on 2026-09-13; preserve that independent provenance and exact scope.
 - Resolve the [pending external review](external-license-review.md) separately;
