@@ -3,6 +3,18 @@
   "license": "CC-BY-4.0",
   "provider": "ddol2ya",
   "source": "https://github.com/ddol2ya/DAEMONLET",
+  "licenseScope": "provider-controlled-rights-only",
+  "characterRights": {
+    "appliesTo": "files",
+    "projectGrant": "additional-contributions-only",
+    "underlyingMaterials": {
+      "includedInGrant": false,
+      "status": "unverified",
+      "license": null,
+      "referenceCollection": "https://gall.dcinside.com/mgallery/board/view/?id=thesingularity&no=1150189",
+      "notice": "ARTWORK-NOTICE.md"
+    }
+  },
   "files": [
     {
       "path": "docs/images/gpichan.png",
