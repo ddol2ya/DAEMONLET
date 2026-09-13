@@ -36,8 +36,13 @@ export async function fileIdentity(root, file) {
   for await (const part of createReadStream(path)) { hash.update(part); bytes += part.length }
   return {file, bytes, sha256: hash.digest('hex')}
 }
+export function buildIdentity(source, appVersion) {
+  if (!/^[a-f0-9]{40}$/.test(source?.sourceCommit ?? '') || !/^[a-f0-9]{64}$/.test(source?.sourceTreeSha256 ?? '') || typeof source?.workingTreeHasChanges !== 'boolean') throw Error('A valid captured build source identity is required')
+  if (typeof appVersion !== 'string' || !/^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(appVersion)) throw Error('A valid artifact app version is required')
+  return {source: {sourceCommit: source.sourceCommit, sourceTreeSha256: source.sourceTreeSha256, workingTreeHasChanges: source.workingTreeHasChanges}, appVersion}
+}
 export async function createValidation({root, source, appVersion, artifacts, target = environment()}) {
-  if (!/^[a-f0-9]{40}$/.test(source?.sourceCommit ?? "") || !/^[a-f0-9]{64}$/.test(source.sourceTreeSha256) || typeof source.workingTreeHasChanges !== 'boolean') throw Error('A captured build source identity is required')
+  source = buildIdentity(source, appVersion).source
   const inventory = []
   for (const {file, kind} of artifacts) {
     if (!kind || inventory.some(a => a.file === file)) throw Error('Invalid/duplicate artifact')

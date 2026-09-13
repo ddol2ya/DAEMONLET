@@ -96,6 +96,25 @@ npm run release:validation -- run --record outputs/mac-candidate/validation.json
 npm run release:validation -- verify --record outputs/mac-candidate/validation.json --required asar --required nativePackageSmoke
 ```
 
+`init` reads source identity and version from the selected ASAR's embedded
+renderer/desktop build metadata and package.json, or from that ASAR inside the
+Mac/Windows ZIP. Creator ZIPs use their own build-source.json and runtime
+package.json. It does not read the checkout's build outputs or version. Mixed
+source identities/versions, missing or malformed metadata and unsupported artifact
+kinds are rejected. An older artifact remains tied to its original source even
+when the checkout has advanced.
+
+Installer EXEs require an explicit hash-matched `installer-build-result.json`:
+
+```sh
+npm run release:validation -- init --record outputs/windows-installer/recheck.json --artifact windowsInstallerExe:artifacts/Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe --packaging-result outputs/windows-installer/installer-build-result.json
+```
+
+New installer build results include the packaged app's source and version plus the
+final EXE size/SHA-256. Legacy results without that information cannot identify an
+EXE; neither checkout metadata nor previous validation PASS entries are a fallback.
+Initializing a new record copies identity only, never earlier check outcomes.
+
 Before that smoke command, extract **that exact archive**, verify its extracted
 bundle against the packaged input (including app.asar and executable hashes), and
 set `ELECTRON_SMOKE_EXECUTABLE` to its executable and
@@ -108,7 +127,12 @@ Codex settings for candidate smoke.
 
 Creating a record sets **all** checks to NOT_RUN. Integrity verification only
 verifies identity and evidence; use `--required` to enforce named completion gates.
-A failed command is recorded FAIL and exits nonzero. Missing evidence, changed
+A failed command is recorded FAIL and exits nonzero. Starting a new run first
+invalidates that check's previous PASS and preserves it in the new attempt log.
+For `unit` and `build`, the source is checked both before and after execution;
+changes to the commit, source tree hash or dirty flag record FAIL even if the
+command exits zero. The log retains both snapshots and the mismatch reason, and
+`--required unit`/`--required build` cannot reuse the earlier PASS. Missing evidence, changed
 hashes or checks copied from another source/candidate fail verification, even for
 the same app version. A fresh record is required if signing, stapling, recompression
 or any other operation changes bytes; rerun affected checks against the final

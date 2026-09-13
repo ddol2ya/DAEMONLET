@@ -40,7 +40,7 @@ for (const file of artifacts.filter(file => file.endsWith('.exe'))) {
   files.push({ path: file, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') })
 }
 if (files.length !== 1) throw new Error('Expected exactly one installer EXE')
-await writeFile(join(root, 'installer-build-result.json'), JSON.stringify({ files, runtimeUnchanged: true, creatorToolsIncluded: false, signing: 'unsigned' }, null, 2) + '\n')
+await writeFile(join(root, 'installer-build-result.json'), JSON.stringify({ schemaVersion: 1, kind: 'windows-installer-build', source: manifest.source, appVersion: manifest.appVersion, files, runtimeUnchanged: true, creatorToolsIncluded: false, signing: 'unsigned' }, null, 2) + '\n')
 const validation = await createValidation({root, source: manifest.source, appVersion: manifest.appVersion, artifacts: files.map(f => ({file: relative(root, f.path).replaceAll('\\', '/'), kind: 'windowsInstallerExe'}))})
 await recordCheck(validation, root, {kind: 'build', status: 'PASS', procedure: 'electron-builder NSIS; payload hashes checked before and after; not native installation', evidence: ['installer-build-result.json', 'payload.json']})
 await saveValidation(root, validation)
