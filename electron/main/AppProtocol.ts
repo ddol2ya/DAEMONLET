@@ -25,7 +25,7 @@ const MIME: Record<string, string> = {
 }
 
 export function registerAppScheme(): void {
-  protocol.registerSchemesAsPrivileged([{ scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }])
+  protocol.registerSchemesAsPrivileged([{ scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }])
 }
 
 export function installAppProtocol(distRoot: string, instance: Protocol = protocol, registry?: CharacterRegistry, devOrigin?: string): void {
@@ -34,8 +34,10 @@ export function installAppProtocol(distRoot: string, instance: Protocol = protoc
     const path = filePathForAppUrl(request.url, distRoot)
     if (!path) return new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } })
     const pathname = new URL(request.url).pathname
-    const dataHeaders: Record<string, string> = { "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox; frame-ancestors 'none'" }
-    if (devOrigin && request.headers.get("origin") === devOrigin) dataHeaders["access-control-allow-origin"] = devOrigin
+    const corsHeaders: Record<string, string> = devOrigin && request.headers.get("origin") === devOrigin
+      && (pathname.startsWith("/characters/") || pathname.startsWith("/character-packs/"))
+      ? { "access-control-allow-origin": devOrigin, "vary": "Origin" } : {}
+    const dataHeaders: Record<string, string> = { ...corsHeaders, "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox; frame-ancestors 'none'" }
     if (registry && pathname === "/characters/catalog.json") return new Response(request.method === "HEAD" ? null : JSON.stringify(registry.catalog()), { headers: { ...dataHeaders, "content-type": MIME[".json"], "cache-control": "no-store" } })
     if (pathname.startsWith("/character-packs/")) {
       if (["document", "iframe", "script", "style", "worker", "sharedworker", "serviceworker", "object", "embed"].includes(request.destination)) return new Response(null, { status: 403 })
@@ -50,6 +52,7 @@ export function installAppProtocol(distRoot: string, instance: Protocol = protoc
       return new Response(request.method === "HEAD" ? null : body, {
         status: 200,
         headers: {
+          ...corsHeaders,
           "content-type": MIME[extname(path).toLowerCase()] ?? "application/octet-stream",
           "x-content-type-options": "nosniff",
           "cache-control": path.endsWith(".html") ? "no-store" : "public, max-age=31536000, immutable",

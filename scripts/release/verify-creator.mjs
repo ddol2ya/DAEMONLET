@@ -1,6 +1,6 @@
 // Extract a generated creator ZIP outside checkout, then use only its runtime tools.
 import {open} from 'yauzl'
-import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises'
+import {cp, mkdir, mkdtemp, readFile, realpath, writeFile} from 'node:fs/promises'
 import {createWriteStream} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {basename, dirname, join, resolve, relative} from 'node:path'
@@ -11,7 +11,7 @@ import {digest} from './artwork.mjs'
 import {createValidation, fileIdentity, recordCheck, saveValidation} from './validation.mjs'
 const root = resolve(import.meta.dirname, '../..')
 if (!process.argv[2]) throw Error('Usage: npm run creator:verify -- <actual creator.zip>')
-const archive = resolve(process.argv[2]), target = await mkdtemp(join(tmpdir(), 'daemonlet-creator-verify-'))
+const archive = resolve(process.argv[2]), target = await realpath(await mkdtemp(join(tmpdir(), 'daemonlet-creator-verify-')))
 const archiveBefore = await fileIdentity(dirname(archive), basename(archive))
 const zip = await promisify(open)(archive, {lazyEntries: true, validateEntrySizes: true})
 let bytes = 0, count = 0

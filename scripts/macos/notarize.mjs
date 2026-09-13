@@ -262,10 +262,10 @@ export async function createFinalArchive(candidateRoot, { retryReason } = {}) {
       // an independent record, never embedded in the bytes it identifies.
       if (verified.source?.sourceCommit !== manifest.sourceCommit) throw new Error("Final archive source differs from candidate source.")
       const validation = await createValidation({root, source: verified.source, appVersion: manifest.version,
-        artifacts: [{file: relative(root, final.path), kind: "macosFinalZip"}]})
+        artifacts: [{file: relative(root, final.path).replaceAll('\\', '/'), kind: "macosFinalZip"}]})
       for (const kind of ["asar", "signing", "notarization"]) await recordCheck(validation, root, {kind, status: "PASS",
         procedure: "macos:archive: extracted production ASAR, Developer ID signature, stapler and Gatekeeper checked; no GUI smoke implied",
-        evidence: [relative(root, extractedManifest)]})
+        evidence: [relative(root, extractedManifest).replaceAll('\\', '/')]})
       await saveValidation(root, validation, "final-validation.json")
       if (revalidate) {
         await attempt.stage("revalidation-complete")
