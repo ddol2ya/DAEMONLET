@@ -68,9 +68,10 @@
         "revision": "aa7a892f83ff68d7b09186a405ba08d5d33f770f",
         "verifiedOn": "2026-09-13",
         "sources": [
-          "https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold/tree/aa7a892f83ff68d7b09186a405ba08d5d33f770f"
+          "https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold/tree/aa7a892f83ff68d7b09186a405ba08d5d33f770f",
+          "https://huggingface.co/24yearsold/seethroughv0.0.1_marigold"
         ],
-        "note": "No README, license metadata or LICENSE file at this revision. The linked research repository points to a different Marigold namespace; its code license is not evidence for these exact weights. Terms and any output restrictions remain pending."
+        "note": "No README, license metadata or LICENSE file at this revision. The official 24yearsold model URL redirects to layerdifforg; both API responses have the same revision, 14-file tree and weight LFS hashes. This is the same model, not a namespace mismatch. Terms and any output restrictions remain pending; installation availability is not a license declaration or a finding that use is prohibited."
       }
     }
   ],

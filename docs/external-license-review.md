@@ -13,12 +13,23 @@ or updated. The app and creator ZIP do not bundle these external dependencies.
 | layerdifforg/seethroughv0.0.1_marigold weights | `aa7a892f83ff68d7b09186a405ba08d5d33f770f` | **Unverified/pending.** Exact [tree](https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold/tree/aa7a892f83ff68d7b09186a405ba08d5d33f770f) has no README or LICENSE; model API provides no license metadata |
 
 The LayerDiff3D card links the official [research repository](https://github.com/shitagaki-lab/see-through).
-Its README links a different Marigold namespace and its Apache code license is
-not sufficient evidence of permission for the exact layerdifforg weights used
-here. The plugin's MIT declaration also cannot resolve that gap. Obtain an
+The README's `24yearsold/seethroughv0.0.1_marigold` link redirects to
+`layerdifforg/seethroughv0.0.1_marigold`. On the review date both model API
+responses identify revision `aa7a892f83ff68d7b09186a405ba08d5d33f770f`, the same
+14-file tree and identical LFS hashes for all three weight files. This is an alias
+for the same model, not evidence of different weights. Neither response provides
+a model card or license metadata. The research code's Apache license and plugin's
+MIT declaration do not supply the missing model-specific declaration. Obtain an
 applicable upstream statement for those exact weights and record the installed
 revision before declaring the production environment's rights review complete.
-No message to upstream has been sent.
+No message to upstream has been sent. Only public metadata was fetched, not weights.
+
+Installing the node pack through ComfyUI Manager is the supported practical route;
+see [creator setup](creator-setup.md). The plugin can download both LayerDiff3D
+and Marigold on first model load when the user chooses `auto_download=true`.
+Installation availability is a technical fact, not a license declaration. A
+pending declaration is not a finding that use is prohibited and does not block
+building or distributing the app without these external models.
 
 No output-specific restriction was found in the reviewed LayerDiff3D card.
 Marigold conditions, including any output-specific clauses, remain unknown.

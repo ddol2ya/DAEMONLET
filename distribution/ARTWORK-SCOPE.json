@@ -96,5 +96,35 @@
       "path": "public/characters/gpichan/source/reference-original.png",
       "sha256": "e9ca4b9b3b26fc4eaf0b1dd17e10fe0d58911e94791222180076f74339f30f88"
     }
+  ],
+  "icons": [
+    {
+      "path": "electron/assets/appIcon.icns",
+      "sha256": "e94d8aaf5407b5cfb86a955eddc693b4806990440a348f3a588317975f2386eb"
+    },
+    {
+      "path": "electron/assets/icon-source/app-a2-rabbit.png",
+      "sha256": "0bf1303ba58d12022a8eee4edd51928ff34b9209a1b8b3b48d005c23d274e3b7"
+    },
+    {
+      "path": "electron/assets/icon-source/menu-m2-rabbit.png",
+      "sha256": "cae6fb6098de183dbe931dba887db2110f341210d696ab3b33c1f61716cd50ca"
+    },
+    {
+      "path": "electron/assets/trayTemplate.png",
+      "sha256": "a055b359fcd691bfddee2a39b522e1f952477a00de8e7ec21bc2c731436b06bb"
+    },
+    {
+      "path": "electron/assets/trayTemplate.svg",
+      "sha256": "cb612907a436ee8e06f0260094bbe1c1e4c0addd417dc93556066b8697437cc8"
+    },
+    {
+      "path": "electron/assets/trayTemplate@2x.png",
+      "sha256": "a1d6c3d8c48f0ce55ce894dcc08cfcc9384e4a4ac8d478d493ca17917fbe4904"
+    },
+    {
+      "path": "public/favicon.svg",
+      "sha256": "3e8863288c2d43dd33d2a71de317dcf9198f09932ea8d61e0def1b846a865435"
+    }
   ]
 }

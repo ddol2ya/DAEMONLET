@@ -30,15 +30,19 @@ describe('artwork scope and creator rights', () => {
   it('rejects missing, empty and altered attribution, full text and overbroad scope', async () => {
     const root = await mkdtemp(join(tmpdir(), 'daemonlet-artwork-'))
     try {
-      for (const path of ['distribution', 'public/characters', 'docs/images', 'LICENSE']) await cp(path, join(root, path), {recursive: true})
+      for (const path of ['distribution', 'public/characters', 'public/favicon.svg', 'electron/assets', 'electron/main/TrayIconData.ts', 'docs/images', 'LICENSE']) await cp(path, join(root, path), {recursive: true})
       await expect(verifyArtwork(root)).resolves.toMatchObject({license: 'CC-BY-4.0'})
-      for (const path of ['public/characters/gpichan/LICENSE.txt', 'distribution/licenses/CC-BY-4.0.txt', 'distribution/ARTWORK-NOTICE.md']) {
+      for (const path of ['public/characters/gpichan/LICENSE.txt', 'distribution/licenses/CC-BY-4.0.txt', 'distribution/ARTWORK-NOTICE.md', 'electron/assets/trayTemplate.png']) {
         const full = join(root, path), bytes = await readFile(full)
         await rm(full); await expect(verifyArtwork(root)).rejects.toThrow()
         await writeFile(full, ''); await expect(verifyArtwork(root)).rejects.toThrow()
         await writeFile(full, Buffer.concat([bytes, Buffer.from('altered')])); await expect(verifyArtwork(root)).rejects.toThrow()
         await writeFile(full, bytes)
       }
+      const embeddedPath = join(root, 'electron/main/TrayIconData.ts'), embedded = await readFile(embeddedPath, 'utf8')
+      await writeFile(embeddedPath, embedded.replace('iVBOR', 'AAAAA'))
+      await expect(verifyArtwork(root)).rejects.toThrow('Embedded icon')
+      await writeFile(embeddedPath, embedded)
       const scopePath = join(root, 'distribution/ARTWORK-SCOPE.json'), scope = JSON.parse(await readFile(scopePath, 'utf8'))
       scope.files.push({path: 'public/characters/other/image.png', sha256: '0'.repeat(64)})
       await writeFile(scopePath, JSON.stringify(scope)); await expect(verifyArtwork(root)).rejects.toThrow('scope')

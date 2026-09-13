@@ -1,6 +1,6 @@
-# Gpichan / 지피쨩 visual asset license
+# Gpichan / 지피쨩 and project icon visual asset license
 
-ddol2ya provides the specifically listed Gpichan visual assets under **Creative
+ddol2ya provides the specifically listed Gpichan visual assets and project icons under **Creative
 Commons Attribution 4.0 International (CC BY 4.0)**, to the extent the provider
 holds rights that they have authority to license. The definitive, explicit file
 inventory is `ARTWORK-SCOPE.json` beside this document; paths are source-repository
@@ -44,17 +44,21 @@ exclusive ownership or clearance of all third-party rights.
 
 ## Scope boundaries
 
-Only the listed PNG/PSD artwork is covered, including the listed documentation
-image. Any third-party screen content, marks or rights within an image are not
+The inventory's `files` lists Gpichan PNG/PSD artwork and the documentation image;
+`icons` separately lists the authorized project PNG, ICNS and SVG icons.
+Identical embedded copies of the listed tray PNG bytes in
+`electron/main/TrayIconData.ts` are also covered as artwork; the TypeScript code
+remains MIT. Any third-party screen content, marks or rights within an image are not
 relicensed. Project code, rig algorithms, configuration JSON, behavior and dialogue
 remain under the project's MIT policy. A `.petchar` is a mixed-file container,
 not a license for everything inside it. Its `LICENSE.txt` preserves this split,
 the exact relative artwork inventory, provenance and both full license texts.
 
-The separately generated A2/M2 rabbit icon sources, ICNS, tray PNG/SVG and embedded
-tray data are excluded: current provenance does not establish derivation from
-Gpichan. Their selection/generation provenance is preserved in ARTWORK-NOTICE.md;
-this document makes no new license grant for them. Upstream embedded generic RGBA
+The provider separately authorized public redistribution of the listed project
+icons on 2026-09-13 under this same CC BY 4.0 grant. Their independent provenance
+is preserved in ARTWORK-NOTICE.md; they need not derive from Gpichan. Icon
+attribution may read: "DAEMONLET project icons — ddol2ya; CC BY 4.0; modified by …".
+Upstream embedded generic RGBA
 parts in `genericparts.js` retain the Anime2.5DRig notice and MIT terms. External
 libraries, model weights, user-imported packs and future characters retain their
 own conditions. Unknown origins do not receive CC BY automatically.

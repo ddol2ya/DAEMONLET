@@ -2,8 +2,9 @@
 
 Keep source preparation, Git history, native distribution, creator ZIP and
 external-model rights as separate PASS / BLOCKED / NOT RUN decisions. This work
-does not authorize changing visibility, publishing a release, uploading binaries,
-merging the PR, rewriting history or force-pushing.
+does not authorize changing visibility, publishing a release, uploading binaries
+or merging the PR. On 2026-09-13 the user separately approved history cleanup of
+this public-preparation repository, including its affected branch updates.
 
 ## PUBLICATION_BLOCKER_HISTORY_REVIEW
 
@@ -26,11 +27,11 @@ inventoried; non-commit trees and reflogs are outside the commit scanner's scope
 No private development repository was inspected. Repeat ref inventory and
 `node scripts/release/history-check.mjs` immediately before publication review.
 
-Separate approval is required to clean affected history: preserve a private
-backup, agree the refs/files and retention requirements, use a separately reviewed
-`git-filter-repo` plan or a clean publication repository, and verify all public
+The authorized cleanup preserves a private, ignored backup and rewrites affected
+source scanner and fixture blobs on `main` and `codex/public-release-notices`,
+with explicit expected-old-value leases for the remote update. Verify all public
 heads/tags plus PR/cached views. Rewriting changes commit IDs and requires clone
-coordination and an explicitly approved remote update. Do not rewrite the private
+coordination. Do not rewrite the private
 development repository. Existing clones, forks, old PR diffs and cached views can
 retain material even after the code PR is merged. If actual credentials are later
 found, classify them separately and arrange revocation/rotation; deleting a path
@@ -48,8 +49,8 @@ https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/r
   generic-parts provenance. The source inventory is not a whole-code authorship audit.
 - Match every packaged Gpichan visual to `distribution/ARTWORK-SCOPE.json`; the
   original illustrations and user packs must not be changed by license work.
-- Confirm separate rabbit-icon rights before broader redistribution claims; the
-  Gpichan grant does not automatically cover their independent provenance.
+- The provider separately authorized the explicit project icon inventory under
+  CC BY 4.0 on 2026-09-13; preserve that independent provenance and exact scope.
 - Resolve the [pending external review](external-license-review.md) separately;
   technical readiness and acknowledgements never grant model permissions.
 

@@ -6,6 +6,6 @@
 
 기존 원화와 포즈를 바탕으로 런타임 PSD/래스터 및 문서 이미지가 제공됩니다. 구체적인 이용 허락과 파일 목록은 함께 제공하는 `ARTWORK-LICENSE.md`와 `ARTWORK-SCOPE.json`에 있습니다. 저장소에서는 이 세 문서가 `distribution/`에 있고, 설치 앱에서는 resources의 `licenses/`에 있습니다. 이 문서는 출처 기록이며 이용 허락을 대체하지 않습니다.
 
-별도 아이콘은 `electron/assets/icon-source/README.md` 및 `manifest.json`에 A2 앱·M2 메뉴 토끼 이미지의 사용자 선택과 생성 도구가 기록돼 있습니다. 파생 경로는 두 PNG에서 `appIcon.icns`, `trayTemplate.png`, `trayTemplate@2x.png`, `electron/main/TrayIconData.ts`로 이어집니다. 기존 `trayTemplate.svg`도 지피쨩 파생 관계가 확인되지 않아 CC BY 지정에서 제외합니다. 이들에는 새 지피쨩 허락을 자동 적용하지 않습니다.
+별도 아이콘은 `electron/assets/icon-source/README.md` 및 `manifest.json`에 A2 앱·M2 메뉴 토끼 이미지의 사용자 선택과 생성 도구가 기록돼 있습니다. 파생 경로는 두 PNG에서 `appIcon.icns`, `trayTemplate.png`, `trayTemplate@2x.png`, `electron/main/TrayIconData.ts`의 PNG 데이터로 이어집니다. 2026-09-13 제공자가 프로젝트 아이콘의 공개 재배포를 별도로 승인하여 `ARTWORK-SCOPE.json`의 `icons`에 지정한 파일과 동일한 내장 PNG 데이터에 CC BY 4.0을 적용합니다. `trayTemplate.svg`와 `public/favicon.svg`도 이 명시적 아이콘 허락에 포함되지만, 이 두 SVG의 생성 도구나 지피쨩 파생 관계는 확인된 것으로 주장하지 않습니다. 코드 자체는 MIT를 유지합니다.
 
 프로젝트 코드와 외부 라이브러리는 각 MIT 등 기존 조건과 전문 고지를 보존합니다. 새로 가져오는 캐릭터 팩의 이미지 및 원작 권리 조건은 해당 제작자가 별도로 안내합니다. OpenAI 이용약관의 출력물 조항은 당사자 사이에서 법이 허용하는 범위의 권리를 설명하며 제3자 권리를 보장하는 자료가 아닙니다: https://openai.com/policies/row-terms-of-use/
