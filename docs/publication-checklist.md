@@ -9,21 +9,32 @@ this public-preparation repository, including its affected branch updates.
 ## PUBLICATION_BLOCKER_HISTORY_REVIEW
 
 Read-only review on 2026-09-13 found personal environment literals (including
-concatenated fragments) in `scripts/release/source-check.mjs:20` of initial commit
-`11dfa475b233eef6e218523baa0f4693c800e567`. Do not reproduce the matched values.
-The current scanner removes them; that does **not** remove the original blob or
-the deletion lines in this PR's diff. Current source passing is not permission to
-make the repository public.
+concatenated fragments) in the initial `scripts/release/source-check.mjs`.
+The subsequently authorized rewrite removed them from reachable branch history,
+along with synthetic fixture matches in four test files. Do not reproduce the
+matched values. All descendant commit trees were preserved byte for byte.
+The remote `main` and existing PR branch were updated atomically with explicit
+leases. The PR remains open and its head/merge refs now use the rewritten history.
+
+Current local branch history and Codex snapshot trees passed the redacted pattern
+scan after rewriting. **The old commit remains retrievable by SHA through GitHub's
+API.** Branch cleanup is complete, but server-retained objects, historical PR
+views and existing clones are not certified purged. GitHub-controlled PR/cached
+objects cannot be removed with a branch push; follow the official procedure below
+before visibility review. No support request has been sent. The backup, commit
+mapping and detailed evidence remain private and ignored, outside release assets.
 
 At review, the clone was not shallow, advertised remote heads contained only
 `refs/heads/main`, no remote tags or existing PRs were listed, and local
 `main`, `origin/main`, `origin/HEAD` and the work branch reached this commit.
 One historical commit was reachable at the initial review. Additional pattern
-matches in five test files were normalized to reserved documentation identities;
+matches in four test files were normalized to reserved documentation identities;
 these fixture matches are not themselves evidence of real credentials.
 No credential pattern was detected in that reachable history. This is not a
 guarantee of absence of all secrets. Internal Codex tree/checkpoint refs were
-inventoried; non-commit trees and reflogs are outside the commit scanner's scope.
+inventoried; the supplemental cleanup check also scanned non-commit trees.
+Local reflogs and a private backup remain for recovery during concurrent work;
+they are not distributed by an ordinary branch push.
 No private development repository was inspected. Repeat ref inventory and
 `node scripts/release/history-check.mjs` immediately before publication review.
 

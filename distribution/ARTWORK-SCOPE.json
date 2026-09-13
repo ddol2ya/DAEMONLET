@@ -116,7 +116,7 @@
     },
     {
       "path": "electron/assets/trayTemplate.svg",
-      "sha256": "cb612907a436ee8e06f0260094bbe1c1e4c0addd417dc93556066b8697437cc8"
+      "sha256": "6daaf8fcec5e848e04646496ee75c4e2f44dec061e1d17f9ed77406d057143ce"
     },
     {
       "path": "electron/assets/trayTemplate@2x.png",
@@ -124,7 +124,7 @@
     },
     {
       "path": "public/favicon.svg",
-      "sha256": "3e8863288c2d43dd33d2a71de317dcf9198f09932ea8d61e0def1b846a865435"
+      "sha256": "e6d2e59b7b5bbb0342e0fb496dfc262decbfe4426bbb7b047aec8d467d1dc6f7"
     }
   ]
 }
