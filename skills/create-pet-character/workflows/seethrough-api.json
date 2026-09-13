@@ -1,0 +1,91 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "reference.png"
+    }
+  },
+  "2": {
+    "class_type": "SeeThrough_LoadLayerDiffModel",
+    "inputs": {
+      "model": "layerdifforg/seethroughv0.0.2_layerdiff3d",
+      "vae_ckpt": "",
+      "unet_ckpt": "",
+      "quant_mode": "none",
+      "cache_tag_embeds": true,
+      "group_offload": true,
+      "auto_download": false
+    }
+  },
+  "3": {
+    "class_type": "SeeThrough_LoadDepthModel",
+    "inputs": {
+      "model": "layerdifforg/seethroughv0.0.1_marigold",
+      "quant_mode": "none",
+      "cache_tag_embeds": true,
+      "group_offload": true,
+      "auto_download": false
+    }
+  },
+  "4": {
+    "class_type": "SeeThrough_GenerateLayers",
+    "inputs": {
+      "image": [
+        "1",
+        0
+      ],
+      "layerdiff_model": [
+        "2",
+        0
+      ],
+      "seed": 42013,
+      "resolution": 1280,
+      "num_inference_steps": 30
+    }
+  },
+  "5": {
+    "class_type": "SeeThrough_GenerateDepth",
+    "inputs": {
+      "layers": [
+        "4",
+        0
+      ],
+      "depth_model": [
+        "3",
+        0
+      ],
+      "seed": 42014,
+      "resolution_depth": 1280
+    }
+  },
+  "6": {
+    "class_type": "SeeThrough_PostProcess",
+    "inputs": {
+      "layers_depth": [
+        "5",
+        0
+      ],
+      "tblr_split": true,
+      "use_lama": false
+    }
+  },
+  "7": {
+    "class_type": "SeeThrough_SavePSD",
+    "inputs": {
+      "parts": [
+        "6",
+        0
+      ],
+      "filename_prefix": "daemonlet-pose_seed_42013"
+    }
+  },
+  "8": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "6",
+        1
+      ]
+    }
+  }
+}

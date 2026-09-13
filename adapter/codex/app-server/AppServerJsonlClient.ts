@@ -1,0 +1,164 @@
+import { EventEmitter, once } from "node:events"
+import type { Readable, Writable } from "node:stream"
+
+type JsonObject = Record<string, unknown>
+
+export type JsonlClientOptions = {
+  readable: Readable
+  writable: Writable
+  requestTimeoutMs?: number
+  maxLineBytes?: number
+}
+
+export class AppServerJsonlClient {
+  private readonly options: JsonlClientOptions
+  private readonly events = new EventEmitter()
+  private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
+  private nextId = 1
+  private buffer = Buffer.alloc(0)
+  private closed = false
+  lastError: string | null = null
+  lastNotification: string | null = null
+  handshakeState: "NEW" | "INITIALIZING" | "READY" | "CLOSED" = "NEW"
+
+  constructor(options: JsonlClientOptions) {
+    this.options = options
+    options.readable.on("data", (chunk: Buffer | string) => this.pushChunk(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
+    options.readable.once("end", () => this.close(new Error("app-server stdout ended")))
+    options.readable.once("error", (error) => this.close(error))
+    options.writable.once("error", (error) => this.close(error))
+  }
+
+  get pendingRequestCount(): number { return this.pending.size }
+
+  onNotification(listener: (method: string, params: unknown) => void): () => void {
+    this.events.on("notification", listener)
+    return () => this.events.off("notification", listener)
+  }
+
+  onServerRequest(listener: (request: JsonObject) => void): () => void {
+    this.events.on("request", listener)
+    return () => this.events.off("request", listener)
+  }
+
+  private pushChunk(chunk: Buffer): void {
+    if (this.closed) return
+    this.buffer = Buffer.concat([this.buffer, chunk])
+    const max = this.options.maxLineBytes ?? 1024 * 1024
+    if (this.buffer.byteLength > max && !this.buffer.includes(0x0a)) {
+      this.lastError = "app-server JSONL line exceeded maximum size"
+      return this.close(new Error(this.lastError))
+    }
+    while (true) {
+      const newline = this.buffer.indexOf(0x0a)
+      if (newline < 0) break
+      let line = this.buffer.subarray(0, newline)
+      this.buffer = this.buffer.subarray(newline + 1)
+      if (line.at(-1) === 0x0d) line = line.subarray(0, -1)
+      if (line.byteLength === 0) continue
+      if (line.byteLength > max) {
+        this.lastError = "app-server JSONL line exceeded maximum size"
+        this.close(new Error(this.lastError))
+        return
+      }
+      this.processLine(line.toString("utf8"))
+    }
+  }
+
+  private processLine(line: string): void {
+    let value: unknown
+    try { value = JSON.parse(line) } catch {
+      this.lastError = "app-server emitted malformed JSONL"
+      this.events.emit("malformed")
+      return
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return
+    const message = value as JsonObject
+    if (typeof message.id === "number" && (Object.hasOwn(message, "result") || Object.hasOwn(message, "error")) && !Object.hasOwn(message, "method")) {
+      const pending = this.pending.get(message.id)
+      if (!pending) return
+      clearTimeout(pending.timer)
+      this.pending.delete(message.id)
+      if (Object.hasOwn(message, "error")) pending.reject(new Error("app-server request failed"))
+      else pending.resolve(message.result)
+      return
+    }
+    if (typeof message.method === "string" && Object.hasOwn(message, "id")) {
+      this.events.emit("request", message)
+      return
+    }
+    if (typeof message.method === "string") {
+      this.lastNotification = message.method
+      this.events.emit("notification", message.method, message.params)
+    }
+  }
+
+  private async write(message: JsonObject): Promise<void> {
+    if (this.closed) throw new Error("app-server client is closed")
+    const line = `${JSON.stringify(message)}\n`
+    if (!this.options.writable.write(line, "utf8")) await once(this.options.writable, "drain")
+  }
+
+  async notify(method: string, params?: unknown): Promise<void> {
+    await this.write({ method, ...(params === undefined ? {} : { params }) })
+  }
+
+  async request(method: string, params?: unknown, timeoutMs = this.options.requestTimeoutMs ?? 15_000): Promise<unknown> {
+    const id = this.nextId++
+    const result = new Promise<unknown>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id)
+        reject(new Error(`app-server request timed out: ${method}`))
+      }, timeoutMs)
+      timer.unref()
+      this.pending.set(id, { resolve, reject, timer })
+    })
+    // Return the response promise immediately so close/error rejection is always
+    // observed, including when the transport breaks while a write is draining.
+    void this.write({ id, method, ...(params === undefined ? {} : { params }) }).catch((error) => {
+      const pending = this.pending.get(id)
+      if (pending) {
+        clearTimeout(pending.timer)
+        this.pending.delete(id)
+        pending.reject(error instanceof Error ? error : new Error("app-server write failed"))
+      }
+    })
+    return result
+  }
+
+  async initialize(clientInfo: { name: string; title: string; version: string }): Promise<unknown> {
+    if (this.handshakeState !== "NEW") throw new Error("app-server client was already initialized")
+    this.handshakeState = "INITIALIZING"
+    const result = await this.request("initialize", {
+      clientInfo,
+      capabilities: {
+        experimentalApi: false,
+        requestAttestation: false,
+        optOutNotificationMethods: [
+          "item/agentMessage/delta",
+          "item/reasoning/summaryTextDelta",
+          "item/reasoning/textDelta",
+          "item/commandExecution/outputDelta",
+          "item/fileChange/outputDelta",
+          "turn/diff/updated",
+          "item/plan/delta",
+        ],
+      },
+    })
+    await this.notify("initialized")
+    this.handshakeState = "READY"
+    return result
+  }
+
+  close(reason = new Error("app-server client closed")): void {
+    if (this.closed) return
+    this.closed = true
+    this.handshakeState = "CLOSED"
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer)
+      pending.reject(reason)
+    }
+    this.pending.clear()
+    this.events.removeAllListeners()
+  }
+}

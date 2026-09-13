@@ -1,0 +1,15 @@
+{
+  "description": "daemonlet-codex-pet-adapter",
+  "events": [
+    "SessionStart",
+    "SessionEnd",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PostToolUse",
+    "SubagentStart",
+    "SubagentStop",
+    "Stop",
+    "Interrupt"
+  ],
+  "behavior": "advisory localhost forwarding only; always exits successfully"
+}

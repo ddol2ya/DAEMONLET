@@ -1,0 +1,20 @@
+{
+  "selection": {
+    "app": "A2",
+    "menu": "M2"
+  },
+  "generator": "built-in image_gen",
+  "export": "sips + iconutil",
+  "trayLogicalSize": 18,
+  "trayScaleFactors": [
+    1,
+    2
+  ],
+  "sha256": {
+    "icon-source/app-a2-rabbit.png": "0bf1303ba58d12022a8eee4edd51928ff34b9209a1b8b3b48d005c23d274e3b7",
+    "icon-source/menu-m2-rabbit.png": "cae6fb6098de183dbe931dba887db2110f341210d696ab3b33c1f61716cd50ca",
+    "appIcon.icns": "e94d8aaf5407b5cfb86a955eddc693b4806990440a348f3a588317975f2386eb",
+    "trayTemplate.png": "a055b359fcd691bfddee2a39b522e1f952477a00de8e7ec21bc2c731436b06bb",
+    "trayTemplate@2x.png": "a1d6c3d8c48f0ce55ce894dcc08cfcc9384e4a4ac8d478d493ca17917fbe4904"
+  }
+}

@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "timing": {
+    "boredAfterMs": 60000,
+    "happyDurationMs": 3500,
+    "stateBlendMs": 300,
+    "boredActionDelayMinMs": 4200,
+    "boredActionDelayMaxMs": 9000
+  },
+  "states": {
+    "NORMAL": {
+      "poseId": null
+    },
+    "BORED": {
+      "poseId": null,
+      "motion": {
+        "loopDurationMs": 4400,
+        "parameters": {
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "angleY": {
+            "type": "constant",
+            "value": 0.09
+          },
+          "angleZ": {
+            "type": "sine",
+            "amplitude": 0.03,
+            "phase": 0,
+            "offset": 0.04
+          },
+          "body": {
+            "type": "sine",
+            "amplitude": 0.016,
+            "phase": 1.2,
+            "offset": 0.07
+          }
+        }
+      },
+      "actions": [
+        {
+          "id": "bored-look-away",
+          "durationMs": 1700,
+          "motion": {
+            "loopDurationMs": 1700,
+            "parameters": {
+              "eyeX": {
+                "type": "keyframes",
+                "interpolation": "smoothstep",
+                "frames": [
+                  {
+                    "atMs": 0,
+                    "value": 0
+                  },
+                  {
+                    "atMs": 240,
+                    "value": -0.34
+                  },
+                  {
+                    "atMs": 1050,
+                    "value": -0.34
+                  },
+                  {
+                    "atMs": 1700,
+                    "value": 0
+                  }
+                ]
+              },
+              "angleX": {
+                "type": "keyframes",
+                "interpolation": "smoothstep",
+                "frames": [
+                  {
+                    "atMs": 0,
+                    "value": 0
+                  },
+                  {
+                    "atMs": 440,
+                    "value": -0.06
+                  },
+                  {
+                    "atMs": 1080,
+                    "value": -0.06
+                  },
+                  {
+                    "atMs": 1700,
+                    "value": 0
+                  }
+                ]
+              }
+            },
+            "playback": "once"
+          }
+        },
+        {
+          "id": "bored-sigh",
+          "durationMs": 2000,
+          "motion": {
+            "loopDurationMs": 2000,
+            "parameters": {
+              "body": {
+                "type": "sine",
+                "amplitude": 0.035,
+                "phase": 0,
+                "offset": 0.01
+              },
+              "angleY": {
+                "type": "sine",
+                "amplitude": 0.045,
+                "phase": 0,
+                "offset": 0.01
+              },
+              "mouthOpen": {
+                "type": "sine",
+                "amplitude": 0.008,
+                "phase": 0,
+                "offset": 0.008
+              }
+            },
+            "playback": "once",
+            "envelope": {
+              "attackMs": 240,
+              "releaseMs": 480
+            }
+          }
+        }
+      ]
+    },
+    "BUSY": {
+      "poseId": "writing",
+      "fallbackMotion": {
+        "loopDurationMs": 1700,
+        "parameters": {
+          "eyeY": {
+            "type": "constant",
+            "value": 0.54
+          },
+          "angleY": {
+            "type": "constant",
+            "value": -0.17
+          },
+          "body": {
+            "type": "sine",
+            "amplitude": 0.013,
+            "phase": 0.8,
+            "offset": 0.023
+          }
+        }
+      }
+    },
+    "HAPPY": {
+      "poseId": null,
+      "motion": {
+        "loopDurationMs": 940,
+        "parameters": {
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 0.27
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 160,
+                "value": -0.018
+              },
+              {
+                "atMs": 380,
+                "value": 0.095
+              },
+              {
+                "atMs": 650,
+                "value": 0.018
+              },
+              {
+                "atMs": 940,
+                "value": 0
+              }
+            ]
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 250,
+                "value": 0.018
+              },
+              {
+                "atMs": 560,
+                "value": -0.012
+              },
+              {
+                "atMs": 940,
+                "value": 0
+              }
+            ]
+          }
+        },
+        "playback": "once"
+      }
+    }
+  },
+  "failureReaction": {
+    "id": "task-failed-recoil",
+    "durationMs": 750,
+    "motion": {
+      "loopDurationMs": 750,
+      "parameters": {
+        "angleY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 160,
+              "value": -0.06
+            },
+            {
+              "atMs": 360,
+              "value": 0.025
+            },
+            {
+              "atMs": 750,
+              "value": 0
+            }
+          ]
+        },
+        "body": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 160,
+              "value": -0.045
+            },
+            {
+              "atMs": 360,
+              "value": 0.015
+            },
+            {
+              "atMs": 750,
+              "value": 0
+            }
+          ]
+        },
+        "eyeOpenL": {
+          "type": "constant",
+          "value": 0.72
+        },
+        "eyeOpenR": {
+          "type": "constant",
+          "value": 0.72
+        }
+      },
+      "playback": "once",
+      "envelope": {
+        "attackMs": 110,
+        "releaseMs": 270
+      }
+    }
+  },
+  "gazeTakeoverFromCurrent": true
+}

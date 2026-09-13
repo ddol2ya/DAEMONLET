@@ -1,0 +1,252 @@
+{
+  "layerAliases": {
+    "mouth": "mouth_close"
+  },
+  "cleanupThresholds": {
+    "face": 10,
+    "neck": 8,
+    "eyewhite": 5,
+    "irides": 4,
+    "eyelash": 4,
+    "eyebrow": 4,
+    "mouth_open": 3,
+    "front hair": 10,
+    "back hair": 10,
+    "topwear": 5,
+    "bottomwear": 5,
+    "handwear": 5,
+    "legwear": 5,
+    "headwear": 5,
+    "earwear": 5,
+    "neck_2": 0
+  },
+  "blinkRepair": {
+    "enabled": false,
+    "paddingX": 7,
+    "paddingY": 6
+  },
+  "physics": {
+    "frontHair": {
+      "amplitude": 0.45,
+      "stiffness": 92,
+      "damping": 15,
+      "wind": 0.18,
+      "inertia": 0.4,
+      "rootLock": 0.45,
+      "maxOffset": 8
+    },
+    "backHair": {
+      "amplitude": 0.45,
+      "stiffness": 80,
+      "damping": 15,
+      "wind": 0.2,
+      "inertia": 0.45,
+      "rootLock": 0.4,
+      "maxOffset": 9
+    }
+  },
+  "layerOrderConstraints": [
+    {
+      "behind": "topwear",
+      "inFrontOf": "neck_2"
+    },
+    {
+      "behind": "neck_2",
+      "inFrontOf": "face"
+    }
+  ],
+  "maskedLayerOverlays": [
+    {
+      "source": "neck",
+      "name": "neck_2",
+      "inFrontOf": "topwear",
+      "replaceExisting": true,
+      "featherPx": 1,
+      "polygon": [
+        [
+          0.46796875,
+          0.1796875
+        ],
+        [
+          0.553125,
+          0.1796875
+        ],
+        [
+          0.553125,
+          0.25859375
+        ],
+        [
+          0.5421875,
+          0.26796875
+        ],
+        [
+          0.53125,
+          0.27265625
+        ],
+        [
+          0.5203125,
+          0.275
+        ],
+        [
+          0.509375,
+          0.27578125
+        ],
+        [
+          0.49765625,
+          0.274609375
+        ],
+        [
+          0.4875,
+          0.27265625
+        ],
+        [
+          0.478125,
+          0.26875
+        ],
+        [
+          0.46796875,
+          0.259375
+        ]
+      ]
+    },
+    {
+      "source": "handwear_2",
+      "name": "forearm_2",
+      "inFrontOf": "topwear",
+      "polygon": [
+        [
+          0,
+          0.5703125
+        ],
+        [
+          0.3703125,
+          0.5703125
+        ],
+        [
+          0.38203125,
+          0.5609375
+        ],
+        [
+          0.42421875,
+          0.553125
+        ],
+        [
+          0.44921875,
+          0.5625
+        ],
+        [
+          0.484375,
+          0.5828125
+        ],
+        [
+          0.55234375,
+          0.56796875
+        ],
+        [
+          0.5875,
+          0.5484375
+        ],
+        [
+          0.6125,
+          0.521875
+        ],
+        [
+          0.64375,
+          0.5140625
+        ],
+        [
+          0.6625,
+          0.53046875
+        ],
+        [
+          0.68984375,
+          0.5390625
+        ],
+        [
+          1,
+          0.5390625
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "featherPx": 1.5
+    },
+    {
+      "source": "handwear_1",
+      "name": "forearm_1",
+      "inFrontOf": "forearm_2",
+      "polygon": [
+        [
+          0,
+          0.5703125
+        ],
+        [
+          0.3703125,
+          0.5703125
+        ],
+        [
+          0.38203125,
+          0.5609375
+        ],
+        [
+          0.42421875,
+          0.553125
+        ],
+        [
+          0.44921875,
+          0.5625
+        ],
+        [
+          0.484375,
+          0.5828125
+        ],
+        [
+          0.55234375,
+          0.56796875
+        ],
+        [
+          0.5875,
+          0.5484375
+        ],
+        [
+          0.6125,
+          0.521875
+        ],
+        [
+          0.64375,
+          0.5140625
+        ],
+        [
+          0.6625,
+          0.53046875
+        ],
+        [
+          0.68984375,
+          0.5390625
+        ],
+        [
+          1,
+          0.5390625
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "featherPx": 1.5
+    }
+  ],
+  "deformationSources": {
+    "neck": "topwear"
+  }
+}

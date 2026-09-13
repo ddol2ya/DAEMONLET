@@ -1,0 +1,82 @@
+{
+  "name": "daemonlet-for-codex",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "productName": "Daemonlet for Codex",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vite --port 4173 --strictPort",
+    "build": "npm run build:renderer",
+    "build:renderer": "tsc --noEmit && vite build",
+    "build:electron": "node electron/build/build-electron.mjs",
+    "build:electron:production": "node electron/build/build-electron.mjs --production",
+    "electron:dev": "npm run build:electron && node scripts/electron-dev.mjs",
+    "electron:smoke": "npm run build:renderer && npm run build:electron && node scripts/electron-smoke.mjs",
+    "electron:package": "npm run build:renderer && npm run build:electron:production && electron-forge package",
+    "macos:package:signed": "node scripts/macos.mjs package",
+    "macos:verify": "node scripts/macos.mjs verify",
+    "macos:notarize": "node scripts/macos.mjs notarize",
+    "macos:archive": "node scripts/macos.mjs archive",
+    "setup:smoke": "node --experimental-strip-types scripts/setup-smoke.mjs",
+    "setup:host-proof": "node --experimental-strip-types scripts/hook-host-proof.ts",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "protocol:mock": "node scripts/protocol-mock-server.mjs",
+    "codex:adapter": "node --no-warnings --experimental-strip-types scripts/codex-adapter.ts",
+    "codex:adapter:doctor": "node --no-warnings --experimental-strip-types scripts/codex-adapter-doctor.ts",
+    "codex:hooks": "node --no-warnings --experimental-strip-types scripts/codex-hooks.ts",
+    "inspect:psd": "node scripts/inspect-psd.mjs",
+    "release:candidate": "node scripts/release/candidate.mjs",
+    "release:check": "node scripts/release/check.mjs",
+    "release:installer": "node scripts/release/installer.mjs",
+    "creator:package": "node scripts/release/creator.mjs",
+    "creator:check": "node skills/create-pet-character/scripts/creator.mjs check",
+    "source:check": "node scripts/release/source-check.mjs"
+  },
+  "dependencies": {
+    "ag-psd": "29.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "stream-chain": "4.2.5",
+    "stream-json": "3.6.0",
+    "yauzl": "3.4.0",
+    "yazl": "3.3.1"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.0-alpha.10",
+    "@electron-forge/core": "8.0.0-alpha.10",
+    "@electron-forge/maker-zip": "8.0.0-alpha.10",
+    "@electron/asar": "4.3.0",
+    "@electron/fuses": "2.1.3",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@types/yauzl": "3.4.0",
+    "@types/yazl": "3.3.1",
+    "@vitejs/plugin-react": "6.0.2",
+    "electron": "43.4.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "smol-toml": "1.8.0",
+    "typescript": "5.9.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.0.18",
+    "ws": "^8.21.3"
+  },
+  "license": "MIT",
+  "description": "A desktop character companion for Codex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ddol2ya/DAEMONLET.git"
+  },
+  "homepage": "https://github.com/ddol2ya/DAEMONLET",
+  "bugs": {
+    "url": "https://github.com/ddol2ya/DAEMONLET/issues"
+  }
+}

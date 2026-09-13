@@ -1,0 +1,7 @@
+{
+  "session_id": "fixture-session",
+  "transcript_path": null,
+  "cwd": "/fixture/workspace",
+  "hook_event_name": "SessionEnd",
+  "reason": "other"
+}

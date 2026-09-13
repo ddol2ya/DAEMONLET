@@ -1,0 +1,58 @@
+import { parseArgs } from 'node:util'
+import { createWriteStream } from 'node:fs'
+import { access, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { dirname, join, relative, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { pipeline } from 'node:stream/promises'
+import { ZipFile } from 'yazl'
+import { withPackTools } from './pack-tools.mjs'
+
+const { values } = parseArgs({ options: { 'character-root': { type: 'string' }, version: { type: 'string' }, output: { type: 'string' }, author: { type: 'string' }, thumbnail: { type: 'string' }, profile: { type: 'string' } } })
+if (!values['character-root'] || !values.output || !values.version) throw new Error('Usage: node scripts/characters/export-pack.mjs --character-root <payload> --version X.Y.Z --output <file.petchar> [--author <name>] [--profile trial|full]')
+const root = resolve(values['character-root']), output = resolve(values.output)
+if (await access(output).then(() => true, () => false)) throw new Error('Output already exists. Use a new version/output path; overwriting is not implicit.')
+if (!relative(root, output).startsWith('..')) throw new Error('The archive must be outside the payload directory')
+const stage = await mkdtemp(join(tmpdir(), 'petchar-export-'))
+try {
+  await withPackTools(async tools => {
+    const files = []
+    const walk = async (directory, prefix = '') => {
+      for (const entry of (await readdir(directory, { withFileTypes: true })).sort((a, b) => a.name < b.name ? -1 : 1)) {
+        const path = tools.validatePackPath(prefix + entry.name), source = join(directory, entry.name)
+        if (entry.isSymbolicLink() || (await lstat(source)).nlink > 1 && !entry.isDirectory()) throw new Error('PACK_PATH')
+        if (entry.isDirectory()) await walk(source, `${path}/`)
+        else {
+          if (!entry.isFile() || !tools.isPayloadPath(path) || path === 'pack.json') throw new Error(`Unexpected payload file: ${path}`)
+          const bytes = await tools.boundedFile(root, path)
+          files.push({ path, bytes: bytes.length, sha256: tools.sha256(bytes) })
+          await mkdir(dirname(join(stage, path)), { recursive: true })
+          await writeFile(join(stage, path), bytes)
+        }
+      }
+    }
+    await walk(root)
+    const character = JSON.parse(await readFile(join(stage, 'character.json'), 'utf8'))
+    const behavior = character.behavior ? tools.parseBehaviorManifest(JSON.parse(await tools.boundedFile(stage,
+      tools.resolvePackReference(character.behavior, 'character.json', new Set(files.map(f => f.path)))))).value : undefined
+    const needsVariants = character.poses.length > tools.PACK_LIMITS.poses || behavior && tools.behaviorUsesPoseVariants(behavior)
+    const dialogue = character.dialogue ? tools.parseDialogueManifest(JSON.parse(await tools.boundedFile(stage,
+      tools.resolvePackReference(character.dialogue, 'character.json', new Set(files.map(f => f.path)))))) : undefined
+    const runtime = { ...tools.PACK_RUNTIME, capabilities: tools.PACK_RUNTIME.capabilities.filter(c =>
+      (c !== 'pose-variants' || needsVariants) && (c !== 'pose-dialogue' || dialogue?.poseLines)) }
+    let provenance = {}
+    try { provenance = JSON.parse(await readFile(join(stage, 'provenance.json'), 'utf8')) } catch { /* Optional. */ }
+    const manifest = { packFormatVersion: 1, id: character.id, name: character.label, version: values.version, entry: 'character.json', runtime, files,
+      ...(values.author ? { author: values.author } : {}), ...(values.thumbnail ? { thumbnail: values.thumbnail } : {}),
+      ...(values.profile || provenance.profile ? { profile: values.profile ?? provenance.profile } : {}), ...(provenance.unsupportedReactions ? { unsupportedReactions: provenance.unsupportedReactions } : {}),
+    }
+    await writeFile(join(stage, 'pack.json'), JSON.stringify(manifest, null, 2) + '\n')
+    const validation = await tools.validatePackDirectory(stage)
+    await mkdir(dirname(output), { recursive: true })
+    const temporary = `${output}.tmp-${process.pid}`, zip = new ZipFile()
+    for (const path of ['pack.json', ...files.map(f => f.path)].sort()) zip.addFile(join(stage, path), path, { mtime: new Date('2000-01-01T00:00:00Z'), mode: 0o100644, compress: true })
+    zip.end()
+    try { await pipeline(zip.outputStream, createWriteStream(temporary, { flags: 'wx', mode: 0o600 })); if ((await lstat(temporary)).size > tools.PACK_LIMITS.archiveBytes) throw new Error('PACK_LIMIT'); await rename(temporary, output) }
+    finally { await rm(temporary, { force: true }) }
+    console.log(JSON.stringify({ id: character.id, version: values.version, revision: validation.revision, bytes: validation.bytes, poseCount: validation.poseCount, output }, null, 2))
+  })
+} finally { await rm(stage, { recursive: true, force: true }) }

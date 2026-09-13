@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "timing": {
+    "boredAfterMs": 60000,
+    "happyDurationMs": 3500,
+    "stateBlendMs": 320,
+    "boredActionDelayMinMs": 4500,
+    "boredActionDelayMaxMs": 9000
+  },
+  "states": {
+    "NORMAL": {
+      "poseId": null
+    },
+    "BORED": {
+      "poseId": null,
+      "motion": {
+        "loopDurationMs": 4600,
+        "parameters": {
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "angleY": {
+            "type": "constant",
+            "value": 0.085
+          },
+          "angleZ": {
+            "type": "sine",
+            "amplitude": 0.026,
+            "phase": 0,
+            "offset": 0.035
+          },
+          "body": {
+            "type": "sine",
+            "amplitude": 0.015,
+            "phase": 1.2,
+            "offset": 0.065
+          }
+        }
+      },
+      "actions": [
+        {
+          "id": "bored-look-away",
+          "durationMs": 1750,
+          "motion": {
+            "loopDurationMs": 1750,
+            "parameters": {
+              "eyeX": {
+                "type": "sine",
+                "amplitude": 0.36,
+                "phase": -1.57,
+                "offset": 0
+              },
+              "angleX": {
+                "type": "sine",
+                "amplitude": 0.065,
+                "phase": -1.57,
+                "offset": 0
+              }
+            }
+          }
+        },
+        {
+          "id": "bored-sigh",
+          "durationMs": 2100,
+          "motion": {
+            "loopDurationMs": 2100,
+            "parameters": {
+              "body": {
+                "type": "sine",
+                "amplitude": 0.045,
+                "phase": 0,
+                "offset": 0.018
+              },
+              "angleY": {
+                "type": "sine",
+                "amplitude": 0.06,
+                "phase": 0,
+                "offset": 0.02
+              },
+              "mouthOpen": {
+                "type": "sine",
+                "amplitude": 0.015,
+                "phase": 0,
+                "offset": 0.015
+              }
+            }
+          }
+        }
+      ]
+    },
+    "BUSY": {
+      "poseId": "writing",
+      "fallbackMotion": {
+        "loopDurationMs": 1800,
+        "parameters": {
+          "eyeY": {
+            "type": "constant",
+            "value": 0.52
+          },
+          "angleY": {
+            "type": "constant",
+            "value": -0.16
+          },
+          "body": {
+            "type": "sine",
+            "amplitude": 0.012,
+            "phase": 0.8,
+            "offset": 0.022
+          }
+        }
+      }
+    },
+    "HAPPY": {
+      "poseId": null,
+      "motion": {
+        "loopDurationMs": 980,
+        "parameters": {
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 0.74
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 0.26
+          },
+          "body": {
+            "type": "sine",
+            "amplitude": 0.12,
+            "phase": 0,
+            "offset": -0.025
+          },
+          "angleZ": {
+            "type": "sine",
+            "amplitude": 0.035,
+            "phase": 0.6,
+            "offset": 0
+          }
+        }
+      }
+    }
+  },
+  "failureReaction": {
+    "id": "task-failed-recoil",
+    "durationMs": 780,
+    "motion": {
+      "loopDurationMs": 1560,
+      "parameters": {
+        "angleY": {
+          "type": "sine",
+          "amplitude": 0.1,
+          "phase": 0,
+          "offset": -0.05
+        },
+        "body": {
+          "type": "sine",
+          "amplitude": 0.07,
+          "phase": 0,
+          "offset": -0.035
+        },
+        "eyeOpenL": {
+          "type": "constant",
+          "value": 0.72
+        },
+        "eyeOpenR": {
+          "type": "constant",
+          "value": 0.72
+        }
+      }
+    }
+  }
+}

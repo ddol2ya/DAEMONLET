@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "locale": "ko-KR",
+  "settings": {
+    "defaultDisplayMs": 2200,
+    "fadeMs": 160,
+    "minGapMs": 900,
+    "maxQueueSize": 3,
+    "repeatMemory": 2,
+    "maxCharacters": 36
+  },
+  "triggers": {
+    "run.started": {
+      "priority": 50,
+      "probability": 1,
+      "cooldownMs": 10000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 1-1.",
+        "테스트 1-2.",
+        "테스트 1-3."
+      ]
+    },
+    "run.completed.observed": {
+      "priority": 90,
+      "probability": 1,
+      "cooldownMs": 1200,
+      "displayMs": 2400,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 2-1.",
+        "테스트 2-2."
+      ]
+    },
+    "run.completed.authoritative": {
+      "priority": 90,
+      "probability": 1,
+      "cooldownMs": 1200,
+      "displayMs": 2400,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 3-1.",
+        "테스트 3-2."
+      ]
+    },
+    "run.failed": {
+      "priority": 100,
+      "probability": 1,
+      "cooldownMs": 1200,
+      "displayMs": 2400,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 4-1.",
+        "테스트 4-2."
+      ]
+    },
+    "run.cancelled.user": {
+      "priority": 95,
+      "probability": 1,
+      "cooldownMs": 1200,
+      "displayMs": 2400,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 5-1.",
+        "테스트 5-2."
+      ]
+    },
+    "task.started.command": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 6-1.",
+        "테스트 6-2."
+      ]
+    },
+    "task.started.file-change": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 7-1.",
+        "테스트 7-2."
+      ]
+    },
+    "task.started.tool": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 8-1."
+      ]
+    },
+    "task.started.web-search": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 9-1.",
+        "테스트 9-2."
+      ]
+    },
+    "task.started.subtask": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 10-1."
+      ]
+    },
+    "task.started.review": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 11-1."
+      ]
+    },
+    "task.started.other": {
+      "priority": 30,
+      "probability": 0.55,
+      "cooldownMs": 16000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 12-1."
+      ]
+    },
+    "state.bored": {
+      "priority": 15,
+      "probability": 0.25,
+      "cooldownMs": 60000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 13-1."
+      ]
+    },
+    "behavior.bored-look-away": {
+      "priority": 15,
+      "probability": 0.25,
+      "cooldownMs": 60000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 14-1.",
+        "테스트 14-2."
+      ]
+    },
+    "behavior.bored-sigh": {
+      "priority": 15,
+      "probability": 0.25,
+      "cooldownMs": 60000,
+      "displayMs": 2000,
+      "mode": "drop-if-busy",
+      "lines": [
+        "테스트 15-1."
+      ]
+    },
+    "interaction.head-tap": {
+      "priority": 70,
+      "probability": 1,
+      "cooldownMs": 4000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 16-1.",
+        "테스트 16-2."
+      ]
+    },
+    "interaction.face-hold": {
+      "priority": 70,
+      "probability": 1,
+      "cooldownMs": 4000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 17-1.",
+        "테스트 17-2."
+      ]
+    },
+    "interaction.pet": {
+      "priority": 70,
+      "probability": 1,
+      "cooldownMs": 4000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 18-1.",
+        "테스트 18-2."
+      ]
+    },
+    "interaction.torso-tap": {
+      "priority": 70,
+      "probability": 1,
+      "cooldownMs": 4000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "테스트 19-1.",
+        "테스트 19-2."
+      ]
+    }
+  }
+}

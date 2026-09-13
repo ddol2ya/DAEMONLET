@@ -1,0 +1,25 @@
+@import "../bubbles/bubble-shell.css";
+.dialogue-bubble {
+  position: absolute;
+  box-sizing: border-box;
+  z-index: 5;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  max-width: min(240px, calc(100% - 16px));
+  width: max-content;
+  text-wrap: pretty;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  opacity: 0;
+  transform: translateY(0) scale(1);
+  transform-origin: var(--bubble-tail-x, 50%) 100%;
+  transition: opacity var(--bubble-fade, var(--bubble-transition)) var(--bubble-ease), transform var(--bubble-fade, var(--bubble-transition)) var(--bubble-ease);
+}
+.dialogue-bubble[data-phase="shown"][data-granted="true"] { opacity: 1; }
+.dialogue-bubble[data-native="true"] { max-width: 240px; }
+/* Keep an ended bubble transparent even when the visible-marker class is
+ * removed. Its last compositor frame cannot flash during the native handoff. */
+.dialogue-bubble[data-phase="hidden"], .dialogue-bubble[data-granted="false"] { opacity: 0; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .dialogue-bubble { transition: none; transform: none; }
+}

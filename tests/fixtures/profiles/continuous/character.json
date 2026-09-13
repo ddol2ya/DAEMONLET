@@ -1,0 +1,14 @@
+{
+  "poses": [
+    "poses/waiting/pose.json",
+    "poses/writing/pose.json",
+    "poses/failed/pose.json",
+    "poses/cancelled/pose.json",
+    "poses/disconnected/pose.json",
+    "poses/bored/pose.json",
+    "poses/happy/pose.json",
+    "poses/head-tap/pose.json",
+    "poses/torso-tap/pose.json",
+    "poses/head-pet/pose.json"
+  ]
+}

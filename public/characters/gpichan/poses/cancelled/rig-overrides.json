@@ -1,0 +1,162 @@
+{
+  "layerAliases": {
+    "mouth": "mouth_close"
+  },
+  "cleanupThresholds": {
+    "face": 10,
+    "neck": 8,
+    "eyewhite": 5,
+    "irides": 4,
+    "eyelash": 4,
+    "eyebrow": 4,
+    "mouth_open": 3,
+    "front hair": 10,
+    "back hair": 10,
+    "topwear": 5,
+    "bottomwear": 5,
+    "handwear": 5,
+    "legwear": 5,
+    "headwear": 5,
+    "earwear": 5,
+    "neck_2": 0
+  },
+  "blinkRepair": {
+    "enabled": false,
+    "paddingX": 7,
+    "paddingY": 6
+  },
+  "physics": {
+    "frontHair": {
+      "amplitude": 0.45,
+      "stiffness": 92,
+      "damping": 15,
+      "wind": 0.18,
+      "inertia": 0.4,
+      "rootLock": 0.45,
+      "maxOffset": 8
+    },
+    "backHair": {
+      "amplitude": 0.45,
+      "stiffness": 80,
+      "damping": 15,
+      "wind": 0.2,
+      "inertia": 0.45,
+      "rootLock": 0.4,
+      "maxOffset": 9
+    }
+  },
+  "layerOrderConstraints": [
+    {
+      "behind": "topwear",
+      "inFrontOf": "neck_2"
+    },
+    {
+      "behind": "neck_2",
+      "inFrontOf": "face"
+    }
+  ],
+  "maskedLayerOverlays": [
+    {
+      "source": "neck",
+      "name": "neck_2",
+      "inFrontOf": "topwear",
+      "replaceExisting": true,
+      "featherPx": 1,
+      "polygon": [
+        [
+          0.46796875,
+          0.1796875
+        ],
+        [
+          0.553125,
+          0.1796875
+        ],
+        [
+          0.553125,
+          0.25859375
+        ],
+        [
+          0.5421875,
+          0.26796875
+        ],
+        [
+          0.53125,
+          0.27265625
+        ],
+        [
+          0.5203125,
+          0.275
+        ],
+        [
+          0.509375,
+          0.27578125
+        ],
+        [
+          0.49765625,
+          0.274609375
+        ],
+        [
+          0.4875,
+          0.27265625
+        ],
+        [
+          0.478125,
+          0.26875
+        ],
+        [
+          0.46796875,
+          0.259375
+        ]
+      ]
+    },
+    {
+      "source": "handwear_2",
+      "name": "forearm_2",
+      "inFrontOf": "topwear",
+      "polygon": [
+        [
+          0.14358600776698813,
+          0.7536722863104748
+        ],
+        [
+          0.4787915628713268,
+          0.7358464102017792
+        ],
+        [
+          0.4979805942118638,
+          1.0966853312846851
+        ],
+        [
+          0.1627750391075251,
+          1.1145112073933805
+        ]
+      ]
+    },
+    {
+      "source": "handwear_1",
+      "name": "forearm_1",
+      "inFrontOf": "forearm_2",
+      "polygon": [
+        [
+          0.5198384359938318,
+          0.516152482215255
+        ],
+        [
+          0.8458422699776591,
+          0.4988159438820922
+        ],
+        [
+          0.8765656917414697,
+          1.0765525770913347
+        ],
+        [
+          0.5505618577576424,
+          1.0938891154244976
+        ]
+      ]
+    }
+  ],
+  "deformationSources": {
+    "neck": "topwear"
+  }
+}

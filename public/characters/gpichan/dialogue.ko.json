@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "locale": "ko-KR",
+  "settings": {
+    "defaultDisplayMs": 2600,
+    "fadeMs": 160,
+    "minGapMs": 500,
+    "maxQueueSize": 0,
+    "repeatMemory": 4,
+    "maxCharacters": 36
+  },
+  "triggers": {
+    "state.normal": {
+      "priority": 15,
+      "probability": 1,
+      "cooldownMs": 30000,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "필요하시면 말씀하십시오.",
+        "듣고 있습니다.",
+        "준비는 끝났습니다."
+      ]
+    },
+    "run.started": {
+      "priority": 50,
+      "probability": 1,
+      "cooldownMs": 12000,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "정리 중입니다. 잠시만 기다리십시오.",
+        "집중하고 있습니다.",
+        "중요한 내용은 기록하겠습니다."
+      ]
+    },
+    "state.waiting": {
+      "priority": 60,
+      "probability": 1,
+      "cooldownMs": 8000,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "한 가지만 확인해 주시겠습니까?",
+        "답변을 기다리고 있습니다.",
+        "선택은 맡기겠습니다."
+      ]
+    },
+    "run.failed": {
+      "priority": 90,
+      "probability": 1,
+      "cooldownMs": 1800,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "이건… 다시 봐야겠습니다.",
+        "예상과 다릅니다. 확인하겠습니다.",
+        "막혔습니다. 원인부터 보겠습니다."
+      ]
+    },
+    "run.cancelled.user": {
+      "priority": 85,
+      "probability": 1,
+      "cooldownMs": 1800,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "알겠습니다. 여기서 멈추겠습니다.",
+        "중단했습니다. 다음 지시를 기다립니다.",
+        "여기까지입니까? 알겠습니다."
+      ]
+    },
+    "state.disconnected": {
+      "priority": 95,
+      "probability": 1,
+      "cooldownMs": 10000,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "연결이 끊겼습니다.",
+        "이쪽에는 신호가 들어오지 않습니다.",
+        "연결부터 확인해 주시겠습니까?"
+      ]
+    },
+    "state.bored": {
+      "priority": 20,
+      "probability": 1,
+      "cooldownMs": 45000,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "조용합니다. 할 일은 없습니까?",
+        "대기도 업무라면, 성실한 편입니다.",
+        "기다리는 데는 익숙합니다."
+      ]
+    },
+    "run.completed.observed": {
+      "priority": 80,
+      "probability": 1,
+      "cooldownMs": 3000,
+      "displayMs": 2600,
+      "mode": "replace-lower",
+      "lines": [
+        "끝났습니다. 확인하십시오.",
+        "이 정도면… 괜찮습니다.",
+        "칭찬은 결과를 확인하신 뒤에 받겠습니다."
+      ]
+    },
+    "interaction.head-tap": {
+      "priority": 70,
+      "probability": 1,
+      "cooldownMs": 1800,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "…부르셨습니까?",
+        "머리는 장식이 아닙니다.",
+        "말로 부르셔도 들립니다."
+      ]
+    },
+    "interaction.torso-tap": {
+      "priority": 70,
+      "probability": 1,
+      "cooldownMs": 1800,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "거긴 터치패널이 아닙니다.",
+        "…지금 뭐 하시는 겁니까?",
+        "허락 없이 손대지 마십시오."
+      ]
+    },
+    "interaction.face-hold": {
+      "priority": 75,
+      "probability": 1,
+      "cooldownMs": 4000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "얼굴은 누르지 마십시오.",
+        "너무 가까우십니다.",
+        "이 정도면 충분하지 않습니까?"
+      ]
+    },
+    "interaction.pet": {
+      "priority": 75,
+      "probability": 1,
+      "cooldownMs": 5000,
+      "displayMs": 2000,
+      "mode": "replace-lower",
+      "lines": [
+        "그렇게까지 쓰다듬으실 필요는 없습니다.",
+        "…싫다는 뜻은 아닙니다.",
+        "이것도 보상에 포함됩니까?"
+      ]
+    }
+  },
+  "poseTriggers": {
+    "base": "state.normal",
+    "writing": "run.started",
+    "writing-full": "run.started",
+    "writing-parts": "run.started",
+    "writing-direct": "run.started",
+    "waiting": "state.waiting",
+    "failed": "run.failed",
+    "cancelled": "run.cancelled.user",
+    "disconnected": "state.disconnected",
+    "bored": "state.bored",
+    "happy": "run.completed.observed",
+    "head-tap": "interaction.head-tap",
+    "torso-tap": "interaction.torso-tap",
+    "head-pet": "interaction.pet"
+  }
+}

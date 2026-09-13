@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "id": "head-pet",
+  "label": "쓰다듬기",
+  "source": "source/arms-aligned.png",
+  "psd": "rigged/head-pet.psd",
+  "overrides": "rig-overrides.json",
+  "strategy": "semantic-layer-swap",
+  "registration": {
+    "strategy": "eyes-and-neck",
+    "maxScaleDelta": 0.06,
+    "maxRotationDeg": 3,
+    "maxAnchorErrorPx": 15
+  },
+  "layers": {
+    "sharedFromBase": [
+      "back hair",
+      "legwear",
+      "neck",
+      "topwear",
+      "ears",
+      "face",
+      "nose",
+      "mouth_close",
+      "mouth_open",
+      "eyebrow",
+      "eyewhite",
+      "irides",
+      "eyelash",
+      "eye_close",
+      "front hair",
+      "headwear"
+    ],
+    "replaceFromBase": [
+      "handwear_1",
+      "handwear_2"
+    ],
+    "useFromPose": [
+      "handwear_1",
+      "handwear_2"
+    ],
+    "addFromPose": [
+      "forearm_2",
+      "forearm_1"
+    ],
+    "renderBehindBase": [
+      {
+        "pose": "handwear_1",
+        "base": "topwear"
+      },
+      {
+        "pose": "handwear_2",
+        "base": "topwear"
+      }
+    ],
+    "renderInFrontOfBase": [
+      {
+        "pose": "forearm_2",
+        "base": "topwear"
+      },
+      {
+        "pose": "forearm_1",
+        "base": "topwear"
+      }
+    ]
+  },
+  "transition": {
+    "enterMs": 380,
+    "exitMs": 300,
+    "swapStart": 0.44,
+    "swapEnd": 0.56
+  },
+  "motion": {
+    "loopDurationMs": 3600,
+    "playback": "loop",
+    "parameters": {
+      "armY": {
+        "type": "constant",
+        "value": 0
+      },
+      "armPos": {
+        "type": "constant",
+        "value": 0
+      }
+    },
+    "layers": {
+      "handwear_1": {
+        "origin": {
+          "x": 0.5,
+          "y": 0
+        },
+        "influence": {
+          "axisX": 0,
+          "axisY": 1,
+          "start": 0,
+          "end": 0.35
+        },
+        "translateY": {
+          "type": "sine",
+          "amplitude": 1.1,
+          "phase": 0,
+          "offset": 0
+        }
+      },
+      "handwear_2": {
+        "origin": {
+          "x": 0.5,
+          "y": 0
+        },
+        "influence": {
+          "axisX": 0,
+          "axisY": 1,
+          "start": 0,
+          "end": 0.35
+        },
+        "translateY": {
+          "type": "sine",
+          "amplitude": 1.1,
+          "phase": 0,
+          "offset": 0
+        }
+      },
+      "forearm_2": {
+        "origin": {
+          "x": 0.5,
+          "y": 0
+        },
+        "influence": {
+          "axisX": 0,
+          "axisY": 1,
+          "start": 0,
+          "end": 0.35
+        },
+        "translateY": {
+          "type": "sine",
+          "amplitude": 1.1,
+          "phase": 0,
+          "offset": 0
+        }
+      },
+      "forearm_1": {
+        "origin": {
+          "x": 0.5,
+          "y": 0
+        },
+        "influence": {
+          "axisX": 0,
+          "axisY": 1,
+          "start": 0,
+          "end": 0.35
+        },
+        "translateY": {
+          "type": "sine",
+          "amplitude": 1.1,
+          "phase": 0,
+          "offset": 0
+        }
+      }
+    },
+    "transition": "continuous"
+  },
+  "interactionScale": {
+    "HEAD_TAP": 0.15,
+    "TORSO_TAP": 0.2
+  }
+}

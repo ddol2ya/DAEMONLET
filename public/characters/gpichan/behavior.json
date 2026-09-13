@@ -1,0 +1,1868 @@
+{
+  "schemaVersion": 1,
+  "timing": {
+    "boredAfterMs": 60000,
+    "happyDurationMs": 3500,
+    "stateBlendMs": 280,
+    "boredActionDelayMinMs": 4000,
+    "boredActionDelayMaxMs": 9000
+  },
+  "states": {
+    "NORMAL": {
+      "poseId": null,
+      "motion": {
+        "loopDurationMs": 6800,
+        "parameters": {
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 2040,
+                "value": 0.1
+              },
+              {
+                "atMs": 4760,
+                "value": -0.1
+              },
+              {
+                "atMs": 6800,
+                "value": 0
+              }
+            ]
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 1904,
+                "value": 0.14
+              },
+              {
+                "atMs": 4760,
+                "value": -0.08
+              },
+              {
+                "atMs": 6800,
+                "value": 0
+              }
+            ]
+          },
+          "armY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 2040,
+                "value": 0.07
+              },
+              {
+                "atMs": 4760,
+                "value": -0.045
+              },
+              {
+                "atMs": 6800,
+                "value": 0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "BORED": {
+      "poseId": "bored",
+      "fallbackMotion": {
+        "loopDurationMs": 6800,
+        "playback": "loop",
+        "parameters": {
+          "armY": {
+            "type": "constant",
+            "value": 0
+          },
+          "armPos": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeX": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.35
+              },
+              {
+                "atMs": 1632,
+                "value": -0.35
+              },
+              {
+                "atMs": 2924,
+                "value": -0.35
+              },
+              {
+                "atMs": 4216,
+                "value": 0.2
+              },
+              {
+                "atMs": 6800,
+                "value": 0.35
+              }
+            ]
+          },
+          "eyeY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.12
+              },
+              {
+                "atMs": 2720,
+                "value": 0.05
+              },
+              {
+                "atMs": 4352,
+                "value": 0.35
+              },
+              {
+                "atMs": 6800,
+                "value": 0.12
+              }
+            ]
+          },
+          "eyeOpenL": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.86
+              },
+              {
+                "atMs": 2176,
+                "value": 0.82
+              },
+              {
+                "atMs": 4488,
+                "value": 0.78
+              },
+              {
+                "atMs": 5916,
+                "value": 0.86
+              },
+              {
+                "atMs": 6800,
+                "value": 0.86
+              }
+            ]
+          },
+          "eyeOpenR": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.86
+              },
+              {
+                "atMs": 2176,
+                "value": 0.82
+              },
+              {
+                "atMs": 4488,
+                "value": 0.78
+              },
+              {
+                "atMs": 5916,
+                "value": 0.86
+              },
+              {
+                "atMs": 6800,
+                "value": 0.86
+              }
+            ]
+          },
+          "brow": {
+            "type": "constant",
+            "value": -0.08
+          },
+          "angleY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.04
+              },
+              {
+                "atMs": 2040,
+                "value": -0.06
+              },
+              {
+                "atMs": 4556,
+                "value": -0.28
+              },
+              {
+                "atMs": 6800,
+                "value": 0.04
+              }
+            ]
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.025
+              },
+              {
+                "atMs": 2040,
+                "value": -0.2
+              },
+              {
+                "atMs": 4420,
+                "value": 0.15
+              },
+              {
+                "atMs": 6800,
+                "value": 0.025
+              }
+            ]
+          },
+          "mouthOpen": {
+            "type": "constant",
+            "value": 0
+          },
+          "angleX": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.08
+              },
+              {
+                "atMs": 2040,
+                "value": -0.15
+              },
+              {
+                "atMs": 3740,
+                "value": -0.08
+              },
+              {
+                "atMs": 6800,
+                "value": 0.08
+              }
+            ]
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.02
+              },
+              {
+                "atMs": 2380,
+                "value": 0.12
+              },
+              {
+                "atMs": 4624,
+                "value": -0.1
+              },
+              {
+                "atMs": 6800,
+                "value": 0.02
+              }
+            ]
+          }
+        }
+      },
+      "actions": []
+    },
+    "BUSY": {
+      "poseId": "writing",
+      "fallbackMotion": {
+        "loopDurationMs": 3200,
+        "playback": "loop",
+        "parameters": {
+          "armY": {
+            "type": "constant",
+            "value": 0
+          },
+          "armPos": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.46
+              },
+              {
+                "atMs": 1600,
+                "value": 0.48
+              },
+              {
+                "atMs": 2048,
+                "value": 0.1
+              },
+              {
+                "atMs": 2432,
+                "value": 0.1
+              },
+              {
+                "atMs": 2752,
+                "value": 0.46
+              },
+              {
+                "atMs": 3200,
+                "value": 0.46
+              }
+            ]
+          },
+          "angleY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": -0.18
+              },
+              {
+                "atMs": 1536,
+                "value": -0.23
+              },
+              {
+                "atMs": 2112,
+                "value": -0.04
+              },
+              {
+                "atMs": 2464,
+                "value": -0.04
+              },
+              {
+                "atMs": 2816,
+                "value": -0.18
+              },
+              {
+                "atMs": 3200,
+                "value": -0.18
+              }
+            ]
+          },
+          "mouthOpen": {
+            "type": "constant",
+            "value": 0
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.02
+              },
+              {
+                "atMs": 1216,
+                "value": -0.1
+              },
+              {
+                "atMs": 2176,
+                "value": 0.07
+              },
+              {
+                "atMs": 3200,
+                "value": 0.02
+              }
+            ]
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.02
+              },
+              {
+                "atMs": 1120,
+                "value": 0.065
+              },
+              {
+                "atMs": 2144,
+                "value": -0.025
+              },
+              {
+                "atMs": 3200,
+                "value": 0.02
+              }
+            ]
+          }
+        }
+      }
+    },
+    "HAPPY": {
+      "poseId": "happy",
+      "fallbackMotion": {
+        "loopDurationMs": 4200,
+        "playback": "loop",
+        "parameters": {
+          "armY": {
+            "type": "constant",
+            "value": 0
+          },
+          "armPos": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeX": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 630,
+                "value": -0.03
+              },
+              {
+                "atMs": 2310,
+                "value": 0.08
+              },
+              {
+                "atMs": 4200,
+                "value": 0
+              }
+            ]
+          },
+          "eyeY": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeOpenL": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.94
+              },
+              {
+                "atMs": 504,
+                "value": 0.94
+              },
+              {
+                "atMs": 672,
+                "value": 0.08
+              },
+              {
+                "atMs": 840,
+                "value": 0.08
+              },
+              {
+                "atMs": 1092,
+                "value": 0.94
+              },
+              {
+                "atMs": 4200,
+                "value": 0.94
+              }
+            ]
+          },
+          "eyeOpenR": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.94
+              },
+              {
+                "atMs": 756,
+                "value": 0.88
+              },
+              {
+                "atMs": 1596,
+                "value": 0.94
+              },
+              {
+                "atMs": 4200,
+                "value": 0.94
+              }
+            ]
+          },
+          "brow": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.1
+              },
+              {
+                "atMs": 630,
+                "value": 0.16
+              },
+              {
+                "atMs": 2100,
+                "value": 0.1
+              },
+              {
+                "atMs": 4200,
+                "value": 0.1
+              }
+            ]
+          },
+          "mouthOpen": {
+            "type": "constant",
+            "value": 0
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 1
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": -0.015
+              },
+              {
+                "atMs": 756,
+                "value": 0.3
+              },
+              {
+                "atMs": 1596,
+                "value": 0.12
+              },
+              {
+                "atMs": 2940,
+                "value": -0.015
+              },
+              {
+                "atMs": 4200,
+                "value": -0.015
+              }
+            ]
+          },
+          "angleX": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 840,
+                "value": 0.05
+              },
+              {
+                "atMs": 2100,
+                "value": 0
+              },
+              {
+                "atMs": 4200,
+                "value": 0
+              }
+            ]
+          },
+          "angleY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 588,
+                "value": 0.1
+              },
+              {
+                "atMs": 2100,
+                "value": 0.02
+              },
+              {
+                "atMs": 4200,
+                "value": 0
+              }
+            ]
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 420,
+                "value": -0.18
+              },
+              {
+                "atMs": 1008,
+                "value": 0.1
+              },
+              {
+                "atMs": 1680,
+                "value": 0
+              },
+              {
+                "atMs": 4200,
+                "value": 0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "WAITING": {
+      "poseId": "waiting",
+      "fallbackMotion": {
+        "loopDurationMs": 4800,
+        "playback": "loop",
+        "parameters": {
+          "armY": {
+            "type": "constant",
+            "value": 0
+          },
+          "armPos": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 960,
+                "value": -0.06
+              },
+              {
+                "atMs": 3072,
+                "value": 0.1
+              },
+              {
+                "atMs": 4800,
+                "value": 0
+              }
+            ]
+          },
+          "eyeX": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 960,
+                "value": 0.1
+              },
+              {
+                "atMs": 3120,
+                "value": -0.06
+              },
+              {
+                "atMs": 4800,
+                "value": 0
+              }
+            ]
+          },
+          "brow": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.07
+              },
+              {
+                "atMs": 768,
+                "value": 0.16
+              },
+              {
+                "atMs": 1920,
+                "value": 0.07
+              },
+              {
+                "atMs": 4800,
+                "value": 0.07
+              }
+            ]
+          },
+          "mouthOpen": {
+            "type": "constant",
+            "value": 0
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.03
+              },
+              {
+                "atMs": 960,
+                "value": 0.34
+              },
+              {
+                "atMs": 2016,
+                "value": 0.12
+              },
+              {
+                "atMs": 3360,
+                "value": -0.12
+              },
+              {
+                "atMs": 4800,
+                "value": 0.03
+              }
+            ]
+          },
+          "angleX": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 1056,
+                "value": 0.12
+              },
+              {
+                "atMs": 3120,
+                "value": -0.06
+              },
+              {
+                "atMs": 4800,
+                "value": 0
+              }
+            ]
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 1152,
+                "value": -0.09
+              },
+              {
+                "atMs": 3120,
+                "value": 0.065
+              },
+              {
+                "atMs": 4800,
+                "value": 0
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "failureReaction": {
+    "id": "failed-pose-reaction",
+    "poseId": "failed",
+    "durationMs": 1500,
+    "motion": {
+      "loopDurationMs": 1500,
+      "playback": "once",
+      "parameters": {
+        "armY": {
+          "type": "constant",
+          "value": 0
+        },
+        "armPos": {
+          "type": "constant",
+          "value": 0
+        },
+        "eyeY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.38
+            },
+            {
+              "atMs": 525,
+              "value": 0.65
+            },
+            {
+              "atMs": 1200,
+              "value": 0.53
+            },
+            {
+              "atMs": 1500,
+              "value": 0.5
+            }
+          ]
+        },
+        "eyeOpenL": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.88
+            },
+            {
+              "atMs": 540,
+              "value": 0.78
+            },
+            {
+              "atMs": 1500,
+              "value": 0.84
+            }
+          ]
+        },
+        "eyeOpenR": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.88
+            },
+            {
+              "atMs": 540,
+              "value": 0.78
+            },
+            {
+              "atMs": 1500,
+              "value": 0.84
+            }
+          ]
+        },
+        "brow": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.12
+            },
+            {
+              "atMs": 675,
+              "value": -0.19
+            },
+            {
+              "atMs": 1500,
+              "value": -0.15
+            }
+          ]
+        },
+        "browAngSym": {
+          "type": "constant",
+          "value": 0.18
+        },
+        "mouthOpen": {
+          "type": "constant",
+          "value": 0
+        },
+        "angleY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.09
+            },
+            {
+              "atMs": 450,
+              "value": -0.38
+            },
+            {
+              "atMs": 1125,
+              "value": -0.3
+            },
+            {
+              "atMs": 1500,
+              "value": -0.28
+            }
+          ]
+        },
+        "angleZ": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 600,
+              "value": -0.15
+            },
+            {
+              "atMs": 1500,
+              "value": -0.08
+            }
+          ]
+        },
+        "body": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 420,
+              "value": 0.08
+            },
+            {
+              "atMs": 1050,
+              "value": -0.05
+            },
+            {
+              "atMs": 1500,
+              "value": 0.02
+            }
+          ]
+        }
+      }
+    }
+  },
+  "disconnected": {
+    "poseId": "disconnected",
+    "fallbackMotion": {
+      "loopDurationMs": 5600,
+      "playback": "loop",
+      "parameters": {
+        "armY": {
+          "type": "constant",
+          "value": 0
+        },
+        "armPos": {
+          "type": "constant",
+          "value": 0
+        },
+        "eyeX": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.2
+            },
+            {
+              "atMs": 1120,
+              "value": -0.52
+            },
+            {
+              "atMs": 3024,
+              "value": -0.18
+            },
+            {
+              "atMs": 4032,
+              "value": 0.1
+            },
+            {
+              "atMs": 5600,
+              "value": -0.2
+            }
+          ]
+        },
+        "eyeY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.08
+            },
+            {
+              "atMs": 1120,
+              "value": 0.18
+            },
+            {
+              "atMs": 2800,
+              "value": 0.33
+            },
+            {
+              "atMs": 4144,
+              "value": 0.04
+            },
+            {
+              "atMs": 5600,
+              "value": 0.08
+            }
+          ]
+        },
+        "brow": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.04
+            },
+            {
+              "atMs": 1456,
+              "value": 0.04
+            },
+            {
+              "atMs": 3472,
+              "value": -0.04
+            },
+            {
+              "atMs": 5600,
+              "value": -0.04
+            }
+          ]
+        },
+        "browAngSym": {
+          "type": "constant",
+          "value": 0.12
+        },
+        "angleZ": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.035
+            },
+            {
+              "atMs": 1568,
+              "value": -0.14
+            },
+            {
+              "atMs": 3248,
+              "value": 0.1
+            },
+            {
+              "atMs": 5600,
+              "value": 0.035
+            }
+          ]
+        },
+        "mouthOpen": {
+          "type": "constant",
+          "value": 0
+        },
+        "angleX": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.05
+            },
+            {
+              "atMs": 1120,
+              "value": -0.24
+            },
+            {
+              "atMs": 3136,
+              "value": -0.08
+            },
+            {
+              "atMs": 4256,
+              "value": 0.06
+            },
+            {
+              "atMs": 5600,
+              "value": -0.05
+            }
+          ]
+        },
+        "angleY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.02
+            },
+            {
+              "atMs": 2128,
+              "value": -0.12
+            },
+            {
+              "atMs": 4200,
+              "value": 0.02
+            },
+            {
+              "atMs": 5600,
+              "value": -0.02
+            }
+          ]
+        },
+        "body": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 1568,
+              "value": 0.08
+            },
+            {
+              "atMs": 3136,
+              "value": -0.055
+            },
+            {
+              "atMs": 5600,
+              "value": 0
+            }
+          ]
+        }
+      }
+    }
+  },
+  "cancellationReaction": {
+    "id": "cancelled-pose-reaction",
+    "poseId": "cancelled",
+    "durationMs": 1100,
+    "motion": {
+      "loopDurationMs": 1100,
+      "playback": "once",
+      "parameters": {
+        "armY": {
+          "type": "constant",
+          "value": 0
+        },
+        "armPos": {
+          "type": "constant",
+          "value": 0
+        },
+        "eyeY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.04
+            },
+            {
+              "atMs": 330,
+              "value": 0.34
+            },
+            {
+              "atMs": 825,
+              "value": 0.16
+            },
+            {
+              "atMs": 1100,
+              "value": 0.12
+            }
+          ]
+        },
+        "eyeOpenL": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.94
+            },
+            {
+              "atMs": 385,
+              "value": 0.84
+            },
+            {
+              "atMs": 880,
+              "value": 0.94
+            },
+            {
+              "atMs": 1100,
+              "value": 0.94
+            }
+          ]
+        },
+        "eyeOpenR": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0.94
+            },
+            {
+              "atMs": 385,
+              "value": 0.84
+            },
+            {
+              "atMs": 880,
+              "value": 0.94
+            },
+            {
+              "atMs": 1100,
+              "value": 0.94
+            }
+          ]
+        },
+        "angleY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": -0.035
+            },
+            {
+              "atMs": 330,
+              "value": -0.25
+            },
+            {
+              "atMs": 825,
+              "value": -0.09
+            },
+            {
+              "atMs": 1100,
+              "value": -0.06
+            }
+          ]
+        },
+        "mouthOpen": {
+          "type": "constant",
+          "value": 0
+        },
+        "angleZ": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 396,
+              "value": 0.12
+            },
+            {
+              "atMs": 1100,
+              "value": 0.02
+            }
+          ]
+        },
+        "body": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 330,
+              "value": -0.05
+            },
+            {
+              "atMs": 880,
+              "value": 0.02
+            },
+            {
+              "atMs": 1100,
+              "value": 0.02
+            }
+          ]
+        }
+      }
+    }
+  },
+  "interactionReactions": {
+    "HEAD_TAP": {
+      "id": "head-tap-pose-reaction",
+      "poseId": "head-tap",
+      "durationMs": 850,
+      "motion": {
+        "loopDurationMs": 850,
+        "playback": "once",
+        "parameters": {
+          "armY": {
+            "type": "constant",
+            "value": 0
+          },
+          "armPos": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeX": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeY": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 1
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 1
+          },
+          "eyeScaleL": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 1.06
+              },
+              {
+                "atMs": 85,
+                "value": 1.1
+              },
+              {
+                "atMs": 383,
+                "value": 1.04
+              },
+              {
+                "atMs": 808,
+                "value": 1
+              },
+              {
+                "atMs": 850,
+                "value": 1
+              }
+            ]
+          },
+          "eyeScaleR": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 1.06
+              },
+              {
+                "atMs": 85,
+                "value": 1.1
+              },
+              {
+                "atMs": 383,
+                "value": 1.04
+              },
+              {
+                "atMs": 808,
+                "value": 1
+              },
+              {
+                "atMs": 850,
+                "value": 1
+              }
+            ]
+          },
+          "irisScale": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.94
+              },
+              {
+                "atMs": 102,
+                "value": 0.9
+              },
+              {
+                "atMs": 595,
+                "value": 0.99
+              },
+              {
+                "atMs": 850,
+                "value": 1
+              }
+            ]
+          },
+          "brow": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.18
+              },
+              {
+                "atMs": 85,
+                "value": 0.24
+              },
+              {
+                "atMs": 595,
+                "value": 0.12
+              },
+              {
+                "atMs": 850,
+                "value": 0.06
+              }
+            ]
+          },
+          "mouthOpen": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 1
+              },
+              {
+                "atMs": 272,
+                "value": 0.75
+              },
+              {
+                "atMs": 510,
+                "value": 0.28
+              },
+              {
+                "atMs": 765,
+                "value": 0
+              },
+              {
+                "atMs": 850,
+                "value": 0
+              }
+            ]
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 0
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 85,
+                "value": -0.34
+              },
+              {
+                "atMs": 255,
+                "value": 0.12
+              },
+              {
+                "atMs": 476,
+                "value": -0.05
+              },
+              {
+                "atMs": 765,
+                "value": 0
+              },
+              {
+                "atMs": 850,
+                "value": 0
+              }
+            ]
+          },
+          "angleY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 85,
+                "value": 0.26
+              },
+              {
+                "atMs": 298,
+                "value": -0.04
+              },
+              {
+                "atMs": 595,
+                "value": 0.04
+              },
+              {
+                "atMs": 850,
+                "value": 0.03
+              }
+            ]
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 94,
+                "value": 0.2
+              },
+              {
+                "atMs": 281,
+                "value": -0.07
+              },
+              {
+                "atMs": 595,
+                "value": 0.02
+              },
+              {
+                "atMs": 850,
+                "value": 0
+              }
+            ]
+          }
+        }
+      }
+    },
+    "TORSO_TAP": {
+      "id": "torso-tap-pose-reaction",
+      "poseId": "torso-tap",
+      "durationMs": 700,
+      "motion": {
+        "loopDurationMs": 700,
+        "playback": "once",
+        "parameters": {
+          "armY": {
+            "type": "constant",
+            "value": 0
+          },
+          "armPos": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeX": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeY": {
+            "type": "constant",
+            "value": 0
+          },
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 1
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 1
+          },
+          "eyeScaleL": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 1.04
+              },
+              {
+                "atMs": 91,
+                "value": 1.09
+              },
+              {
+                "atMs": 595,
+                "value": 1
+              },
+              {
+                "atMs": 700,
+                "value": 1
+              }
+            ]
+          },
+          "eyeScaleR": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 1.04
+              },
+              {
+                "atMs": 91,
+                "value": 1.09
+              },
+              {
+                "atMs": 595,
+                "value": 1
+              },
+              {
+                "atMs": 700,
+                "value": 1
+              }
+            ]
+          },
+          "irisScale": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.96
+              },
+              {
+                "atMs": 105,
+                "value": 0.93
+              },
+              {
+                "atMs": 525,
+                "value": 1
+              },
+              {
+                "atMs": 700,
+                "value": 1
+              }
+            ]
+          },
+          "brow": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0.14
+              },
+              {
+                "atMs": 84,
+                "value": 0.22
+              },
+              {
+                "atMs": 490,
+                "value": 0.08
+              },
+              {
+                "atMs": 700,
+                "value": 0.06
+              }
+            ]
+          },
+          "mouthOpen": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 1
+              },
+              {
+                "atMs": 168,
+                "value": 0.85
+              },
+              {
+                "atMs": 420,
+                "value": 0.3
+              },
+              {
+                "atMs": 665,
+                "value": 0
+              },
+              {
+                "atMs": 700,
+                "value": 0
+              }
+            ]
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 0
+          },
+          "mouthScale": {
+            "type": "constant",
+            "value": 0.85
+          },
+          "body": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 84,
+                "value": -0.28
+              },
+              {
+                "atMs": 210,
+                "value": 0.1
+              },
+              {
+                "atMs": 406,
+                "value": -0.025
+              },
+              {
+                "atMs": 700,
+                "value": 0
+              }
+            ]
+          },
+          "angleZ": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 105,
+                "value": 0.2
+              },
+              {
+                "atMs": 245,
+                "value": -0.08
+              },
+              {
+                "atMs": 560,
+                "value": 0
+              },
+              {
+                "atMs": 700,
+                "value": 0
+              }
+            ]
+          },
+          "angleY": {
+            "type": "keyframes",
+            "interpolation": "smoothstep",
+            "frames": [
+              {
+                "atMs": 0,
+                "value": 0
+              },
+              {
+                "atMs": 84,
+                "value": 0.2
+              },
+              {
+                "atMs": 238,
+                "value": -0.05
+              },
+              {
+                "atMs": 560,
+                "value": 0.01
+              },
+              {
+                "atMs": 700,
+                "value": 0.01
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "gazeTakeoverFromCurrent": true,
+  "continuousReactions": {
+    "PET": {
+      "poseId": "head-pet",
+      "enterMs": 200,
+      "releaseMs": 300,
+      "workScale": 0.55,
+      "motion": {
+        "loopDurationMs": 3600,
+        "playback": "loop",
+        "parameters": {
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 0.62
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 0.62
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 0.34
+          },
+          "angleY": {
+            "type": "constant",
+            "value": -0.025
+          },
+          "angleZ": {
+            "type": "sine",
+            "amplitude": 0.018,
+            "phase": 0,
+            "offset": 0
+          }
+        }
+      }
+    },
+    "HOLD": {
+      "enterMs": 180,
+      "releaseMs": 260,
+      "workScale": 0.55,
+      "motion": {
+        "loopDurationMs": 3100,
+        "playback": "loop",
+        "parameters": {
+          "eyeOpenL": {
+            "type": "constant",
+            "value": 0.72
+          },
+          "eyeOpenR": {
+            "type": "constant",
+            "value": 0.72
+          },
+          "mouthOpen": {
+            "type": "constant",
+            "value": 0.18
+          },
+          "mouthForm": {
+            "type": "constant",
+            "value": 0
+          },
+          "brow": {
+            "type": "constant",
+            "value": -0.045
+          },
+          "angleY": {
+            "type": "constant",
+            "value": 0.045
+          },
+          "angleZ": {
+            "type": "sine",
+            "amplitude": 0.009,
+            "phase": 0,
+            "offset": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "policy": "user-installed; no automatic engine update or model download",
+  "comfyui": {"url":"https://github.com/Comfy-Org/ComfyUI", "pythonEnvironment":"Use the Python belonging to the selected ComfyUI installation"},
+  "seeThrough": {"url":"https://github.com/jtydhr88/ComfyUI-See-through", "compatibleCommit":"98d754bf04f668647919ab750eccb0e0640faa81", "diffusersMinimum":"0.37.0", "requiredNodes":["SeeThrough_LoadLayerDiffModel","SeeThrough_LoadDepthModel","SeeThrough_GenerateLayers","SeeThrough_GenerateDepth","SeeThrough_PostProcess","SeeThrough_SavePSD"]},
+  "models": [
+    {"id":"layerdifforg/seethroughv0.0.2_layerdiff3d","url":"https://huggingface.co/layerdifforg/seethroughv0.0.2_layerdiff3d","folder":"ComfyUI/models/SeeThrough/layerdifforg/seethroughv0.0.2_layerdiff3d","licenseReview":"Inspect the model card and record the installed revision; do not substitute the plugin license"},
+    {"id":"layerdifforg/seethroughv0.0.1_marigold","url":"https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold","folder":"ComfyUI/models/SeeThrough/layerdifforg/seethroughv0.0.1_marigold","licenseReview":"License was not declared in the reviewed model card; check upstream terms before use/distribution"}
+  ],
+  "profile":{"targetGpu":"RTX 3060 12GB","measured3060Performance":false,"groupOffload":true,"layerResolution":1280,"steps":30,"vram8GiBOrLess":{"recommended":false,"maximumLayerResolution":1024,"depthResolution":720}}
+}

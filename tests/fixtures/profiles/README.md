@@ -1,0 +1,1 @@
+Synthetic runtime regression profiles. Timing, scheduling and event contracts retain the original regression cases; all dialogue is generic test text. No character artwork is included. These profiles are never packaged with the app.

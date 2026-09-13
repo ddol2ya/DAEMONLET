@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "gpichan",
+  "label": "지피쨩",
+  "base": {
+    "source": "source/reference-original.png",
+    "psd": "rigged/gpichan-expressions.psd",
+    "overrides": "rig-overrides.expressions.json"
+  },
+  "poses": [
+    "poses/writing/pose.json",
+    "poses/waiting/pose.json",
+    "poses/failed/pose.json",
+    "poses/cancelled/pose.json",
+    "poses/disconnected/pose.json",
+    "poses/bored/pose.json",
+    "poses/happy/pose.json",
+    "poses/head-tap/pose.json",
+    "poses/torso-tap/pose.json",
+    "poses/head-pet/pose.json"
+  ],
+  "behavior": "behavior.json",
+  "dialogue": "dialogue.ko.json"
+}

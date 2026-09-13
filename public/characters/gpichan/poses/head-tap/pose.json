@@ -1,0 +1,504 @@
+{
+  "schemaVersion": 1,
+  "id": "head-tap",
+  "label": "머리 클릭",
+  "source": "source/arms-trimmed.png",
+  "psd": "rigged/head-tap.psd",
+  "overrides": "rig-overrides.json",
+  "strategy": "semantic-layer-swap",
+  "registration": {
+    "strategy": "eyes-and-neck",
+    "maxScaleDelta": 0.06,
+    "maxRotationDeg": 3,
+    "maxAnchorErrorPx": 15
+  },
+  "layers": {
+    "sharedFromBase": [
+      "back hair",
+      "legwear",
+      "neck",
+      "topwear",
+      "ears",
+      "face",
+      "nose",
+      "mouth_close",
+      "mouth_open",
+      "eyebrow",
+      "eyewhite",
+      "irides",
+      "eyelash",
+      "eye_close",
+      "front hair",
+      "headwear",
+      "handwear_1"
+    ],
+    "replaceFromBase": [
+      "handwear_2"
+    ],
+    "useFromPose": [
+      "handwear_2"
+    ],
+    "addFromPose": [
+      "forearm_2"
+    ],
+    "renderInFrontOfBase": [
+      {
+        "pose": "forearm_2",
+        "base": "topwear"
+      }
+    ],
+    "renderBehindBase": [
+      {
+        "pose": "handwear_2",
+        "base": "topwear"
+      }
+    ]
+  },
+  "transition": {
+    "enterMs": 360,
+    "exitMs": 260,
+    "swapStart": 0.44,
+    "swapEnd": 0.56
+  },
+  "motion": {
+    "loopDurationMs": 850,
+    "playback": "once",
+    "transition": "continuous",
+    "parameters": {
+      "armY": {
+        "type": "constant",
+        "value": 0
+      },
+      "armPos": {
+        "type": "constant",
+        "value": 0
+      },
+      "eyeX": {
+        "type": "constant",
+        "value": 0
+      },
+      "eyeY": {
+        "type": "constant",
+        "value": 0
+      },
+      "eyeOpenL": {
+        "type": "constant",
+        "value": 1
+      },
+      "eyeOpenR": {
+        "type": "constant",
+        "value": 1
+      },
+      "eyeScaleL": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 1.06
+          },
+          {
+            "atMs": 85,
+            "value": 1.1
+          },
+          {
+            "atMs": 383,
+            "value": 1.04
+          },
+          {
+            "atMs": 808,
+            "value": 1
+          },
+          {
+            "atMs": 850,
+            "value": 1
+          }
+        ]
+      },
+      "eyeScaleR": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 1.06
+          },
+          {
+            "atMs": 85,
+            "value": 1.1
+          },
+          {
+            "atMs": 383,
+            "value": 1.04
+          },
+          {
+            "atMs": 808,
+            "value": 1
+          },
+          {
+            "atMs": 850,
+            "value": 1
+          }
+        ]
+      },
+      "irisScale": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 0.94
+          },
+          {
+            "atMs": 102,
+            "value": 0.9
+          },
+          {
+            "atMs": 595,
+            "value": 0.99
+          },
+          {
+            "atMs": 850,
+            "value": 1
+          }
+        ]
+      },
+      "brow": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 0.18
+          },
+          {
+            "atMs": 85,
+            "value": 0.24
+          },
+          {
+            "atMs": 595,
+            "value": 0.12
+          },
+          {
+            "atMs": 850,
+            "value": 0.06
+          }
+        ]
+      },
+      "mouthOpen": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 1
+          },
+          {
+            "atMs": 272,
+            "value": 0.75
+          },
+          {
+            "atMs": 510,
+            "value": 0.28
+          },
+          {
+            "atMs": 765,
+            "value": 0
+          },
+          {
+            "atMs": 850,
+            "value": 0
+          }
+        ]
+      },
+      "mouthForm": {
+        "type": "constant",
+        "value": 0
+      },
+      "angleZ": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 0
+          },
+          {
+            "atMs": 85,
+            "value": -0.34
+          },
+          {
+            "atMs": 255,
+            "value": 0.12
+          },
+          {
+            "atMs": 476,
+            "value": -0.05
+          },
+          {
+            "atMs": 765,
+            "value": 0
+          },
+          {
+            "atMs": 850,
+            "value": 0
+          }
+        ]
+      },
+      "angleY": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 0
+          },
+          {
+            "atMs": 85,
+            "value": 0.26
+          },
+          {
+            "atMs": 298,
+            "value": -0.04
+          },
+          {
+            "atMs": 595,
+            "value": 0.04
+          },
+          {
+            "atMs": 850,
+            "value": 0.03
+          }
+        ]
+      },
+      "body": {
+        "type": "keyframes",
+        "interpolation": "smoothstep",
+        "frames": [
+          {
+            "atMs": 0,
+            "value": 0
+          },
+          {
+            "atMs": 94,
+            "value": 0.2
+          },
+          {
+            "atMs": 281,
+            "value": -0.07
+          },
+          {
+            "atMs": 595,
+            "value": 0.02
+          },
+          {
+            "atMs": 850,
+            "value": 0
+          }
+        ]
+      }
+    },
+    "layers": {
+      "handwear_2": {
+        "origin": {
+          "x": 0.5714285714285714,
+          "y": 0.3697916666666667
+        },
+        "influence": {
+          "axisX": 203.02201199678342,
+          "axisY": -200.39266117408656,
+          "start": 0.13444393013670125,
+          "end": 0.3272482554047497
+        },
+        "translateY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 85,
+              "value": -7
+            },
+            {
+              "atMs": 238,
+              "value": 1.6
+            },
+            {
+              "atMs": 383,
+              "value": -0.8
+            },
+            {
+              "atMs": 612,
+              "value": 0
+            },
+            {
+              "atMs": 850,
+              "value": 0
+            }
+          ]
+        },
+        "translateX": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 102,
+              "value": 2
+            },
+            {
+              "atMs": 323,
+              "value": -0.5
+            },
+            {
+              "atMs": 612,
+              "value": 0
+            },
+            {
+              "atMs": 850,
+              "value": 0
+            }
+          ]
+        },
+        "rotationDeg": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 85,
+              "value": -3
+            },
+            {
+              "atMs": 238,
+              "value": 1
+            },
+            {
+              "atMs": 425,
+              "value": -0.4
+            },
+            {
+              "atMs": 638,
+              "value": 0
+            },
+            {
+              "atMs": 850,
+              "value": 0
+            }
+          ]
+        }
+      },
+      "forearm_2": {
+        "origin": {
+          "x": 0.5714285714285714,
+          "y": 0.3697916666666667
+        },
+        "influence": {
+          "axisX": 203.02201199678342,
+          "axisY": -200.39266117408656,
+          "start": 0.13444393013670125,
+          "end": 0.3272482554047497
+        },
+        "translateY": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 85,
+              "value": -7
+            },
+            {
+              "atMs": 238,
+              "value": 1.6
+            },
+            {
+              "atMs": 383,
+              "value": -0.8
+            },
+            {
+              "atMs": 612,
+              "value": 0
+            },
+            {
+              "atMs": 850,
+              "value": 0
+            }
+          ]
+        },
+        "translateX": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 102,
+              "value": 2
+            },
+            {
+              "atMs": 323,
+              "value": -0.5
+            },
+            {
+              "atMs": 612,
+              "value": 0
+            },
+            {
+              "atMs": 850,
+              "value": 0
+            }
+          ]
+        },
+        "rotationDeg": {
+          "type": "keyframes",
+          "interpolation": "smoothstep",
+          "frames": [
+            {
+              "atMs": 0,
+              "value": 0
+            },
+            {
+              "atMs": 85,
+              "value": -3
+            },
+            {
+              "atMs": 238,
+              "value": 1
+            },
+            {
+              "atMs": 425,
+              "value": -0.4
+            },
+            {
+              "atMs": 638,
+              "value": 0
+            },
+            {
+              "atMs": 850,
+              "value": 0
+            }
+          ]
+        }
+      }
+    }
+  },
+  "interactionScale": {
+    "HEAD_TAP": 0.15,
+    "TORSO_TAP": 0.2
+  }
+}

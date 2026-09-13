@@ -1,0 +1,4 @@
+interface:
+  display_name: "Daemonlet 캐릭터 제작"
+  short_description: "레퍼런스부터 독립 포즈, 표정 검수와 캐릭터 팩까지 제작"
+  default_prompt: "$create-pet-character 스킬로 레퍼런스를 Daemonlet 캐릭터 팩으로 제작해줘."

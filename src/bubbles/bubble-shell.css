@@ -1,0 +1,29 @@
+:root {
+  --bubble-background: rgba(255, 252, 246, .97);
+  --bubble-ink: #382e2c;
+  --bubble-muted: #746761;
+  --bubble-border: 1px solid rgba(85, 73, 67, .2);
+  --bubble-radius: 15px;
+  --bubble-shadow: 0 2px 4px rgba(38, 28, 26, .12);
+  --bubble-font: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --bubble-line-height: 1.5;
+  --bubble-padding: 10px 11px;
+  --bubble-transition: 160ms;
+  --bubble-ease: cubic-bezier(.16, 1, .3, 1);
+}
+.bubble-shell {
+  box-sizing: border-box;
+  padding: var(--bubble-padding);
+  border: var(--bubble-border);
+  border-radius: var(--bubble-radius);
+  background: var(--bubble-background);
+  color: var(--bubble-ink);
+  box-shadow: var(--bubble-shadow);
+  font-family: var(--bubble-font);
+  font-size: var(--bubble-font-size, 13px);
+  font-weight: 500;
+  line-height: var(--bubble-line-height);
+  letter-spacing: -.01em;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
