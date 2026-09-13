@@ -1,2 +1,4 @@
 # Preserve the downloaded official legal code byte for byte on every platform.
-/distribution/licenses/CC-BY-4.0.txt -text
+/distribution/licenses/CC-BY-4.0.txt -text whitespace=-blank-at-eof
+# The pack includes the complete legal code, including its trailing blank lines.
+/public/characters/gpichan/LICENSE.txt whitespace=-blank-at-eof
