@@ -3,6 +3,7 @@ import { extractFile, listPackage } from '@electron/asar'
 import { readFile } from 'node:fs/promises'
 import { resolve, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {assertSameSource} from './validation.mjs'
 import { runtimeAssetPaths } from './runtime-assets.mjs'
 import { requiredNotices } from './licenses.mjs'
 import { verifyArtwork, digest } from './artwork.mjs'
@@ -15,6 +16,7 @@ export async function checkCandidate(asar) {
   const extract = path => extractFile(asar, normalize(path))
   const json = path => JSON.parse(extract(path).toString('utf8'))
   if (json('package.json').productName !== APP_NAME) throw new Error('Packaged app still shares the regular product identity')
+  assertSameSource(json('dist/build-source.json'), json('dist-electron/build-source.json'))
   const catalog = json('dist/characters/catalog.json')
   const expected = ['gpichan/character.json']
   if (JSON.stringify(catalog.characters) !== JSON.stringify(expected)) throw new Error('Unexpected built-in characters')

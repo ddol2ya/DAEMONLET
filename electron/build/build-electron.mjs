@@ -1,11 +1,16 @@
 import { build } from "esbuild"
-import { copyFile, mkdir, rm, writeFile } from "node:fs/promises"
+import { sourceIdentity, assertSameSource } from "../../scripts/release/validation.mjs"
+import { requireElectronRuntime } from "../../scripts/release/electron-runtime.mjs"
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { writeLicenseBundle } from "../../scripts/release/licenses.mjs"
 
 const root = resolve(import.meta.dirname, "../..")
+await requireElectronRuntime(root)
 const outdir = resolve(root, "dist-electron")
 const production = process.argv.includes("--production")
+const source = await sourceIdentity(root)
+if (production) assertSameSource(source, JSON.parse(await readFile(resolve(root, "dist/build-source.json"), "utf8")))
 const setupSmoke = process.argv.includes("--setup-smoke")
 await rm(outdir, { recursive: true, force: true })
 await mkdir(resolve(outdir, "codex"), { recursive: true })
@@ -50,3 +55,6 @@ await writeFile(resolve(outdir, "build-mode.json"), `${JSON.stringify({ schemaVe
 
 await import("./build-dictation.mjs")
 await import("../../scripts/release/stage-notices.mjs")
+
+assertSameSource(source, await sourceIdentity(root))
+await writeFile(resolve(outdir, "build-source.json"), JSON.stringify(source) + "\n")

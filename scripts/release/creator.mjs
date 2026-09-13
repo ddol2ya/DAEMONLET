@@ -8,8 +8,10 @@ import {pipeline} from 'node:stream/promises'
 import {createHash} from 'node:crypto'
 import {build} from 'esbuild'
 import {ZipFile} from 'yazl'
+import {sourceIdentity, assertSameSource} from './validation.mjs'
 const root=resolve(import.meta.dirname,'../..')
 export async function packageCreator(requestedOutput){
+ const source = await sourceIdentity(root)
  const output=resolve(requestedOutput),pkg=JSON.parse(await readFile(join(root,'package.json'),'utf8'))
  await mkdir(output,{recursive:true})
  await writeFile(join(output,'creator-build-started.json'),JSON.stringify({version:pkg.version}),{flag:'wx'})
@@ -35,8 +37,10 @@ export async function packageCreator(requestedOutput){
  await promisify(execFile)(npm,['install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund'],{cwd:runtime,timeout:180000,maxBuffer:1024*1024,...(process.platform==='win32'?{shell:true}:{})})
  const zip=new ZipFile(),archive=join(output,`Daemonlet-creator-skill-${pkg.version}.zip`),inventory=[]
  async function walk(dir,prefix){for(const entry of (await readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){const path=join(dir,entry.name),name=prefix+entry.name;if(entry.isDirectory())await walk(path,name+'/');else if(entry.isFile()){if(/\.(psd|safetensors|ckpt|pyc)$/.test(name)||name.includes('/node_modules/'))throw Error('Unexpected creator payload: '+name);zip.addFile(path,name,{mode:0o100644,mtime:new Date('2000-01-01')});inventory.push(name)}else throw Error('Unexpected creator payload link')}}
+ await writeFile(join(skill,'build-source.json'),JSON.stringify(source)+'\n')
  await walk(skill,'create-pet-character/');zip.end();await pipeline(zip.outputStream,createWriteStream(archive,{flags:'wx'}))
- const bytes=await readFile(archive),result={archive,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),files:inventory,includesRuntime:true,includesComfyUI:false,includesModelWeights:false}
+ assertSameSource(source, await sourceIdentity(root))
+ const bytes=await readFile(archive),result={source,archive,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),files:inventory,includesRuntime:true,includesComfyUI:false,includesModelWeights:false}
  await writeFile(join(output,'creator-build-result.json'),JSON.stringify(result,null,2)+'\n');return result
 }
 if(process.argv[1]&&resolve(process.argv[1])===resolve(import.meta.filename)){

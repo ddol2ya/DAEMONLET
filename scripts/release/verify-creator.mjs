@@ -3,14 +3,16 @@ import {open} from 'yauzl'
 import {cp, mkdir, mkdtemp, readFile, writeFile} from 'node:fs/promises'
 import {createWriteStream} from 'node:fs'
 import {tmpdir} from 'node:os'
-import {dirname, join, resolve, relative} from 'node:path'
+import {basename, dirname, join, resolve, relative} from 'node:path'
 import {promisify} from 'node:util'
 import {execFile} from 'node:child_process'
 import {pipeline} from 'node:stream/promises'
 import {digest} from './artwork.mjs'
+import {createValidation, fileIdentity, recordCheck, saveValidation} from './validation.mjs'
 const root = resolve(import.meta.dirname, '../..')
 if (!process.argv[2]) throw Error('Usage: npm run creator:verify -- <actual creator.zip>')
 const archive = resolve(process.argv[2]), target = await mkdtemp(join(tmpdir(), 'daemonlet-creator-verify-'))
+const archiveBefore = await fileIdentity(dirname(archive), basename(archive))
 const zip = await promisify(open)(archive, {lazyEntries: true, validateEntrySizes: true})
 let bytes = 0, count = 0
 await new Promise((done, reject) => {
@@ -75,4 +77,9 @@ const {stdout: buildOutput} = await exec(process.execPath, ['--input-type=module
 const result = {status: 'creator-extracted-verified', archive, sha256: digest(await readFile(archive)), extractedTo: target, files: count, bytes, runtimeCheck: check.technicalReadiness, licenseReview: check.licenseReview.status, export: join(target, 'gpichan.petchar'), exportSha256: digest(await readFile(join(target, 'gpichan.petchar'))), fixturePreparation: 'Only unselected dialogue pose references removed from temporary copy; original artwork and notice preserved', pythonHelpers: 'loaded', renderer: buildOutput.trim(), inferenceRun: false}
 await mkdir(join(root, 'outputs/release-verification'), {recursive: true})
 await writeFile(join(root, 'outputs/release-verification/creator-result.json'), JSON.stringify(result, null, 2) + '\n')
+if (JSON.stringify(archiveBefore) !== JSON.stringify(await fileIdentity(dirname(archive), basename(archive)))) throw Error('Creator archive changed during verification')
+const validation = await createValidation({root: dirname(archive), source: JSON.parse(await readFile(join(skill, 'build-source.json'), 'utf8')), appVersion: JSON.parse(await readFile(join(runtime, 'package.json'), 'utf8')).version, artifacts: [{file: basename(archive), kind: 'creatorZip'}]})
+await writeFile(join(dirname(archive), 'creator-extraction-result.json'), JSON.stringify(result, null, 2) + '\n', {mode: 0o600})
+await recordCheck(validation, dirname(archive), {kind: 'creatorExtraction', status: 'PASS', procedure: ['npm', 'run', 'creator:verify', '--', basename(archive)], evidence: ['creator-extraction-result.json']})
+await saveValidation(dirname(archive), validation, 'creator-validation.json')
 console.log(JSON.stringify(result, null, 2))

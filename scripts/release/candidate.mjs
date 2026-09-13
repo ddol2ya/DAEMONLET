@@ -9,6 +9,7 @@ import { promisify, parseArgs } from 'node:util'
 import { ZipFile } from 'yazl'
 import { checkCandidate } from './check.mjs'
 import { packageCreator } from './creator.mjs'
+import {createValidation, readBuildSource, recordCheck, saveValidation} from './validation.mjs'
 import { checkExternalNotices } from './check-notices.mjs'
 
 const { values } = parseArgs({ options: { platform: { type: 'string', default: 'win32' }, arch: { type: 'string', default: 'x64' }, output: { type: 'string' } } })
@@ -85,6 +86,10 @@ await writeFile(join(output, 'artifacts/SHA256SUMS.txt'), hashes.join('\n') + '\
 await writeFile(join(output, 'candidate-review.json'), JSON.stringify({ ...checks, platform: values.platform, arch: values.arch, version: pkg.version, app, archive,
   distribution: 'test-candidate', signing: 'unsigned Windows test candidate',
   rightsReview: 'THIRD_PARTY_NOTICES.md', externalPublication: false, nativeSmoke: 'pending' }, null, 2) + '\n')
+const validation = await createValidation({root: output, source: await readBuildSource(root), appVersion: pkg.version, target: {platform: values.platform, arch: values.arch, osVersion: process.platform === values.platform ? (await import('node:os')).version() : 'NOT_RUN: cross-packaged; native OS not observed'}, artifacts: [{file: 'artifacts/' + basename(archive), kind: 'windowsPortableZip'}]})
+await recordCheck(validation, output, {kind: 'build', status: 'PASS', procedure: 'release:candidate: renderer, production Electron and Forge Windows package', evidence: ['build-renderer.log', 'build-electron-production.log', 'candidate-review.json']})
+await recordCheck(validation, output, {kind: 'asar', status: 'PASS', procedure: 'checkCandidate and checkExternalNotices on packaged input before ZIP creation; native extraction is a separate check', evidence: ['candidate-review.json']})
+await saveValidation(output, validation)
 // Candidate work and evidence stay outside artifacts; only artifacts are handoff files.
 await rm(join(output, 'bundle'), { recursive: true })
 await rm(join(output, 'creator'), { recursive: true })

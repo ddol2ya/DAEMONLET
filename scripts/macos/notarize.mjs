@@ -1,9 +1,11 @@
 import { lstat, mkdir, readdir } from "node:fs/promises"
-import { join } from "node:path"
+import { join, relative } from "node:path"
 import { APP_NAME, NOTARY_PROFILE, assertCanSubmit, assertUploadApproval, notaryStatus } from "./policy.mjs"
 import { hashFile, hashObject, privateDirectory, readJSON, run, withLock, writeJSON } from "./io.mjs"
 import { assertOnlyTicketAdded, assertSameBundle, candidateApp, verifyApp } from "./verify.mjs"
 import { linkedAttempt, localAttempt, optionalJSON, ownedDirectory } from "./attempts.mjs"
+
+import {createValidation, recordCheck, saveValidation} from "../release/validation.mjs"
 
 const stateName = "private-submission-state.json"
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -256,6 +258,15 @@ export async function createFinalArchive(candidateRoot, { retryReason } = {}) {
       await attempt.stage("record-extraction")
       const extractedManifest = join(attempt.directory, "extracted-manifest.json")
       await writeJSON(extractedManifest, verified)
+      // The final ZIP is hashed after signing, stapling and compression. This is
+      // an independent record, never embedded in the bytes it identifies.
+      if (verified.source?.sourceCommit !== manifest.sourceCommit) throw new Error("Final archive source differs from candidate source.")
+      const validation = await createValidation({root, source: verified.source, appVersion: manifest.version,
+        artifacts: [{file: relative(root, final.path), kind: "macosFinalZip"}]})
+      for (const kind of ["asar", "signing", "notarization"]) await recordCheck(validation, root, {kind, status: "PASS",
+        procedure: "macos:archive: extracted production ASAR, Developer ID signature, stapler and Gatekeeper checked; no GUI smoke implied",
+        evidence: [relative(root, extractedManifest)]})
+      await saveValidation(root, validation, "final-validation.json")
       if (revalidate) {
         await attempt.stage("revalidation-complete")
         await attempt.validated({ final, extraction, extractedManifest, canonicalStateUnchanged: true })

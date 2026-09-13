@@ -1,63 +1,74 @@
 {
-  "version": "0.7.0",
-  "checkedAt": "2026-09-13",
-  "unitTests": {
-    "files": 134,
-    "passed": 1257,
-    "skipped": 3
-  },
-  "creatorPythonTests": 4,
-  "macos": {
-    "appName": "Daemonlet for Codex",
-    "availableCharacters": [
-      {
-        "id": "gpichan",
-        "source": "builtin"
-      }
-    ],
-    "webgl": true,
-    "adapterSupervisorState": "READY",
-    "adapterOwnership": "OWNED_UTILITY",
-    "characterReloadCount": 3,
-    "characterReloadFailures": [],
-    "cleanup": {
-      "protocolPortReleased": true,
-      "hookPortReleased": true
+  "schemaVersion": 1,
+  "historical": {
+    "scope": "Historical 2026-09-13 observations; not evidence for any newly built candidate. App source SHA and final app hashes were not captured.",
+    "record": {
+      "version": "0.7.0",
+      "checkedAt": "2026-09-13",
+      "unitTests": {
+        "files": 134,
+        "passed": 1257,
+        "skipped": 3
+      },
+      "creatorPythonTests": 4,
+      "macos": {
+        "appName": "Daemonlet for Codex",
+        "availableCharacters": [
+          {
+            "id": "gpichan",
+            "source": "builtin"
+          }
+        ],
+        "webgl": true,
+        "adapterSupervisorState": "READY",
+        "adapterOwnership": "OWNED_UTILITY",
+        "characterReloadCount": 3,
+        "characterReloadFailures": [],
+        "cleanup": {
+          "protocolPortReleased": true,
+          "hookPortReleased": true
+        }
+      },
+      "windows": {
+        "appName": "Daemonlet for Codex",
+        "availableCharacters": [
+          {
+            "id": "gpichan",
+            "source": "builtin"
+          }
+        ],
+        "webgl": true,
+        "adapterSupervisorState": "READY",
+        "adapterOwnership": "OWNED_UTILITY",
+        "characterReloadCount": 3,
+        "characterReloadFailures": [],
+        "cleanup": {
+          "protocolPortReleased": true,
+          "hookPortReleased": true
+        }
+      },
+      "creatorSkill": {
+        "bytes": 346097,
+        "sha256": "3712be659100415413e4e6271f4cb62c9fc2171478283c7a2c66b89b3e6b2d56",
+        "files": 172,
+        "standaloneRuntimeChecked": true,
+        "syntheticPackExported": true,
+        "syntheticRenderer": {
+          "status": "passed",
+          "models": 3,
+          "staticCases": 120,
+          "customFrames": 90,
+          "maxVertexDifference": 0,
+          "compositor": "passed"
+        },
+        "imageGenerationAndComfyInferenceThisCheck": false
+      },
+      "releaseSigning": "New product identity packages were not notarized in this source-preparation pass."
     }
   },
-  "windows": {
-    "appName": "Daemonlet for Codex",
-    "availableCharacters": [
-      {
-        "id": "gpichan",
-        "source": "builtin"
-      }
-    ],
-    "webgl": true,
-    "adapterSupervisorState": "READY",
-    "adapterOwnership": "OWNED_UTILITY",
-    "characterReloadCount": 3,
-    "characterReloadFailures": [],
-    "cleanup": {
-      "protocolPortReleased": true,
-      "hookPortReleased": true
-    }
-  },
-  "creatorSkill": {
-    "bytes": 346097,
-    "sha256": "3712be659100415413e4e6271f4cb62c9fc2171478283c7a2c66b89b3e6b2d56",
-    "files": 172,
-    "standaloneRuntimeChecked": true,
-    "syntheticPackExported": true,
-    "syntheticRenderer": {
-      "status": "passed",
-      "models": 3,
-      "staticCases": 120,
-      "customFrames": 90,
-      "maxVertexDifference": 0,
-      "compositor": "passed"
-    },
-    "imageGenerationAndComfyInferenceThisCheck": false
-  },
-  "releaseSigning": "New product identity packages were not notarized in this source-preparation pass."
+  "current": {
+    "status": "NOT_RUN",
+    "summary": "Candidate-specific results are recorded separately after verification.",
+    "identityFile": "validation-candidates.json"
+  }
 }

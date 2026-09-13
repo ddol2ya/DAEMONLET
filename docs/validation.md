@@ -1,4 +1,11 @@
-# Public source validation — 0.7.0
+# Validation records
+
+## Historical observations — 0.7.0 (2026-09-13)
+
+The following observations are preserved as history. They did not capture the app
+source SHA and final package hashes, so they do not certify a new candidate with
+the same version. New candidate identities and outcomes are listed separately in
+[structured records](validation.json); raw evidence stays in ignored `outputs/`.
 
 The public source contains Gpichan's selected 47-file runtime graph, app code,
 maintained production helpers, synthetic regression fixtures and required notices.

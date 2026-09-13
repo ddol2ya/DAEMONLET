@@ -49,7 +49,7 @@ async function fixture(stage: "signed" | "notarized" = "notarized") {
   const payloadPath = join(app, "Contents", "fixture-payload")
   await writeFile(payloadPath, "unchanged-signed-payload-fixture")
   const manifest = {
-    schemaVersion: 1, sourceCommit: "a".repeat(40), app,
+    schemaVersion: 1, source: {sourceCommit: "a".repeat(40), sourceTreeSha256: "d".repeat(64), workingTreeHasChanges: false}, sourceCommit: "a".repeat(40), app,
     version: "0.2.0", architecture: "arm64",
     signer: { team: "ABCDEFGHIJ", fingerprint: "A".repeat(40) },
     payload: { "app.asar": "b".repeat(64) }, signedCode: [],

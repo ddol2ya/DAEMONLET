@@ -8,8 +8,8 @@ import { createHash } from "node:crypto"
 import { startSmokeDesktopPresence } from "./smoke-desktop-presence.mjs"
 
 const root = resolve(import.meta.dirname, "..")
-const evidenceDirectory = resolve(process.env.ELECTRON_SMOKE_EVIDENCE_DIRECTORY ?? join(root, "docs/evidence/electron-desktop-pet"))
-const bellEvidenceDirectory = resolve(process.env.ELECTRON_SMOKE_BELL_DIRECTORY ?? join(root, "docs/evidence/bell-character/electron"))
+const evidenceDirectory = resolve(process.env.ELECTRON_SMOKE_EVIDENCE_DIRECTORY ?? join(root, "outputs/evidence/electron-desktop-pet"))
+const bellEvidenceDirectory = resolve(process.env.ELECTRON_SMOKE_BELL_DIRECTORY ?? join(root, "outputs/evidence/bell-character/electron"))
 const adapterMode = process.env.ELECTRON_SMOKE_ADAPTER_MODE ?? "owned"
 const forceTrayOffscreen = process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1"
 const dialogueEvidence = process.env.ELECTRON_SMOKE_DIALOGUE_EVIDENCE
@@ -53,7 +53,7 @@ if (activityEvidence) {
     records: [{ key: createHash("sha256").update("codex-adapter\0fixture-failure").digest("hex"), activityId: "activity-1", state: "failed", revision: 2, firstObservedAt: at, lastObservedAt: at, eventAt: at, endedAt: at, acknowledgedAt: null, confidence: null, category: null }],
   }), { mode: 0o600 })
 }
-const isolatedPresence = Boolean((dialogueEvidence || hybridEvidence) && process.platform !== "win32")
+const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence)
 const shortCodexHome = process.env.ELECTRON_SMOKE_DESKTOP_CONTROL_EVIDENCE || isolatedPresence
 const smokeCodexHome = shortCodexHome
   ? await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-home-"))

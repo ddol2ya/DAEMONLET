@@ -25,7 +25,7 @@ async function fixture(status = "prepared") {
   await mkdir(join(root, "evidence-private"))
   const zip = join(root, "notarization/submission.zip")
   await writeFile(zip, "frozen-submission")
-  const manifest = { schemaVersion: 1, sourceCommit: "a".repeat(40), app, version: "0.2.0", signer: { team: "ABCDEFGHIJ", fingerprint: "A".repeat(40) }, payload: { "app.asar": "b".repeat(64) }, signedCode: [], inventory: { entries: [], sha256: "c".repeat(64) } }
+  const manifest = { schemaVersion: 1, source: {sourceCommit: "a".repeat(40), sourceTreeSha256: "d".repeat(64), workingTreeHasChanges: false}, sourceCommit: "a".repeat(40), app, version: "0.2.0", signer: { team: "ABCDEFGHIJ", fingerprint: "A".repeat(40) }, payload: { "app.asar": "b".repeat(64) }, signedCode: [], inventory: { entries: [], sha256: "c".repeat(64) } }
   const state = { schemaVersion: 1, sourceCommit: manifest.sourceCommit, profile: "test-notary", status, submissionId: status === "prepared" ? undefined : submissionId, submission: { path: zip, sha256: await hashFile(zip), bytes: 17 } }
   await writeJSON(join(root, "private-manifest.json"), manifest)
   await writeJSON(join(root, stateFile), state)
