@@ -1,6 +1,6 @@
 # Release builds
 
-Use Node 24 and `npm ci`, then `node node_modules/electron/install.js` to install
+Use Node 24 and `npm ci`, then `npm run electron:install` to install
 the lockfile-pinned Electron runtime and its Electron/Chromium notices. Electron
 43 has an explicit installer instead of an npm postinstall hook. No engine/model
 weights are involved. Validate `npm run typecheck`, `npm test`, `npm run build:renderer`
@@ -63,3 +63,92 @@ copied from the current checkout and compared to its source during verification.
 Complete the separate [publication checklist](publication-checklist.md). A passing
 current-source or ASAR check does not clear historical commits, model conditions
 or unexecuted platform checks. Keep all local evidence under ignored `outputs/`.
+
+## Candidate identity and evidence
+
+Use a Git checkout for source builds. The renderer and Electron builds capture
+`sourceCommit`, `workingTreeHasChanges` and a SHA-256 of tracked/nonignored source
+inputs in `build-source.json`. Production Electron rejects a renderer from a
+different source snapshot. Commit implementation changes before the final build;
+subsequent documentation/evidence commits do not change the captured build SHA.
+
+`release:verify` writes `outputs/release-verification/validation.json` alongside
+the actual ASAR. `release:candidate` writes a portable ZIP record, installer
+builds write a **separate EXE** record, and `creator:verify` writes
+`creator-validation.json` beside the tested ZIP. `macos:archive` writes
+`final-validation.json` after final extraction/signature/ticket checks. Existing
+macOS frozen bundle/archive checks remain mandatory. Rebuilt or legacy candidates
+without build provenance must be rebuilt before using the new final archive gate.
+
+Each schema-versioned record contains a unique candidate ID, original build SHA,
+source tree hash/dirty state, app version, timestamp/time zone, target OS/arch,
+relative artifact names/types/sizes/SHA-256, and separate check entries. Executed
+checks include host OS/arch/Node/Codex version (or an explicit untested reason),
+command/procedure, timestamp and hashed evidence files. Cross-packaging names the
+build host separately; unknown target OS is NOT_RUN, not the host's OS version.
+
+Additional checks against a frozen final archive can use the existing metadata:
+
+```sh
+npm run release:validation -- init --record outputs/mac-candidate/validation.json --artifact macosZip:Daemonlet-for-Codex.zip
+npm run release:validation -- verify --record outputs/mac-candidate/validation.json
+npm run release:validation -- run --record outputs/mac-candidate/validation.json --kind nativePackageSmoke -- node scripts/electron-smoke.mjs
+npm run release:validation -- verify --record outputs/mac-candidate/validation.json --required asar --required nativePackageSmoke
+```
+
+`init` reads source identity and version from the selected ASAR's embedded
+renderer/desktop build metadata and package.json, or from that ASAR inside the
+Mac/Windows ZIP. Creator ZIPs use their own build-source.json and runtime
+package.json. It does not read the checkout's build outputs or version. Mixed
+source identities/versions, missing or malformed metadata and unsupported artifact
+kinds are rejected. An older artifact remains tied to its original source even
+when the checkout has advanced.
+
+Installer EXEs require an explicit hash-matched `installer-build-result.json`:
+
+```sh
+npm run release:validation -- init --record outputs/windows-installer/recheck.json --artifact windowsInstallerExe:artifacts/Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe --packaging-result outputs/windows-installer/installer-build-result.json
+```
+
+New installer build results include the packaged app's source and version plus the
+final EXE size/SHA-256. Legacy results without that information cannot identify an
+EXE; neither checkout metadata nor previous validation PASS entries are a fallback.
+Initializing a new record copies identity only, never earlier check outcomes.
+
+Before that smoke command, extract **that exact archive**, verify its extracted
+bundle against the packaged input (including app.asar and executable hashes), and
+set `ELECTRON_SMOKE_EXECUTABLE` to its executable and
+`ELECTRON_SMOKE_EVIDENCE_DIRECTORY` under this candidate's `outputs/` directory.
+The runner executes the supplied command; it cannot attest a manually mislabelled
+command or an arbitrary executable outside the archive. Include extraction/bundle
+comparison evidence and review the procedure. Use isolated profiles and synthetic
+Codex resources as the existing smoke runner does. Do not use real-user Hook or
+Codex settings for candidate smoke.
+
+Creating a record sets **all** checks to NOT_RUN. Integrity verification only
+verifies identity and evidence; use `--required` to enforce named completion gates.
+A failed command is recorded FAIL and exits nonzero. Starting a new run first
+invalidates that check's previous PASS and preserves it in the new attempt log.
+For `unit` and `build`, the source is checked both before and after execution;
+changes to the commit, source tree hash or dirty flag record FAIL even if the
+command exits zero. The log retains both snapshots and the mismatch reason, and
+`--required unit`/`--required build` cannot reuse the earlier PASS. Missing evidence, changed
+hashes or checks copied from another source/candidate fail verification, even for
+the same app version. A fresh record is required if signing, stapling, recompression
+or any other operation changes bytes; rerun affected checks against the final
+files. Never put a final file's hash inside that file itself.
+
+The categories are `unit`, `build`, `asar`, `creatorExtraction`,
+`nativePackageSmoke`, `nativeInstall`, `realCodexIntegration`, `signing` and
+`notarization`. Manual/interactive checks remain NOT_RUN until executed with a
+recorded procedure and evidence. N/A requires a concrete reason; it does not satisfy
+a `--required` PASS gate. Mock Hook runs are not real Codex integration. An unsigned
+native smoke does not satisfy signing/notarization. Update/rollback needs an
+identified previous candidate; otherwise record NOT_RUN and the missing comparison.
+
+Keep original logs, local paths, SSH details, profiles and raw records under ignored
+`outputs/` (or the existing private macOS candidate root). Publish only a redacted
+summary. Source SHA and final artifact hashes may be copied into a separate public
+candidate identity file; no personal environment paths belong there. Technical
+checks do not change the separate character rights, external-model, history or
+publication decisions. A reviewer must decide publication independently.

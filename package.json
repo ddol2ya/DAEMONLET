@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "vite --port 4173 --strictPort",
     "build": "npm run build:renderer",
-    "build:renderer": "tsc --noEmit && vite build",
+    "build:renderer": "node scripts/build-renderer.mjs",
     "build:electron": "node electron/build/build-electron.mjs",
     "build:electron:production": "node electron/build/build-electron.mjs --production",
     "electron:dev": "npm run build:electron && node scripts/electron-dev.mjs",
@@ -39,7 +39,9 @@
     "creator:check": "node skills/create-pet-character/scripts/creator.mjs check",
     "source:check": "node scripts/release/source-check.mjs",
     "release:verify": "node scripts/release/verify.mjs",
-    "creator:verify": "node scripts/release/verify-creator.mjs"
+    "creator:verify": "node scripts/release/verify-creator.mjs",
+    "electron:install": "node node_modules/electron/install.js",
+    "release:validation": "node scripts/release/validation-cli.mjs"
   },
   "dependencies": {
     "ag-psd": "29.0.0",

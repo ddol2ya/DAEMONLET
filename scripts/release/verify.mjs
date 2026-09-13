@@ -5,6 +5,7 @@ import {createPackage} from '@electron/asar'
 import {checkCandidate} from './check.mjs'
 import {checkExternalNotices} from './check-notices.mjs'
 import {digest} from './artwork.mjs'
+import {createValidation, readBuildSource, recordCheck, saveValidation} from './validation.mjs'
 const root = resolve(import.meta.dirname, '../..'), output = resolve(root, 'outputs/release-verification')
 await mkdir(output, {recursive: true})
 const stage = join(output, 'stage')
@@ -12,6 +13,7 @@ await rm(stage, {recursive: true, force: true}); await mkdir(stage)
 for (const path of ['package.json', 'dist', 'dist-electron']) await cp(join(root, path), join(stage, path), {recursive: true})
 const asar = join(output, 'app.asar')
 await createPackage(stage, asar)
+const validation = await createValidation({root: output, source: await readBuildSource(root), appVersion: JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version, artifacts: [{file: 'app.asar', kind: 'asar'}]})
 const checks = await checkCandidate(asar)
 await cp(join(root, 'dist-notices/licenses'), join(output, 'licenses'), {recursive: true})
 await checkExternalNotices(join(output, 'licenses'))
@@ -35,4 +37,6 @@ await writeFile(external, bytes)
 if (!rejectedExternal) throw Error('Empty external notice was accepted')
 const result = {checks, asar, sha256: digest(await readFile(asar)), negativeFixturesRejected: rejected, externalNoticeNegativeRejected: rejectedExternal, nativeInstallation: 'NOT RUN'}
 await writeFile(join(output, 'result.json'), JSON.stringify(result, null, 2) + '\n')
+await recordCheck(validation, output, {kind: 'asar', status: 'PASS', procedure: 'npm run release:verify (production ASAR, scoped assets, external notices and negative fixtures)', evidence: ['result.json']})
+await saveValidation(output, validation)
 console.log(JSON.stringify(result, null, 2))

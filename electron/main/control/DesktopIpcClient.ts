@@ -1,3 +1,4 @@
+import {windowsDesktopPipe} from "../../shared/desktop-ipc-endpoint.mjs"
 import { randomUUID } from "node:crypto"
 import { connect, type Socket } from "node:net"
 import { join } from "node:path"
@@ -50,7 +51,7 @@ export class DesktopIpcClient implements DesktopIpc {
     // Codex Desktop uses a fixed local named pipe on Windows. It is not a
     // filesystem socket and cannot pass Unix lstat/uid/mode checks.
     const path = process.platform === "win32"
-      ? "\\\\.\\pipe\\codex-ipc"
+      ? windowsDesktopPipe(home)
       : await validateControlSocket(join(home, "ipc", "ipc.sock"))
     const socket = connect(path), client = new DesktopIpcClient(socket, onClosed)
     try {

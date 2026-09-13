@@ -1,8 +1,10 @@
 // External resources make notices readable without an ASAR reader, on every platform.
 import {cp, mkdir, readFile, rm} from 'node:fs/promises'
 import {resolve} from 'node:path'
+import {requireElectronRuntime} from './electron-runtime.mjs'
 import {requiredNotices} from './licenses.mjs'
 const root = resolve(import.meta.dirname, '../..'), target = resolve(root, 'dist-notices/licenses')
+await requireElectronRuntime(root)
 await rm(resolve(root, 'dist-notices'), {recursive: true, force: true})
 await mkdir(target, {recursive: true})
 for (const [name, source] of Object.entries(requiredNotices)) await cp(resolve(root, source), resolve(target, name))

@@ -1,3 +1,4 @@
+import {windowsDesktopPipe} from "../electron/shared/desktop-ipc-endpoint.mjs"
 import { createServer } from "node:net"
 import { chmod, mkdir } from "node:fs/promises"
 import { join } from "node:path"
@@ -30,8 +31,8 @@ export async function startSmokeDesktopPresence(home) {
       }
     })
   })
-  const path = join(directory, "ipc.sock")
+  const path = process.platform === "win32" ? windowsDesktopPipe(home, {ELECTRON_SMOKE_TEST: "1"}) : join(directory, "ipc.sock")
   await new Promise((resolve, reject) => { server.once("error", reject); server.listen(path, resolve) })
-  await chmod(path, 0o600)
+  if (process.platform !== "win32") await chmod(path, 0o600)
   return async () => { for (const socket of sockets) socket.destroy(); await new Promise(resolve => server.close(resolve)) }
 }

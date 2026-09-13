@@ -6,7 +6,29 @@ does not authorize changing visibility, publishing a release, uploading binaries
 or merging the PR. On 2026-09-13 the user separately approved history cleanup of
 this public-preparation repository, including its affected branch updates.
 
-## PUBLICATION_BLOCKER_HISTORY_REVIEW
+## Current read-only review — 2026-09-14
+
+Remote main was `37ec67b619eb259245ca97efb9ae9779fa320876`. PRs #1, #2 and #3
+were merged; PR #4 remained OPEN at `47c2326e71f2fe511f3ffd7fce2ccac865e64f91`.
+The follow-up branch depends on PR #4. These are time-stamped observations, not
+permanent branch states. Recheck them before publication.
+
+The final pre-PR history checker snapshot scanned 15 accessible local refs and 20 commits,
+after fetching advertised remote heads, tags and PR head/merge refs. No tags were
+advertised. These counts precede creation of the follow-up PR and its remote ref. It reported nine environment-literal matches in one **stale local
+main** commit: three home paths, one private hostname, four private IP matches,
+and one private workspace path. No credential-category matches were reported.
+The fetched current remote branches and PR refs did not contain that commit and
+had no pattern findings in this scan. Counts describe scanner matches, not nine
+credentials or a complete secret audit. The old local ref was preserved.
+
+History remains **BLOCKED for publication review**: server-retained old objects,
+cached PR views and existing clones are not certified purged. No history rewrite,
+force push, remote deletion, Support contact or credential rotation was performed.
+Original reports/ref inventories remain private in ignored outputs. The earlier
+cleanup narrative below is historical; its then-open PR status is not current.
+
+## Historical PUBLICATION_BLOCKER_HISTORY_REVIEW
 
 Read-only review on 2026-09-13 found personal environment literals (including
 concatenated fragments) in the initial `scripts/release/source-check.mjs`.
@@ -14,7 +36,7 @@ The subsequently authorized rewrite removed them from reachable branch history,
 along with synthetic fixture matches in four test files. Do not reproduce the
 matched values. All descendant commit trees were preserved byte for byte.
 The remote `main` and existing PR branch were updated atomically with explicit
-leases. The PR remains open and its head/merge refs now use the rewritten history.
+leases. At that earlier checkpoint the PR remained open and its head/merge refs used the rewritten history. PR #1 has since merged, as recorded above.
 
 Current local branch history and Codex snapshot trees passed the redacted pattern
 scan after rewriting. **The old commit remains retrievable by SHA through GitHub's
@@ -81,5 +103,7 @@ https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/r
 - Before actual delivery: Windows EXE install/startup, character selection,
   settings, Codex integration, interactions, update/rollback/uninstall; macOS
   signature, notarization, extraction and runtime checks. Record actual runs.
-- Keep binaries, local paths, output hashes/logs and signing state in ignored
+- Keep binaries, local paths, raw logs and private signing metadata in ignored
   local evidence; do not commit experiment artifacts or private machine metadata.
+  Redacted final artifact identities/hashes are kept separately in
+  `docs/validation-candidates.json`, with outcomes in `docs/validation.json`.

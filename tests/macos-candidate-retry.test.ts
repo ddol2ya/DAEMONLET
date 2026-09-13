@@ -49,7 +49,7 @@ async function fixture(stage: "signed" | "notarized" = "notarized") {
   const payloadPath = join(app, "Contents", "fixture-payload")
   await writeFile(payloadPath, "unchanged-signed-payload-fixture")
   const manifest = {
-    schemaVersion: 1, sourceCommit: "a".repeat(40), app,
+    schemaVersion: 1, source: {sourceCommit: "a".repeat(40), sourceTreeSha256: "d".repeat(64), workingTreeHasChanges: false}, sourceCommit: "a".repeat(40), app,
     version: "0.2.0", architecture: "arm64",
     signer: { team: "ABCDEFGHIJ", fingerprint: "A".repeat(40) },
     payload: { "app.asar": "b".repeat(64) }, signedCode: [],
@@ -296,7 +296,7 @@ it("preserves unknown legacy output and an orphaned attempt instead of mixing it
   await writeFile(join(orphan, "incomplete-output"), "crash before journal commit")
   const before = await inventory(orphan)
   const result = await createFinalArchive(f.root)
-  expect(result.state.final.path).toContain(`/attempts/${result.state.archiveAttempt}/final/`)
+  expect(result.state.final.path).toContain(join("attempts", result.state.archiveAttempt, "final"))
   for (const name of ["final", "verify-extracted"]) expect(await readFile(join(f.root, name, "unknown-output"), "utf8")).toBe("preserve this manual output")
   expect((await inventory(orphan)).sha256).toBe(before.sha256)
   const record = await readJSON(join(f.root, "attempts", result.state.archiveAttempt, "attempt.json"))

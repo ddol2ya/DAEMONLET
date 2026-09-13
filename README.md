@@ -2,7 +2,7 @@
 
 Codex 작업 상태에 반응하는 데스크톱 캐릭터 앱입니다. 저장소 이름은 **DAEMONLET**, 앱 이름은 **Daemonlet for Codex**입니다. OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
-기본 캐릭터는 OpenAI 이미지 생성으로 제작한 가상 캐릭터 **지피쨩 하나**입니다. 다른 캐릭터는 `.petchar` 팩으로 추가할 수 있습니다. 작업 상태별 포즈·말풍선, 머리/몸통 클릭, 쓰다듬기, 크기·위치 조절을 지원합니다.
+기본 캐릭터는 커뮤니티 캐릭터 자료를 참고해 앱용으로 추가 제작·가공한 **지피쨩 하나**입니다. 다른 캐릭터는 `.petchar` 팩으로 추가할 수 있습니다. 작업 상태별 포즈·말풍선, 머리/몸통 클릭, 쓰다듬기, 크기·위치 조절을 지원합니다.
 
 <img src="docs/images/gpichan.png" width="360" alt="Gpichan running in Daemonlet for Codex">
 
@@ -14,6 +14,8 @@ Codex 작업 상태에 반응하는 데스크톱 캐릭터 앱입니다. 저장�
 
 앱 사용에는 ComfyUI, 모델 가중치 또는 제작용 NVIDIA GPU가 필요하지 않습니다. 앱은 기존 2D Live/Test 설치와 별도 이름·앱 ID·사용자 데이터 경로를 사용합니다.
 
+[개인정보·저장 위치·삭제 안내](PRIVACY.md)를 확인하세요.
+
 ## 캐릭터 제작 — 실험 기능
 
 [create-pet-character 스킬](skills/create-pet-character/SKILL.md)은 레퍼런스 확인, 포즈 제작, See-through 분해, 리깅·표정 검수와 `.petchar` 출력을 안내하고 자체 제작 도구를 실행합니다. 레퍼런스가 없으면 사용 가능한 이미지 생성 도구로 기준 이미지를 만드는 단계부터 진행합니다.
@@ -24,10 +26,11 @@ Codex 작업 상태에 반응하는 데스크톱 캐릭터 앱입니다. 저장�
 
 ## 소스에서 실행
 
-Node.js 22.13 이상이 필요하며 Node 24에서 검증합니다.
+소스 빌드는 Git checkout에서 실행하며 **Node 24**를 검증 기준으로 사용합니다(선언된 최소 버전: 22.13). macOS에서는 음성 입력 helper 컴파일에 **Xcode Command Line Tools**가 필요합니다. `xcode-select -p`로 확인하고, 설치되지 않았다면 `xcode-select --install`을 실행하세요. 일반 배포 앱 실행에는 Node나 Xcode가 필요하지 않습니다.
 
 ```sh
 npm ci
+npm run electron:install
 npm run electron:dev
 ```
 
@@ -38,6 +41,8 @@ npm run build:renderer
 npm run build:electron:production
 npm run electron:package
 ```
+
+Electron 준비는 lockfile에 고정된 로컬 설치 스크립트를 실행합니다. `npm ci`만으로 런타임과 고지가 준비되지 않습니다. `typecheck`와 `test`는 Electron 설치 없이 실행할 수 있으며 숨은 다운로드를 하지 않습니다.
 
 ComfyUI 없이 앱을 빌드할 수 있습니다. macOS 음성 입력 helper 빌드에는 Xcode Command Line Tools가 필요합니다. [배포 빌드](docs/releasing.md) · [캐릭터 팩 규격](docs/character-pack-format.md)
 

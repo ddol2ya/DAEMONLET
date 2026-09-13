@@ -62,7 +62,7 @@ export async function verifyApp(requestedApp, expected, { evidence, requireTicke
   }
   const after = await inventory(app)
   if (after.sha256 !== before.sha256) throw new Error("Candidate changed during read-only verification.")
-  return { schemaVersion: 1, app, version: production.version, bundleId, signerMatched: true,
+  return { schemaVersion: 1, source: JSON.parse(extractFile(asar, "dist-electron/build-source.json").toString()), app, version: production.version, bundleId, signerMatched: true,
     payload, signedCode, fuses, runAsNode: "enabled", inventory: before, ticket: requireTicket ? "validated" : "not-assessed" }
 }
 
