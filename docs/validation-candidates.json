@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "recordType": "public-candidate-identities",
+  "limitations": "Hashes identify actual tested bytes. This public inventory is not executable evidence; raw command logs and hashed check records remain in ignored outputs. No publication approval is implied.",
+  "candidates": [
+    {
+      "label": "production-asar",
+      "schemaVersion": 1,
+      "candidateId": "3fb11427-4dc8-4cad-8c25-e5756f37b423",
+      "sourceCommit": "a9dcf491952a8f6e18c44382097eb9aec592c857",
+      "sourceTreeSha256": "a840022fd032dbc64fe0a7b03cec405408551f0859aaab0e801f4d180d2f2044",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-13T16:53:16.477Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "macOS 26.6.2 (25G83)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: synthetic resources only"
+      },
+      "artifacts": [
+        {
+          "file": "app.asar",
+          "bytes": 42866382,
+          "sha256": "9315851d04129c757012a55560ca520f3c2290d11e9956d80e5da6c81bb536ff",
+          "kind": "asar"
+        }
+      ]
+    },
+    {
+      "label": "macos-zip",
+      "schemaVersion": 1,
+      "candidateId": "dd2a35e7-ad81-4317-ae88-43d84008efbb",
+      "sourceCommit": "2683f0aa762e7b2f53b35b871997a50673bf17a3",
+      "sourceTreeSha256": "3d56613a19e8e9343da8c039c69858c8d15afb1d880db05686201861b1f8cab9",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-13T16:43:38.907Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "macOS 26.6.2 (25G83)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: synthetic resources only"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-macos-arm64.zip",
+          "bytes": 153466992,
+          "sha256": "44c55b680e2e6177733fa921b3ee6315f23d7845793cbd960d5d74a90301aeef",
+          "kind": "macosUnsignedZip"
+        }
+      ]
+    },
+    {
+      "label": "windows-zip",
+      "schemaVersion": 1,
+      "candidateId": "eea8e78c-dee7-4666-98b0-2fb8fe2f693f",
+      "sourceCommit": "48cc487718764c840342b638559abcb759f35dc1",
+      "sourceTreeSha256": "489bf50de04404bacffd2472ba4e0a346c5fb2218c01d9e1dec9d7ee55f8f3b8",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-13T16:46:37.829Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "osVersion": "10.0.26200 (Windows 11 Pro)",
+        "nodeVersion": "v24.13.1",
+        "codexVersion": "NOT_RUN: synthetic resources only"
+      },
+      "artifacts": [
+        {
+          "file": "artifacts/Daemonlet-for-Codex-0.7.0-windows-x64.zip",
+          "bytes": 183253131,
+          "sha256": "503db88625a15e7d1d34841d2a83c039ed353d9fdf33fdcd34169d5cc5bb78f3",
+          "kind": "windowsPortableZip"
+        }
+      ]
+    },
+    {
+      "label": "windows-installer",
+      "schemaVersion": 1,
+      "candidateId": "5ee6527b-f7e0-4111-bb6a-094aa88e7a66",
+      "sourceCommit": "48cc487718764c840342b638559abcb759f35dc1",
+      "sourceTreeSha256": "489bf50de04404bacffd2472ba4e0a346c5fb2218c01d9e1dec9d7ee55f8f3b8",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-13T16:48:48.039Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "osVersion": "10.0.26200 (Windows 11 Pro)",
+        "nodeVersion": "v24.13.1",
+        "codexVersion": "NOT_RUN: synthetic resources only"
+      },
+      "artifacts": [
+        {
+          "file": "artifacts/Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe",
+          "bytes": 101006564,
+          "sha256": "e658f8329b11fcf948a1840eee4696108b45283c074785367f2392e385f26db7",
+          "kind": "windowsInstallerExe"
+        }
+      ]
+    },
+    {
+      "label": "creator-zip",
+      "schemaVersion": 1,
+      "candidateId": "fc10a10d-84b7-469d-8146-d7504ff340ec",
+      "sourceCommit": "48cc487718764c840342b638559abcb759f35dc1",
+      "sourceTreeSha256": "d11a94f02497e59263905b8099f045ccadee272a32c8d6cef1c15929410ee36a",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-13T16:46:11.516Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "macOS 26.6.2 (25G83)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: synthetic resources only"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-creator-skill-0.7.0.zip",
+          "bytes": 355056,
+          "sha256": "db2d461ba73438e3fcfa620d64af25cf8547e4db41123c75663b14db61a6f758",
+          "kind": "creatorZip"
+        }
+      ]
+    },
+    {
+      "label": "synthetic-setup-only",
+      "schemaVersion": 1,
+      "candidateId": "f3afc43b-6612-4a53-8d89-71b1ad87849d",
+      "sourceCommit": "a9dcf491952a8f6e18c44382097eb9aec592c857",
+      "sourceTreeSha256": "a840022fd032dbc64fe0a7b03cec405408551f0859aaab0e801f4d180d2f2044",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-13T16:50:33.649Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "macOS 26.6.2 (25G83)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: synthetic resources only"
+      },
+      "artifacts": [
+        {
+          "file": "setup-smoke.asar",
+          "bytes": 42857140,
+          "sha256": "4c3c7def9301bdb9d6f1b54a64d132245b600291bca3dabe6c04eea62d24fec5",
+          "kind": "testOnlySetupAsar"
+        }
+      ]
+    }
+  ]
+}

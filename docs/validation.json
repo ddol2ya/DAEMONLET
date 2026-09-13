@@ -67,8 +67,160 @@
     }
   },
   "current": {
-    "status": "NOT_RUN",
-    "summary": "Candidate-specific results are recorded separately after verification.",
-    "identityFile": "validation-candidates.json"
-  }
+    "reviewedOn": "2026-09-14 (Asia/Seoul)",
+    "identityFile": "validation-candidates.json",
+    "results": [
+      {
+        "label": "production-asar",
+        "candidateId": "3fb11427-4dc8-4cad-8c25-e5756f37b423",
+        "checks": {
+          "unit": "PASS",
+          "build": "PASS",
+          "asar": "PASS",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "NOT_RUN",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "NOT_RUN",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "macos-zip",
+        "candidateId": "dd2a35e7-ad81-4317-ae88-43d84008efbb",
+        "checks": {
+          "unit": "PASS",
+          "build": "PASS",
+          "asar": "PASS",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "FAIL",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "windows-zip",
+        "candidateId": "eea8e78c-dee7-4666-98b0-2fb8fe2f693f",
+        "checks": {
+          "unit": "FAIL",
+          "build": "PASS",
+          "asar": "PASS",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "NOT_RUN",
+          "notarization": "N/A"
+        }
+      },
+      {
+        "label": "windows-installer",
+        "candidateId": "5ee6527b-f7e0-4111-bb6a-094aa88e7a66",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "PASS",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "PASS",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "FAIL",
+          "notarization": "N/A"
+        }
+      },
+      {
+        "label": "creator-zip",
+        "candidateId": "fc10a10d-84b7-469d-8146-d7504ff340ec",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "NOT_RUN",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "PASS",
+          "nativePackageSmoke": "NOT_RUN",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "NOT_RUN",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "synthetic-setup-only",
+        "candidateId": "f3afc43b-6612-4a53-8d89-71b1ad87849d",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "NOT_RUN",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "NOT_RUN",
+          "notarization": "NOT_RUN"
+        }
+      }
+    ],
+    "macosSourceTests": {
+      "sourceCommit": "a9dcf491952a8f6e18c44382097eb9aec592c857",
+      "files": 138,
+      "passed": 1301,
+      "skipped": 3,
+      "pythonPassed": 4
+    },
+    "windowsSourceTests": {
+      "sourceCommit": "48cc487718764c840342b638559abcb759f35dc1",
+      "status": "FAIL",
+      "filesFailed": 14,
+      "filesPassed": 124,
+      "testsFailed": 60,
+      "testsPassed": 1182,
+      "skipped": 2,
+      "baselinePR4": "61 failed tests and 15 failed files on the same Windows host; Unix path/socket/permission assumptions. No additional failure names remain after the portability fixes.",
+      "changedRegressionSubset": {
+        "files": 4,
+        "passed": 40
+      }
+    },
+    "firstRun": {
+      "status": "PASS",
+      "sourceCommit": "2683f0aa762e7b2f53b35b871997a50673bf17a3",
+      "workingTreeHasChanges": false,
+      "steps": [
+        "independent npm ci",
+        "explicit electron:install",
+        "repeat installation",
+        "missing runtime rejection",
+        "missing required notice rejection and pinned restore",
+        "actual Vite + Electron window, Gpichan/WebGL, three reloads",
+        "Vite and adapter ports released"
+      ],
+      "reproducedBeforeFix": [
+        "Missing Electron LICENSE after npm ci",
+        "Development CSP blocks pet://app character catalog; Electron 43 also requires explicit CORS scheme/header handling"
+      ],
+      "evidence": "Private independent-checkout logs and native renderer captures under outputs"
+    },
+    "notRun": [
+      "Real Codex start/completion/cancel and restart with actual approval",
+      "Dialog-based .petchar import on the final native candidates",
+      "Full ordinary macOS install/permission-denial acceptance",
+      "OS microphone/speech permission prompt denial",
+      "Update/rollback against an identified prior artifact",
+      "Developer ID signing and notarization submission"
+    ],
+    "decisions": {
+      "technicalSource": "PASS",
+      "windowsFullUnitSuite": "FAIL (pre-existing platform assumptions retained)",
+      "nativePackageSmoke": "PASS for the named Mac and Windows candidates only",
+      "windowsInstallUninstall": "PASS including 127 installed payload hashes and preservation of test-owned settings/extra-pack sentinels; not a dialog import test",
+      "signing": "FAIL: tested Mac/Windows candidates do not satisfy distribution signature verification",
+      "notarization": "NOT_RUN; N/A for Windows",
+      "characterRights": "BLOCKED: community reference rights unverified; provider-controlled contribution grant preserved",
+      "externalModelTerms": "BLOCKED: separate review pending; no inference or model installation performed",
+      "gitHistory": "BLOCKED for publication review: stale local main environment literals and unverified server-retained objects",
+      "publication": "NOT_RUN: human decision required; no merge, visibility change, release, upload or notarization submission authorized"
+    }
+  },
+  "recordType": "public-validation-summary"
 }

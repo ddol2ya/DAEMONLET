@@ -26,7 +26,7 @@ Codex 작업 상태에 반응하는 데스크톱 캐릭터 앱입니다. 저장�
 
 ## 소스에서 실행
 
-소스 빌드는 **Node 24**를 검증 기준으로 사용합니다(선언된 최소 버전: 22.13). macOS에서는 음성 입력 helper 컴파일에 **Xcode Command Line Tools**가 필요합니다. `xcode-select -p`로 확인하고, 설치되지 않았다면 `xcode-select --install`을 실행하세요. 일반 배포 앱 실행에는 Node나 Xcode가 필요하지 않습니다.
+소스 빌드는 Git checkout에서 실행하며 **Node 24**를 검증 기준으로 사용합니다(선언된 최소 버전: 22.13). macOS에서는 음성 입력 helper 컴파일에 **Xcode Command Line Tools**가 필요합니다. `xcode-select -p`로 확인하고, 설치되지 않았다면 `xcode-select --install`을 실행하세요. 일반 배포 앱 실행에는 Node나 Xcode가 필요하지 않습니다.
 
 ```sh
 npm ci

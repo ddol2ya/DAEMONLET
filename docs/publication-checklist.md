@@ -13,9 +13,9 @@ were merged; PR #4 remained OPEN at `47c2326e71f2fe511f3ffd7fce2ccac865e64f91`.
 The follow-up branch depends on PR #4. These are time-stamped observations, not
 permanent branch states. Recheck them before publication.
 
-The existing history checker scanned 15 accessible local refs and 15 commits,
+The final pre-PR history checker snapshot scanned 15 accessible local refs and 20 commits,
 after fetching advertised remote heads, tags and PR head/merge refs. No tags were
-advertised. It reported nine environment-literal matches in one **stale local
+advertised. These counts precede creation of the follow-up PR and its remote ref. It reported nine environment-literal matches in one **stale local
 main** commit: three home paths, one private hostname, four private IP matches,
 and one private workspace path. No credential-category matches were reported.
 The fetched current remote branches and PR refs did not contain that commit and
@@ -103,5 +103,7 @@ https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/r
 - Before actual delivery: Windows EXE install/startup, character selection,
   settings, Codex integration, interactions, update/rollback/uninstall; macOS
   signature, notarization, extraction and runtime checks. Record actual runs.
-- Keep binaries, local paths, output hashes/logs and signing state in ignored
+- Keep binaries, local paths, raw logs and private signing metadata in ignored
   local evidence; do not commit experiment artifacts or private machine metadata.
+  Redacted final artifact identities/hashes are kept separately in
+  `docs/validation-candidates.json`, with outcomes in `docs/validation.json`.
