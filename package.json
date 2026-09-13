@@ -37,7 +37,9 @@
     "release:installer": "node scripts/release/installer.mjs",
     "creator:package": "node scripts/release/creator.mjs",
     "creator:check": "node skills/create-pet-character/scripts/creator.mjs check",
-    "source:check": "node scripts/release/source-check.mjs"
+    "source:check": "node scripts/release/source-check.mjs",
+    "release:verify": "node scripts/release/verify.mjs",
+    "creator:verify": "node scripts/release/verify-creator.mjs"
   },
   "dependencies": {
     "ag-psd": "29.0.0",

@@ -216,3 +216,11 @@ version의 다른 내용, `PACK_DOWNGRADE`는 낮은 버전, `PACK_TRANSACTION`�
 신규 ID import → 시각 변화가 있는 update → 잘못된 update 거부 → rollback → 재시작 →
 원본 archive 제거 후 실행 → 선택 중 remove를 검증하고 후보 bundle hash를 전후 대조한다.
 캐릭터의 눈/입 중간값, 접촉, 모션, 사용 크기의 시각 검토는 별도로 기록한다.
+
+## 라이선스 보존
+
+기존 v1의 선택 파일 `LICENSE.txt`를 그대로 사용합니다. 지피쨩 payload에는 정확한
+상대 시각 파일 목록, 제작 출처, CC BY 4.0 전문 및 비시각 파일의 프로젝트 MIT 전문이
+들어 있습니다. export/import의 기존 inventory 해시와 크기·경로 검증 대상이며 새로운
+확장자나 제한 완화는 없습니다. 다른 팩의 LICENSE.txt는 바이트 그대로 보존하고
+출처 미상 팩에 자동 라이선스를 붙이지 않습니다. 팩 컨테이너 전체를 CC BY로 선언하지 않습니다.

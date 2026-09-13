@@ -10,6 +10,7 @@ __pycache__/
 *.tsbuildinfo
 /dist/
 /dist-electron/
+/dist-notices/
 /out/
 /outputs/
 /.generated/

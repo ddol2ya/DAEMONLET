@@ -1,0 +1,2 @@
+# Preserve the downloaded official legal code byte for byte on every platform.
+/distribution/licenses/CC-BY-4.0.txt -text

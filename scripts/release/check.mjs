@@ -1,14 +1,19 @@
 import { APP_NAME, BUNDLE_ID } from "../../electron/shared/app-identity.mjs"
 import { extractFile, listPackage } from '@electron/asar'
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { resolve, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runtimeAssetPaths } from './runtime-assets.mjs'
+import { requiredNotices } from './licenses.mjs'
+import { verifyArtwork, digest } from './artwork.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 export async function checkCandidate(asar) {
+  await verifyArtwork(root)
   const files = listPackage(asar).map(p => p.replaceAll('\\', '/').replace(/^\//, ''))
-  const json = path => JSON.parse(extractFile(asar, path).toString('utf8'))
+  // @electron/asar resolves member components with the host path separator.
+  const extract = path => extractFile(asar, normalize(path))
+  const json = path => JSON.parse(extract(path).toString('utf8'))
   if (json('package.json').productName !== APP_NAME) throw new Error('Packaged app still shares the regular product identity')
   const catalog = json('dist/characters/catalog.json')
   const expected = ['gpichan/character.json']
@@ -17,7 +22,7 @@ export async function checkCandidate(asar) {
   if (!mode.production || mode.setupSmoke) throw new Error('Not a production build')
   const needed = await runtimeAssetPaths(resolve(root, 'public/characters'))
   for (const path of needed) {
-    const packaged = extractFile(asar, 'dist/characters/' + path)
+    const packaged = extract('dist/characters/' + path)
     const source = await readFile(resolve(root, 'public/characters', path))
     if (!packaged.equals(source)) throw new Error(`Runtime asset differs from source: ${path}`)
   }
@@ -26,15 +31,25 @@ export async function checkCandidate(asar) {
   }))
   for (const path of files) {
     if (!/^(package\.json|dist(?:\/|$)|dist-electron(?:\/|$))/.test(path)) throw new Error(`Unexpected app content: ${path}`)
-    if (/\.(map|pyc)$/.test(path)) throw new Error(`Development artifact shipped: ${path}`)
+    if (/\.(map|pyc|safetensors|ckpt|pt|pth|onnx|gguf)$|(^|\/)(node_modules|outputs|__pycache__)(\/|$)/i.test(path)) throw new Error(`Development artifact shipped: ${path}`)
     if (path.startsWith('dist/characters/') && !allowedAssets.has(path)) throw new Error(`Unreferenced artwork shipped: ${path}`)
   }
   const packages = []
   for (const prefix of ['dist/licenses', 'dist-electron/licenses']) {
-    for (const name of ['PROJECT-LICENSE.txt', 'Anime2.5DRig-LICENSE.txt', 'ARTWORK-NOTICE.md']) extractFile(asar, `${prefix}/${name}`)
+    for (const [name, source] of Object.entries(requiredNotices)) {
+      const bytes = extract(`${prefix}/${name}`)
+      if (!bytes.length || !bytes.equals(await readFile(resolve(root, source)))) throw new Error(`Missing or altered notice: ${prefix}/${name}`)
+    }
+    // Build inventory and package files must match; removal of an inventory entry is not a bypass.
+    if (!extract(`${prefix}/inventory.json`).equals(await readFile(resolve(root, prefix, 'inventory.json')))) throw Error('License inventory differs from build')
     for (const pkg of json(`${prefix}/inventory.json`)) {
       if (!['MIT', 'BSD-2-Clause', 'BSD-3-Clause', '(MIT AND Zlib)'].includes(pkg.license)) throw new Error(`Review license for ${pkg.name}: ${pkg.license}`)
-      for (const notice of pkg.notices) if (!extractFile(asar, `${prefix}/${notice}`).length) throw new Error(`Empty notice: ${notice}`)
+      if (!pkg.notices.length) throw Error(`Missing dependency notices: ${pkg.name}`)
+      for (const notice of pkg.notices) {
+        if (!/^[\w@.+-]+\/[\w.-]+$/.test(notice)) throw Error('Invalid notice path')
+        const bytes = extract(`${prefix}/${notice}`)
+        if (!bytes.length || digest(bytes) !== pkg.noticeHashes?.[notice]) throw new Error(`Empty or altered notice: ${notice}`)
+      }
       packages.push(`${pkg.name}@${pkg.version}`)
     }
   }

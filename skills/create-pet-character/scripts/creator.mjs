@@ -3,6 +3,7 @@ import {access,readFile} from 'node:fs/promises'
 import {join,resolve} from 'node:path'
 import {spawn} from 'node:child_process'
 import {createRequire} from 'node:module'
+import {externalLicenseStatus} from './license-status.mjs'
 const skill=resolve(import.meta.dirname,'..')
 const source=resolve(skill,'../..')
 const candidates=process.env.DAEMONLET_CREATOR_RUNTIME?[resolve(process.env.DAEMONLET_CREATOR_RUNTIME)]:[join(skill,'runtime'),source]
@@ -16,7 +17,8 @@ else if(action==='check'){
  const errors=[],require=createRequire(join(runtime,'package.json'))
  for(const tool of [...Object.values(actions),'src/engine/anime25d/PsdRigLoader.ts','scripts/characters/verify-independent-browser.mjs','scripts/characters/lib/prepare.py'])try{await access(join(runtime,tool))}catch{errors.push('Missing runtime file: '+tool)}
  for(const dep of ['ag-psd','esbuild','vite','electron','yauzl','yazl'])try{require.resolve(dep)}catch{errors.push('Run npm ci in the creator runtime: '+dep)}
- console.log(JSON.stringify({runtime,errors,externalTools:'ComfyUI, See-through, models and Python are checked separately; nothing was downloaded'},null,2));if(errors.length)process.exitCode=1
+ const dependencies=JSON.parse(await readFile(join(skill,'external-dependencies.json'),'utf8'))
+ console.log(JSON.stringify({runtime,errors,technicalReadiness:errors.length?'not-ready':'runtime-ready',licenseReview:externalLicenseStatus(dependencies),externalTools:'ComfyUI, See-through, models and Python are checked separately; nothing was downloaded'},null,2));if(errors.length)process.exitCode=1
 }else{
  const tool=actions[action];if(!tool)throw Error('Unknown creator action. Use info, check, '+Object.keys(actions).join(', '))
  const python=process.env.DAEMONLET_CREATOR_PYTHON||(process.platform==='win32'?'python':'python3')
