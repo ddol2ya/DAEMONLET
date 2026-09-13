@@ -37,7 +37,7 @@ export class CodexThreadLauncher {
       if (!belongsToLocalCodexHome(target.rolloutPath, target.threadId, this.home)) throw new Error("UNAVAILABLE")
       const [home, path] = await Promise.all([realpath(this.home), realpath(target.rolloutPath!)])
       const info = await stat(path)
-      if (!belongsToLocalCodexHome(path, target.threadId, home) || !info.isFile() || info.uid !== process.getuid?.()) throw new Error("UNAVAILABLE")
+      if (!belongsToLocalCodexHome(path, target.threadId, home) || !info.isFile() || (process.platform !== "win32" && info.uid !== process.getuid?.())) throw new Error("UNAVAILABLE")
       const result = await (this.options.app ?? new CodexAppLauncher()).openThread(target.threadId)
       if (result !== "opened") throw new Error(result === "unavailable" ? "UNAVAILABLE" : "OPEN_FAILED")
     } finally { this.opening = false }
