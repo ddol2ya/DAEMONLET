@@ -19,6 +19,8 @@ export async function runtimeAssetPaths(directory) {
   }
   for (const ref of (await json('catalog.json')).characters) {
     const path = await add(ref, 'catalog.json'), character = await json(path)
+    // Only the approved Gpichan notice, not arbitrary files in character folders.
+    if (path === 'gpichan/character.json') await add('LICENSE.txt', path)
     for (const key of ['source', 'psd', 'overrides']) if (character.base[key]) await add(character.base[key], path)
     for (const key of ['behavior', 'dialogue', 'thumbnail']) if (character[key]) await add(character[key], path)
     for (const ref of character.poses) {

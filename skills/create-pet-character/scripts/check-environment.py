@@ -31,7 +31,13 @@ try:
 except (OSError, subprocess.SubprocessError):
     gpu = None
     errors.append('Cannot query NVIDIA GPU; confirm the selected GPU environment')
+dependencies = json.loads((Path(__file__).resolve().parent.parent / 'external-dependencies.json').read_text(encoding='utf-8'))
+license_entries = [{'id': name, **item.get('licenseEvidence', {'status': 'unverified'}), 'installedRevisionChecked': False}
+                   for name, item in [('ComfyUI', dependencies['comfyui']), ('ComfyUI-See-through', dependencies['seeThrough'])]
+                   + [(item['id'], item) for item in dependencies['models']]]
 print(json.dumps({'comfyRoot': str(root), 'python': sys.executable, 'versions': versions,
+                  'technicalReadiness': 'not-ready' if errors else 'environment-ready',
+                  'licenseReview': {'status': 'pending', 'installedEnvironment': 'unverified', 'entries': license_entries, 'acknowledgementGrantsRights': False},
                   'gpu': gpu, 'errors': errors, 'inferenceRun': False,
                   'next': 'Verify both loaders actually enable group offload in the first inference log.'}, ensure_ascii=False, indent=2))
 sys.exit(1 if errors else 0)

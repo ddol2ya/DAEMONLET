@@ -9,6 +9,7 @@ import { promisify, parseArgs } from 'node:util'
 import { ZipFile } from 'yazl'
 import { checkCandidate } from './check.mjs'
 import { packageCreator } from './creator.mjs'
+import { checkExternalNotices } from './check-notices.mjs'
 
 const { values } = parseArgs({ options: { platform: { type: 'string', default: 'win32' }, arch: { type: 'string', default: 'x64' }, output: { type: 'string' } } })
 if (!values.output || values.platform !== 'win32' || values.arch !== 'x64') throw new Error('This release targets Windows x64 only. Require --output <new directory> [--platform win32 --arch x64]')
@@ -37,6 +38,7 @@ const appDirectory = apps[0].packagedPath
 const name = APP_NAME, app = appDirectory
 const resources = join(app, 'resources')
 const checks = await checkCandidate(join(resources, 'app.asar'))
+await checkExternalNotices(join(resources, 'licenses'))
 // Keep Electron and Chromium notices supplied with the exact runtime distribution.
 const chromiumNotice = join(appDirectory, 'LICENSES.chromium.html')
 await stat(chromiumNotice)
@@ -47,6 +49,8 @@ await mkdir(stage, { recursive: true })
 await cp(app, join(stage, name), { recursive: true })
 await cp(join(root, 'distribution/README.md'), join(stage, 'README.md'))
 await cp(join(root, 'distribution/ARTWORK-NOTICE.md'), join(stage, 'ARTWORK-NOTICE.md'))
+await cp(join(root, 'distribution/ARTWORK-LICENSE.md'), join(stage, 'ARTWORK-LICENSE.md'))
+await cp(join(root, 'distribution/ARTWORK-SCOPE.json'), join(stage, 'ARTWORK-SCOPE.json'))
 await cp(join(root, 'LICENSE'), join(stage, 'LICENSE.txt'))
 await cp(join(root, 'dist/licenses'), join(stage, 'licenses/renderer'), { recursive: true })
 await cp(join(root, 'dist-electron/licenses'), join(stage, 'licenses/desktop'), { recursive: true })

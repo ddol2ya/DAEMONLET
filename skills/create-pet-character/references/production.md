@@ -6,6 +6,23 @@
 
 ## 입력과 분해
 
+### See-through 설치와 모델 준비
+
+사용자가 노드팩 설치를 요청하면 확인한 ComfyUI의 Manager에서
+**ComfyUI-See-through**를 검색하여 [공식 노드팩](https://github.com/jtydhr88/ComfyUI-See-through)을
+설치하고 재시작한다. 수동 설치는 그 ComfyUI의 `custom_nodes`와 Python을 사용한다.
+먼저 기존 설치를 검사하고 자동 업데이트하지 않는다. 폴더 이름만으로 루트나 Python을
+추정하지 않는다. `external-dependencies.json`의 호환 commit, 필수 노드와
+`/object_info`를 비교하고 import 오류를 해결한 뒤 진행한다.
+
+공식 로더는 `auto_download=true`일 때 첫 로딩에서 LayerDiff3D와 깊이 추정용 Marigold를
+내려받을 수 있다. 사용자가 모델 준비도 요청한 경우 이 설치 절차를 사용하고 실제 snapshot을
+기록한다. 기존 모델은 재사용한다. 코드 설치만으로 모델까지 이미 존재한다고 가정하지 않는다.
+준비 후 아래 제작 명령은 `auto_download=false`를 유지한다. 앱과 제작 ZIP에는 가중치를 넣지 않는다.
+공식 문서의 `24yearsold/seethroughv0.0.1_marigold`는 확인일 현재 목록의 `layerdifforg` 주소와
+같은 모델로 연결된다. 노드 설치 성공과 모델 조건 확인은 별개이며, 조건 미확인을 사용 금지
+판정으로 바꾸지 않는다. 설치 설명: https://docs.comfy.org/installation/install_custom_node
+
 작업 루트는 **`outputs/characters/<new-run>`** 하위로 만든다. 출력 보호 검사는 이 위치를 요구한다. 동결된 기존 run은 수정하지 않는다.
 
 ```text

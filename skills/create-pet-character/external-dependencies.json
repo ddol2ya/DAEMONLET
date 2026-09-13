@@ -1,11 +1,90 @@
 {
   "schemaVersion": 1,
   "policy": "user-installed; no automatic engine update or model download",
-  "comfyui": {"url":"https://github.com/Comfy-Org/ComfyUI", "pythonEnvironment":"Use the Python belonging to the selected ComfyUI installation"},
-  "seeThrough": {"url":"https://github.com/jtydhr88/ComfyUI-See-through", "compatibleCommit":"98d754bf04f668647919ab750eccb0e0640faa81", "diffusersMinimum":"0.37.0", "requiredNodes":["SeeThrough_LoadLayerDiffModel","SeeThrough_LoadDepthModel","SeeThrough_GenerateLayers","SeeThrough_GenerateDepth","SeeThrough_PostProcess","SeeThrough_SavePSD"]},
+  "comfyui": {
+    "url": "https://github.com/Comfy-Org/ComfyUI",
+    "pythonEnvironment": "Use the Python belonging to the selected ComfyUI installation",
+    "licenseEvidence": {
+      "status": "verified",
+      "license": "GPL-3.0",
+      "revision": "02d39c8cd7828566f48ccf783c1c75b8336044f5",
+      "verifiedOn": "2026-09-13",
+      "sources": [
+        "https://github.com/Comfy-Org/ComfyUI/blob/02d39c8cd7828566f48ccf783c1c75b8336044f5/LICENSE"
+      ],
+      "note": "GPL v3 full text reviewed for external engine code, not model weights. Installed revision not inspected."
+    }
+  },
+  "seeThrough": {
+    "url": "https://github.com/jtydhr88/ComfyUI-See-through",
+    "compatibleCommit": "98d754bf04f668647919ab750eccb0e0640faa81",
+    "diffusersMinimum": "0.37.0",
+    "requiredNodes": [
+      "SeeThrough_LoadLayerDiffModel",
+      "SeeThrough_LoadDepthModel",
+      "SeeThrough_GenerateLayers",
+      "SeeThrough_GenerateDepth",
+      "SeeThrough_PostProcess",
+      "SeeThrough_SavePSD"
+    ],
+    "licenseEvidence": {
+      "status": "declared",
+      "license": "MIT",
+      "revision": "98d754bf04f668647919ab750eccb0e0640faa81",
+      "verifiedOn": "2026-09-13",
+      "sources": [
+        "https://github.com/jtydhr88/ComfyUI-See-through/blob/98d754bf04f668647919ab750eccb0e0640faa81/pyproject.toml",
+        "https://github.com/jtydhr88/ComfyUI-See-through/blob/98d754bf04f668647919ab750eccb0e0640faa81/README.md"
+      ],
+      "note": "pyproject declares MIT; no LICENSE file in the reviewed root tree. Declaration is not a substitute for model terms."
+    }
+  },
   "models": [
-    {"id":"layerdifforg/seethroughv0.0.2_layerdiff3d","url":"https://huggingface.co/layerdifforg/seethroughv0.0.2_layerdiff3d","folder":"ComfyUI/models/SeeThrough/layerdifforg/seethroughv0.0.2_layerdiff3d","licenseReview":"Inspect the model card and record the installed revision; do not substitute the plugin license"},
-    {"id":"layerdifforg/seethroughv0.0.1_marigold","url":"https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold","folder":"ComfyUI/models/SeeThrough/layerdifforg/seethroughv0.0.1_marigold","licenseReview":"License was not declared in the reviewed model card; check upstream terms before use/distribution"}
+    {
+      "id": "layerdifforg/seethroughv0.0.2_layerdiff3d",
+      "url": "https://huggingface.co/layerdifforg/seethroughv0.0.2_layerdiff3d",
+      "folder": "ComfyUI/models/SeeThrough/layerdifforg/seethroughv0.0.2_layerdiff3d",
+      "licenseReview": "Apache-2.0 declared at recorded revision; installed revision and component provenance still require review.",
+      "licenseEvidence": {
+        "status": "declared",
+        "license": "Apache-2.0",
+        "revision": "966721bb4ef2ddc3af3696862fa10b3f78d9785d",
+        "verifiedOn": "2026-09-13",
+        "sources": [
+          "https://huggingface.co/layerdifforg/seethroughv0.0.2_layerdiff3d/tree/966721bb4ef2ddc3af3696862fa10b3f78d9785d",
+          "https://huggingface.co/layerdifforg/seethroughv0.0.2_layerdiff3d/blob/966721bb4ef2ddc3af3696862fa10b3f78d9785d/README.md"
+        ],
+        "note": "Official model card declares Apache-2.0 for this repository. No separate LICENSE file. Linked research code license does not independently clear every bundled model component. No output-specific restriction found in this card; not a universal rights clearance."
+      }
+    },
+    {
+      "id": "layerdifforg/seethroughv0.0.1_marigold",
+      "url": "https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold",
+      "folder": "ComfyUI/models/SeeThrough/layerdifforg/seethroughv0.0.1_marigold",
+      "licenseReview": "Unverified: confirm terms for these exact weights before use or redistribution.",
+      "licenseEvidence": {
+        "status": "unverified",
+        "license": null,
+        "revision": "aa7a892f83ff68d7b09186a405ba08d5d33f770f",
+        "verifiedOn": "2026-09-13",
+        "sources": [
+          "https://huggingface.co/layerdifforg/seethroughv0.0.1_marigold/tree/aa7a892f83ff68d7b09186a405ba08d5d33f770f",
+          "https://huggingface.co/24yearsold/seethroughv0.0.1_marigold"
+        ],
+        "note": "No README, license metadata or LICENSE file at this revision. The official 24yearsold model URL redirects to layerdifforg; both API responses have the same revision, 14-file tree and weight LFS hashes. This is the same model, not a namespace mismatch. Terms and any output restrictions remain pending; installation availability is not a license declaration or a finding that use is prohibited."
+      }
+    }
   ],
-  "profile":{"targetGpu":"RTX 3060 12GB","measured3060Performance":false,"groupOffload":true,"layerResolution":1280,"steps":30,"vram8GiBOrLess":{"recommended":false,"maximumLayerResolution":1024,"depthResolution":720}}
+  "profile": {
+    "targetGpu": "RTX 3060 12GB",
+    "measured3060Performance": false,
+    "groupOffload": true,
+    "layerResolution": 1280,
+    "steps": 30,
+    "vram8GiBOrLess": {
+      "recommended": false,
+      "maximumLayerResolution": 1024,
+      "depthResolution": 720
+    }
+  }
 }

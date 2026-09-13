@@ -8,11 +8,13 @@ import { createHash } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { checkCandidate } from './check.mjs'
+import { checkExternalNotices } from './check-notices.mjs'
 
 const { values } = parseArgs({ options: { app: { type: 'string' }, output: { type: 'string' } } })
 if (!values.app || !values.output) throw new Error('Usage: npm run release:installer -- --app <verified Windows app folder> --output <new build project>')
 const root = resolve(import.meta.dirname, '../..'), app = resolve(values.app), output = resolve(values.output)
 const checks = await checkCandidate(join(app, 'resources/app.asar'))
+await checkExternalNotices(join(app, 'resources/licenses'))
 await mkdir(output) // Existing build projects are never overwritten.
 const staged = join(output, 'runtime')
 await cp(app, staged, { recursive: true })

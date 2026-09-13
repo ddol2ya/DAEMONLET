@@ -47,6 +47,8 @@ ComfyUI 없이 앱을 빌드할 수 있습니다. macOS 음성 입력 helper 빌
 
 ## 라이선스와 제보
 
-프로젝트 코드에는 [MIT](LICENSE)를 적용하며, 사용한 코드의 [고지](THIRD_PARTY_NOTICES.md)와 [이미지 출처](distribution/ARTWORK-NOTICE.md)를 보존합니다. 외부 모델과 사용자가 제공한 이미지의 조건은 별도로 확인해야 합니다.
+프로젝트 코드는 [MIT](LICENSE), 명시적으로 지정된 지피쨩 시각 자산은 [CC BY 4.0](distribution/ARTWORK-LICENSE.md)입니다. 출처·라이선스·변경 표시 조건으로 원본과 수정본 재배포 및 **상업적 이용**도 허용합니다. [정확한 적용 파일](distribution/ARTWORK-SCOPE.json) · [이미지 출처](distribution/ARTWORK-NOTICE.md) · [CC BY 전문](distribution/licenses/CC-BY-4.0.txt)을 확인하세요. 외부 코드·upstream 자산·모델·다른 캐릭터 팩은 [각자의 조건](THIRD_PARTY_NOTICES.md)을 따릅니다. `.petchar` 전체가 하나의 자산 라이선스로 바뀌는 것은 아닙니다.
+
+위 링크는 소스 저장소 경로입니다. 설치된 앱의 고지는 Windows/Linux `resources/licenses/`, macOS 앱 패키지의 `Contents/Resources/licenses/`에 있으며 ASAR를 열지 않고 읽을 수 있습니다. 기존 MIT의 `Momo Motion Lab contributors` 표기는 권리자 변경 근거가 없어 보존합니다.
 
 버그 제보에는 앱 버전, OS, 재현 순서와 개인 정보를 가린 화면을 첨부해 주세요. 계정 토큰, 원본 대화 또는 전체 Codex 설정을 올리지 마세요.

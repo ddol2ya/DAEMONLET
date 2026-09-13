@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "license": "CC-BY-4.0",
+  "provider": "ddol2ya",
+  "source": "https://github.com/ddol2ya/DAEMONLET",
+  "files": [
+    {
+      "path": "docs/images/gpichan.png",
+      "sha256": "5b2ec3c1a28569ab0084dfd5a1e56aa192cf702c15525cd840de940810f491f3"
+    },
+    {
+      "path": "public/characters/gpichan/poses/bored/rigged/bored.psd",
+      "sha256": "72abf77dd3f05182282ea47c1007a81327690925722548c8159c730b6338dff0"
+    },
+    {
+      "path": "public/characters/gpichan/poses/bored/source/arms-trimmed.png",
+      "sha256": "73b342974bd1708316669f87384c7b8c593729048761fc2cc5255456c20d1f37"
+    },
+    {
+      "path": "public/characters/gpichan/poses/cancelled/rigged/cancelled.psd",
+      "sha256": "129fdba611ecfc66126a32efc8b95179759530c363a1651947de04d9ea9648d4"
+    },
+    {
+      "path": "public/characters/gpichan/poses/cancelled/source/arms-trimmed.png",
+      "sha256": "20d692dff5f351e1d59bf29c4bde5fd3b1121571e85cc09efc9a0ca3430da5cb"
+    },
+    {
+      "path": "public/characters/gpichan/poses/disconnected/rigged/disconnected.psd",
+      "sha256": "a49f73588786c2d45bc4005693df501ad0d311ecd0f18da22d714f37d45e295d"
+    },
+    {
+      "path": "public/characters/gpichan/poses/disconnected/source/arms-trimmed.png",
+      "sha256": "2868912394aed5ce34f8cb3611d309e2a4bfe92f18227bc7fa924bad95a2b97c"
+    },
+    {
+      "path": "public/characters/gpichan/poses/failed/rigged/failed.psd",
+      "sha256": "384fb34f6c256ecd1b3575f0cd945b217fc171acf5bc9e6071f4fd4f87751b9e"
+    },
+    {
+      "path": "public/characters/gpichan/poses/failed/source/arms-trimmed.png",
+      "sha256": "dcdb33845d1263e988c69db000741efda05ed8d91852befacb8be922ed9ff8e2"
+    },
+    {
+      "path": "public/characters/gpichan/poses/happy/rigged/happy.psd",
+      "sha256": "59384048922b2137dea63d6efc26cfac91786597df583a533ba9aff61ea04f2e"
+    },
+    {
+      "path": "public/characters/gpichan/poses/happy/source/arms-trimmed.png",
+      "sha256": "baa55513129727749b6d3e29d30580c25b3f0c0db4c9fc44d4f18b9b23d0b04f"
+    },
+    {
+      "path": "public/characters/gpichan/poses/head-pet/rigged/head-pet.psd",
+      "sha256": "bc4a18c2b5fd92db73bff1bb96e2e3cb5688ade13f69e80ff282afaa8ce37dbc"
+    },
+    {
+      "path": "public/characters/gpichan/poses/head-pet/source/arms-aligned.png",
+      "sha256": "46738707eb78e0cb1f3e5ba39f0e43c0895491b55782afc3c92d32a437b55164"
+    },
+    {
+      "path": "public/characters/gpichan/poses/head-tap/rigged/head-tap.psd",
+      "sha256": "b3f1a57e4924b34ed96e58fafe6c17c80d8f775f2b8d6ad3d2ce44f74bf01db4"
+    },
+    {
+      "path": "public/characters/gpichan/poses/head-tap/source/arms-trimmed.png",
+      "sha256": "55b9219a2cc819c2cf923926212ddfeeb4819252e2e8cfde0523a379cc0c32b9"
+    },
+    {
+      "path": "public/characters/gpichan/poses/torso-tap/rigged/torso-tap.psd",
+      "sha256": "b448a2551d49999435069155d4a70daeff5588b06329a5aec011ae80ffaa9c32"
+    },
+    {
+      "path": "public/characters/gpichan/poses/torso-tap/source/arms-trimmed.png",
+      "sha256": "634f5eca2e8659e6efb77a03a04009a037b35d2dee3d0c2ecfbd7df0224a72f3"
+    },
+    {
+      "path": "public/characters/gpichan/poses/waiting/rigged/waiting.psd",
+      "sha256": "d43f251254f7b9041337b38c7eb3afa1d190686372fe96626bcb58f3e24039d7"
+    },
+    {
+      "path": "public/characters/gpichan/poses/waiting/source/arms-trimmed.png",
+      "sha256": "f69f97c9d21e874de1032abd21207566ef1761ae5b8b079695d9cb1458eaa4ce"
+    },
+    {
+      "path": "public/characters/gpichan/poses/writing/rigged/writing.psd",
+      "sha256": "0bb03f3773ff07b89f30da7219de45089e577b0678a3ecd593f8ee6aee6999a3"
+    },
+    {
+      "path": "public/characters/gpichan/poses/writing/source/reference.png",
+      "sha256": "bccf3b694a5df044a5afc92f34dd7a1766f50b6d0b9df785a9c68735e327ebfd"
+    },
+    {
+      "path": "public/characters/gpichan/rigged/gpichan-expressions.psd",
+      "sha256": "551333896900c1a47e415949eeac6a23d4e92f12bfdd3bbf3ec15222e813fc0e"
+    },
+    {
+      "path": "public/characters/gpichan/source/reference-original.png",
+      "sha256": "e9ca4b9b3b26fc4eaf0b1dd17e10fe0d58911e94791222180076f74339f30f88"
+    }
+  ],
+  "icons": [
+    {
+      "path": "electron/assets/appIcon.icns",
+      "sha256": "e94d8aaf5407b5cfb86a955eddc693b4806990440a348f3a588317975f2386eb"
+    },
+    {
+      "path": "electron/assets/icon-source/app-a2-rabbit.png",
+      "sha256": "0bf1303ba58d12022a8eee4edd51928ff34b9209a1b8b3b48d005c23d274e3b7"
+    },
+    {
+      "path": "electron/assets/icon-source/menu-m2-rabbit.png",
+      "sha256": "cae6fb6098de183dbe931dba887db2110f341210d696ab3b33c1f61716cd50ca"
+    },
+    {
+      "path": "electron/assets/trayTemplate.png",
+      "sha256": "a055b359fcd691bfddee2a39b522e1f952477a00de8e7ec21bc2c731436b06bb"
+    },
+    {
+      "path": "electron/assets/trayTemplate.svg",
+      "sha256": "6daaf8fcec5e848e04646496ee75c4e2f44dec061e1d17f9ed77406d057143ce"
+    },
+    {
+      "path": "electron/assets/trayTemplate@2x.png",
+      "sha256": "a1d6c3d8c48f0ce55ce894dcc08cfcc9384e4a4ac8d478d493ca17917fbe4904"
+    },
+    {
+      "path": "public/favicon.svg",
+      "sha256": "e6d2e59b7b5bbb0342e0fb496dfc262decbfe4426bbb7b047aec8d467d1dc6f7"
+    }
+  ]
+}
