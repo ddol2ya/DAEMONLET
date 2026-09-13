@@ -1,6 +1,11 @@
 # Release builds
 
-Use Node 24 and `npm ci`. Validate `npm run typecheck`, `npm test`, `npm run build:renderer` and `npm run build:electron:production` first. The app packages only its runtime and Gpichan. Creator tools and weights are excluded.
+Use Node 24 and `npm ci`, then `node node_modules/electron/install.js` to install
+the lockfile-pinned Electron runtime and its Electron/Chromium notices. Electron
+43 has an explicit installer instead of an npm postinstall hook. No engine/model
+weights are involved. Validate `npm run typecheck`, `npm test`, `npm run build:renderer`
+and `npm run build:electron:production` first. The app packages only its runtime
+and Gpichan. Creator tools and weights are excluded.
 
 ## Windows x64
 

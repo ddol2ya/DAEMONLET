@@ -20,7 +20,7 @@ RTX 3060 12GB + group offload가 최소 지원 목표입니다. 기본 1280px, 8
 
 소스에서 사용할 때는 이 레포에서 `npm ci`를 실행하고 `skills/create-pet-character`를 Codex skills 폴더에 복사하거나 이 경로를 지정합니다. 복사본이 소스와 떨어져 있으면 `DAEMONLET_CREATOR_RUNTIME`을 이 레포 절대 경로로 지정합니다.
 
-독립 배포 스킬 ZIP에는 `create-pet-character/runtime/`이 포함됩니다. 폴더 전체를 Codex skills 폴더에 복사한 뒤 해당 `runtime/`에서 `npm ci`를 실행합니다. 필요한 자체 도구·공용 렌더러 소스가 함께 들어 있어 예전 비공개 레포는 필요하지 않습니다. 외부 엔진과 모델 설치는 여전히 별도입니다.
+독립 배포 스킬 ZIP에는 `create-pet-character/runtime/`이 포함됩니다. 폴더 전체를 Codex skills 폴더에 복사한 뒤 해당 `runtime/`에서 `npm ci`를 실행합니다. Electron으로 렌더러를 실행·캡처하려면 같은 폴더에서 `node node_modules/electron/install.js`도 실행합니다(Electron 43의 명시적 런타임 설치). 필요한 자체 도구·공용 렌더러 소스가 함께 들어 있어 예전 비공개 레포는 필요하지 않습니다. 외부 엔진과 모델 설치는 여전히 별도입니다.
 
 ```sh
 node <skill>/scripts/creator.mjs info

@@ -16,6 +16,9 @@ jobs:
         with:
           python-version: '3.11'
       - run: npm ci
+      # Electron 43 exposes install-electron instead of an npm postinstall hook.
+      # Fetch only the lockfile-pinned runtime and its notices; never creator models.
+      - run: node node_modules/electron/install.js
       - run: python -m pip install -r scripts/characters/requirements.txt
       - run: npm run source:check
       - run: npm run typecheck
