@@ -35,7 +35,7 @@ describe("host-owned app-only navigation", () => {
 
   it("does not guess other-platform executables or URIs", async () => {
     const run = vi.fn()
-    const launcher = new CodexAppLauncher({ platform: "win32", run })
+    const launcher = new CodexAppLauncher({ platform: "linux", run })
     expect(await launcher.available()).toBe(false); expect(await launcher.open()).toBe("unavailable")
     expect(run).not.toHaveBeenCalled()
   })
