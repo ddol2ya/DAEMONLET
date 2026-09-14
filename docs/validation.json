@@ -275,18 +275,15 @@
       "Actual Codex approval-dialog handling and CLI Hook installation/trust acceptance; no such prompt occurred in the Desktop test"
     ],
     "remainingPrerequisites": [
-      "Any additional release acceptance must name the actual final artifact; real voice and Desktop controls currently have evidence for the signed submission ZIP only",
-      "A distinct-version prior Daemonlet artifact is required for real version-upgrade/rollback acceptance; no artificial version-labelled candidate is substituted",
-      "Windows distribution signing identity is not available in the tested environment",
-      "Publication history treatment requires a separate maintainer decision; no history rewriting or branch deletion performed"
+      "Any additional release acceptance must name the actual final artifact; real voice and Desktop controls currently have evidence for the signed submission ZIP only"
     ],
     "decisions": {
       "technicalSource": "PASS for the named code source and CI runs",
       "macosNotarization": "PASS for both named notarized final ZIPs; newest c6e7a4d final SHA-256 8c7e2c7cb06670d9675663752fd2f4c7f0d001b39981dc63edb0f1d76ca035c4",
-      "windowsSigning": "FAIL: actual EXE NotSigned",
+      "windowsSigning": "FAIL remains on tested unsigned EXEs. Maintainer chooses unsigned Windows distribution because signing is unavailable; no signing PASS or certificate claim.",
       "characterRights": "User states the base character is open; existing attribution and the exact contribution-grant scope are preserved. This is not an independent legal attestation.",
       "externalModelTerms": "External user downloads only; missing model license remains disclosed in the external workflow. No model bundled or newly installed.",
-      "gitHistory": "Read-only review completed; existing retained historical objects remain pending publication review",
+      "gitHistory": "Read-only review completed. Maintainer chooses to retain existing history without rewriting; historical objects remain. This does not authorize public visibility or establish a clean-history attestation.",
       "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or PR6 merge. Apple submissions were separately approved for exact ZIP hashes.",
       "microphoneAcceptance": "7fd4a73: actual microphone prompt and denial guidance PASS, completed dictation FAIL. c6e7a4d signed submission: permission-enabled speech, stop-to-draft retention and editing PASS. Earlier failures unchanged.",
       "desktopControls": "PASS for c6e7a4d signed submission only: send, turn interruption and resend. External process termination is not established; approval/CLI Hook trust remains unrun."
@@ -338,7 +335,19 @@
         "notes": "Both jobs execute source checks, typecheck, full npm test, both production builds and ASAR verification. Unix CI additionally executes Python and standalone creator checks. Windows platform skips are not Windows native PASS evidence.",
         "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492"
       }
-    ]
+    ],
+    "firstReleaseScope": {
+      "confirmedByMaintainer": true,
+      "appVersion": "0.7.0",
+      "previousVersionArtifactExists": false,
+      "repositoryReleases": 0,
+      "repositoryTags": 0,
+      "distinctVersionUpgrade": "NOT_APPLICABLE to this first release because no previous Daemonlet version exists. Do not synthesize a version label or claim an upgrade PASS. Repeat real upgrade/rollback acceptance when a subsequent version has a released predecessor.",
+      "existingReplacementChecks": "Previously executed same-version installation/replacement/rollback/uninstall outcomes remain attached to their original candidate identities.",
+      "windowsSigning": "Explicitly retain unsigned binaries; technical NotSigned findings unchanged.",
+      "gitHistory": "Leave the existing history and branches in place; no rewrite or deletion.",
+      "publication": "Still not authorized by this validation request."
+    }
   },
   "recordType": "public-validation-summary",
   "previousCandidateReview": {

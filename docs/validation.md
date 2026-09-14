@@ -281,3 +281,20 @@ record. Approval/CLI Hook trust, an actual distinct-version app upgrade/rollback
 Windows distribution signing and the separate publication-history decision remain
 outstanding. No repository visibility change, Release, tag, binary distribution,
 PR6 merge, history rewrite or branch deletion was performed.
+
+### First-release scope confirmed by the maintainer
+
+The maintainer confirmed that 0.7.0 is the first Daemonlet release preparation and
+no earlier-version installer exists. The repository has no Releases or tags, and
+every version-bearing commit inspected identifies 0.7.0. A distinct-version
+upgrade/rollback comparison is therefore not applicable to this first release;
+it is not recorded as PASS. The existing same-version installation, replacement,
+rollback and uninstall observations remain unchanged. The next app version needs
+an actual upgrade/rollback comparison against its released predecessor.
+
+Windows signing is unavailable, and the maintainer explicitly elected to keep
+the Windows binaries unsigned. Their recorded `NotSigned` failures remain; this
+decision does not supply a signature. The maintainer also elected to retain Git
+history without rewriting or branch deletion. The read-only findings remain
+available, and retained historical objects are not described as removed. Neither
+decision authorizes repository publication, a Release, a tag or app deployment.
