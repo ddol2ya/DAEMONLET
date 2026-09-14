@@ -90,7 +90,7 @@ export async function prepareSubmission(candidateRoot, profile = process.env.MAC
       }
       const zip = join(attempt.directory, "submission.zip")
       await attempt.stage("compress-submission")
-      await run("/usr/bin/ditto", ["-c", "-k", "--keepParent", app, zip], { timeoutMs: 300_000, logPath: join(attempt.directory, "compression.json") })
+      await run("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, zip], { timeoutMs: 300_000, logPath: join(attempt.directory, "compression.json") })
       assertSameBundle(manifest, await verifyForAttempt(attempt, "verify-candidate-after", app, manifest.signer))
       const state = { schemaVersion: 1, sourceCommit: manifest.sourceCommit, profile, status: "prepared", createdAt: stamp(), preparationAttempt: attempt.id,
         submission: await archiveInfo(zip), destination: "Apple notarization service", includes: ["Electron application and frameworks", "production ASAR", "bundled Hook and worker", "built-in character PNG/PSD resources"] }
@@ -234,7 +234,9 @@ export async function createFinalArchive(candidateRoot, { retryReason } = {}) {
         await mkdir(finalDirectory, { mode: 0o700 })
         await attempt.stage("compress-final")
         const path = join(finalDirectory, finalName(manifest))
-        await run("/usr/bin/ditto", ["-c", "-k", "--keepParent", app, path], { timeoutMs: 300_000, logPath: join(attempt.directory, "compression.json") })
+        // Archive Utility can leave inline AppleDouble files beside framework
+        // symlinks, invalidating their resource seals. Keep metadata outside the app.
+        await run("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", app, path], { timeoutMs: 300_000, logPath: join(attempt.directory, "compression.json") })
         final = await archiveInfo(path)
       }
       await mkdir(extraction, { mode: 0o700 })
