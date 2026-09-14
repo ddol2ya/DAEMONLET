@@ -15,6 +15,7 @@ export function characterReadApi(): CharacterReadApi {
 }
 export function characterManageApi(): CharacterManageApi {
   return Object.freeze({ ...characterReadApi(),
+    onProgress: listener => { const wrapped = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value); ipcRenderer.on(CHARACTER_IPC.progress, wrapped); return () => ipcRenderer.removeListener(CHARACTER_IPC.progress, wrapped) },
     chooseImport: () => request(CHARACTER_IPC.choose), commitImport: token => request(CHARACTER_IPC.commit, token), cancelImport: () => request(CHARACTER_IPC.cancel),
     remove: selection => request(CHARACTER_IPC.remove, selection), rollback: selection => request(CHARACTER_IPC.rollback, selection),
   } satisfies CharacterManageApi)

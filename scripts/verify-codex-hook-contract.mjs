@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL("..", import.meta.url))
 export function extractCommandInputSchema(binary, title) {
   const titleAt = binary.indexOf(Buffer.from(`"title": "${title}"`))
   assert(titleAt >= 0, `Missing embedded schema: ${title}`)
-  const start = binary.lastIndexOf(Buffer.from('{\n  "$schema"'), titleAt)
+  const start = Math.max(...['{\n  "$schema"', '{\r\n  "$schema"'].map(prefix => binary.lastIndexOf(Buffer.from(prefix), titleAt)))
   assert(start >= 0 && titleAt - start < 65536, `Invalid embedded schema boundary: ${title}`)
   let depth = 0, quoted = false, escaped = false
   for (let i = start; i < Math.min(binary.length, start + 65536); i++) {

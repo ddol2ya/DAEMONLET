@@ -21,6 +21,53 @@ async function fixture() {
 }
 
 describe("character registry transactions", () => {
+  it("opens the catalog without decoding unselected rigs and validates only the chosen revision", async () => {
+    const f = await fixture()
+    const p1 = await f.registry.prepareImport(await writePack(f.root), "owner")
+    const first = await f.registry.commitImport(p1.token, "owner")
+    const p2 = await f.registry.prepareImport(await writePack(f.root, { id: "second-character" }), "owner")
+    const second = await f.registry.commitImport(p2.token, "owner")
+    const checked = vi.fn(validator), reopened = new CharacterRegistry(f.user, f.builtin, checked)
+    registries.push(reopened); await reopened.initialize({ deferRig: true })
+    expect(checked.mock.calls.map(([task]) => task.rig)).toEqual([false, false])
+    expect(reopened.get(first.id)?.status).toBe("pending")
+    expect(reopened.isAvailable("gpichan")).toBe(true)
+    expect(reopened.catalog().characters).toHaveLength(1)
+    expect(await reopened.resolveAsset(first.id, first.revision, "model.psd")).toBeNull()
+    const generation = reopened.snapshot().generation
+    await reopened.ensureReady(first)
+    expect(checked.mock.calls.at(-1)?.[0].rig).toBeUndefined()
+    expect(reopened.snapshot().generation).toBeGreaterThan(generation)
+    expect(reopened.get(first.id)?.status).toBe("ready")
+    expect(reopened.get(second.id)?.status).toBe("pending")
+    expect(reopened.catalog().characters).toHaveLength(2)
+    await reopened.ensureReady(first)
+    expect(checked).toHaveBeenCalledTimes(3)
+    await expect(reopened.prepareImport(await writePack(f.root, { id: second.id, version: "0.9.0" }), "owner")).rejects.toThrow("PACK_DOWNGRADE")
+  })
+  it("can restore a previous version before the current pending character has been selected", async () => {
+    const f = await fixture()
+    const first = await f.registry.prepareImport(await writePack(f.root), "owner")
+    const old = await f.registry.commitImport(first.token, "owner")
+    const second = await f.registry.prepareImport(await writePack(f.root, { version: "2.0.0", color: 90 }), "owner")
+    const current = await f.registry.commitImport(second.token, "owner")
+    const reopened = new CharacterRegistry(f.user, f.builtin, validator)
+    registries.push(reopened); await reopened.initialize({ deferRig: true })
+    await reopened.rollback(current)
+    expect(reopened.get(old.id)).toMatchObject({ revision: old.revision, status: "ready" })
+  })
+  it("rejects a deferred revision changed before selection and never exposes its assets", async () => {
+    const f = await fixture(), preview = await f.registry.prepareImport(await writePack(f.root), "owner")
+    const entry = await f.registry.commitImport(preview.token, "owner")
+    const path = await f.registry.resolveAsset(entry.id, entry.revision, "model.psd")
+    const reopened = new CharacterRegistry(f.user, f.builtin, validator)
+    registries.push(reopened); await reopened.initialize({ deferRig: true })
+    await writeFile(path!, "tampered")
+    await expect(reopened.ensureReady(entry)).rejects.toThrow("PACK_INTEGRITY")
+    expect(reopened.get(entry.id)?.status).toBe("disabled")
+    expect(await reopened.resolveAsset(entry.id, entry.revision, "model.psd")).toBeNull()
+  })
+
   it("defers archived rig decoding, protects old assets, and validates before rollback", async () => {
     const f = await fixture()
     const first = await f.registry.prepareImport(await writePack(f.root), "owner")

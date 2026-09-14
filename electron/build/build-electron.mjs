@@ -54,6 +54,7 @@ await writeFile(resolve(outdir, "versions.json"), `${JSON.stringify({ electron: 
 await writeFile(resolve(outdir, "build-mode.json"), `${JSON.stringify({ schemaVersion: 1, production: production && !setupSmoke, setupSmoke })}\n`)
 
 await import("./build-dictation.mjs")
+await import("./build-hook-host.mjs")
 await import("../../scripts/release/stage-notices.mjs")
 
 assertSameSource(source, await sourceIdentity(root))

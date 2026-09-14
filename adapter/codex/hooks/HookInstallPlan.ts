@@ -53,7 +53,7 @@ const publicEvent = (event: string): string => (INSTALLED_HOOK_EVENTS as readonl
 
 export function hookHandler(spec: HookLaunchSpec, legacyDevelopment = false): JsonObject {
   if (legacyDevelopment) return { type: "command", ...legacyHookCommands(spec.executablePath, spec.forwarderPath), timeout: 1 }
-  return { type: "command", command: createHookCommand(spec), timeout: spec.mode === "packaged-electron-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS : 1 }
+  return { type: "command", command: createHookCommand(spec), timeout: spec.mode !== "development-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS : 1 }
 }
 
 export function classifyHandler(handler: JsonObject, group: HookGroup, context: OwnershipContext): Ownership {
@@ -66,7 +66,7 @@ export function classifyHandler(handler: JsonObject, group: HookGroup, context: 
     return legacy && !exact && !recorded ? "legacy-recognized" : "managed-exact"
   }
   const command = typeof handler.command === "string" ? handler.command : ""
-  const resemblesOwnedCommand = command.includes(HOOK_MARKER) && (command.includes("hook-forwarder.mjs") || command.startsWith("/usr/bin/env -i "))
+  const resemblesOwnedCommand = command.includes(HOOK_MARKER) && (command.includes("hook-forwarder.mjs") || command.includes("hook-host.exe") || command.startsWith("/usr/bin/env -i "))
   return resemblesOwnedCommand ? "ambiguous" : "foreign"
 }
 

@@ -16,6 +16,7 @@ export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
   const installed = status.configurationStatus === "installed-current"
   const receiving = status.reception.status === "receiving"
   const found = discovery?.executable.probeStatus === "verified"
+  const hookHeading = receiving ? "Hook 이벤트 수신 중" : installed ? "Hook 설정됨" : status.configurationStatus === "not-installed" ? "Hook 미설정" : "Hook 확인 필요"
   const reviewDone = status.hookReviewStatus === "user-reported-reviewed"
   const prepare = async () => {
     setApplied(null)
@@ -38,30 +39,26 @@ export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
   }
   const warnings = status.configurationWarnings.filter(code => !["PACKAGED_TIMEOUT_2_SECONDS", "COMMITTED_RECEIPT_RECOVERED", "PREPARED_CHANGE_NOT_COMMITTED"].includes(code))
 
-  if (status.app.platform === "win32") {
-    const connected = status.adapter.state === "READY" && status.adapter.codexAvailable === true
-    return <>
-      <header className="page-header"><h1>Codex 연결</h1><button className="button secondary small" disabled={disabled} onClick={() => void run("상태 확인", () => api.refreshStatus())}>새로 확인</button></header>
-      <section className="section-card connection-summary" aria-label="Codex 연결 상태">
-        <div className="connection-heading"><span className={`connection-indicator ${connected ? "connected" : ""}`} aria-hidden="true">{connected ? "✓" : "◎"}</span><div><h2>{connected ? "데스크톱 자동 연결됨" : "데스크톱 연결 대기"}</h2><p>{connected ? "Codex의 작업 상태를 자동으로 수신하고 있습니다." : "같은 Windows 계정에서 Codex 앱을 실행해 주세요."}</p></div></div>
-        <dl className="connection-checks"><div><dt>Codex Desktop</dt><dd>{connected ? "연결됨" : "연결 대기"}</dd></div><div><dt>진행 중인 작업</dt><dd>{status.adapter.activeRunCount}개</dd></div><div><dt>연결 서비스</dt><dd>{status.adapter.state}</dd></div></dl>
-        <p>Windows에서는 Hook 설치 없이 자동 연결됩니다. 트레이의 Codex 제어에서 대화를 선택할 수 있습니다.</p>
-        {status.adapter.state !== "READY" && <button className="button secondary" disabled={disabled || status.adapter.ownership === "EXTERNAL_PROCESS"} onClick={() => void run("연결 재시작", async () => { await api.restartAdapter(); return api.refreshStatus() })}>연결 다시 시작</button>}
-      </section>
-    </>
-  }
+  const connected = status.desktop?.connected === true
 
   return <>
     <header className="page-header"><h1>Codex 연결</h1><button className="button secondary small" disabled={disabled} onClick={() => void run("상태 확인", () => api.refreshStatus())}>새로 확인</button></header>
-    <section className="section-card connection-summary" aria-label="Codex 연결 상태">
-      <div className="connection-heading"><span className={`connection-indicator ${receiving ? "connected" : ""}`} aria-hidden="true">{receiving ? "✓" : "◎"}</span><div><h2>{receiving ? "연결됨" : installed ? "신호 대기 중" : "연결 준비"}</h2><p>{receiving ? `최근 수신 ${time(status.reception.lastReceivedAt!)}` : installed ? "Codex를 사용하면 연결 상태가 자동으로 갱신됩니다." : "Codex 위치와 실행 환경을 자동으로 확인합니다."}</p></div></div>
-      <dl className="connection-checks"><div><dt>Codex</dt><dd>{found ? discovery.executable.version?.replace("codex-cli ", "v") : discovery?.executable.path ? "확인 필요" : discovery ? "찾지 못함" : "찾는 중…"}</dd></div><div><dt>Hook</dt><dd>{installed ? "설정됨" : configurationLabels[status.configurationStatus]}</dd></div><div><dt>이벤트 수신</dt><dd>{receiving ? "확인됨" : status.reception.status === "waiting" ? "자동 확인 중" : "연결 대기"}</dd></div></dl>
-      <div className="button-row"><button className="button primary" disabled={disabled} onClick={() => void prepare()}>{installed ? "연결 확인" : "연결 준비"}</button>{discovery && !discovery.executable.path && <button className="button secondary" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>Codex 앱 선택</button>}</div>
+    <section className="section-card connection-summary" aria-label="Codex Desktop 연결 상태">
+      <div className="connection-heading"><span className={`connection-indicator ${connected ? "connected" : ""}`} aria-hidden="true">{connected ? "✓" : "◎"}</span><div><h2>{connected ? "데스크톱 연결됨" : "데스크톱 연결 대기"}</h2><p>{connected ? "Codex 앱과 자동으로 연결되었습니다." : "같은 사용자 계정에서 Codex 앱을 실행해 주세요."}</p></div></div>
+      <p>데스크톱 앱은 별도 Hook 설정 없이 사용할 수 있습니다. ‘Codex 제어’에서 대화를 선택하세요.</p>
+      {status.adapter.state !== "READY" && <button className="button secondary" disabled={disabled || status.adapter.ownership === "EXTERNAL_PROCESS"} onClick={() => void run("연결 재시작", async () => { await api.restartAdapter(); return api.refreshStatus() })}>연결 다시 시작</button>}
+    </section>
+    <section className="section-card connection-summary" aria-label="CLI Hook 설정">
+      <h2>CLI Hook 설정 <span className="source-label">선택 사항</span></h2>
+      <p>터미널에서 Codex CLI를 사용할 때 설정하세요. 데스크톱 연결과 별도로 관리됩니다.</p>
+      <div className="connection-heading"><span className={`connection-indicator ${receiving ? "connected" : ""}`} aria-hidden="true">{receiving ? "✓" : "◎"}</span><div><h2>{hookHeading}</h2><p>{receiving ? `최근 수신 ${time(status.reception.lastReceivedAt!)}` : installed ? "CLI에서 Hook을 허용한 뒤 작업하면 수신 상태가 갱신됩니다." : "CLI 위치와 Hook 실행 환경을 확인합니다."}</p></div></div>
+      <dl className="connection-checks"><div><dt>Codex CLI</dt><dd>{found ? discovery.executable.version?.replace("codex-cli ", "v") : discovery?.executable.path ? "확인 필요" : discovery ? "찾지 못함" : "찾는 중…"}</dd></div><div><dt>Hook</dt><dd>{installed ? "설정됨" : configurationLabels[status.configurationStatus]}</dd></div><div><dt>이벤트 수신</dt><dd>{receiving ? "확인됨" : status.reception.status === "waiting" ? "자동 확인 중" : "연결 대기"}</dd></div></dl>
+      <div className="button-row"><button className="button primary" disabled={disabled} onClick={() => void prepare()}>{installed ? "Hook 확인" : "CLI Hook 설정"}</button>{discovery && !discovery.executable.path && <button className="button secondary" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>Codex 앱 선택</button>}</div>
     </section>
     {status.issue && <div className="notice warning" role="alert">{reasonText(status.issue)}</div>}
     {applied && applied.status !== "no-change" && (applied.status !== "applied" || !receiving) && <div className={`notice ${applied.status === "applied" ? "success" : "warning"}`} role="status">{applied.status === "applied-with-receipt-warning" ? "Hook 설정은 저장됐지만 설치 기록을 저장하지 못했습니다. 진단에서 확인해 주세요." : applied.status === "committed-conflict" ? "설정 저장 후 다른 변경이 발견됐습니다. 진단에서 확인해 주세요." : "Hook 설정을 저장했습니다. Codex에서 변경 내용을 검토해 주세요."}</div>}
     {discovery?.manualFeatureInstruction && <section className="section-card"><h2>Hook 기능 켜기</h2><p><code>config.toml</code>에 아래 설정을 추가한 뒤 Codex를 다시 실행해 주세요.</p><pre>{discovery.manualFeatureInstruction}</pre></section>}
-    {(installed || applied) && !receiving && <section className="section-card hook-review"><div><h2>Codex에서 Hook 검토</h2><p>{reviewDone ? "검토 완료로 표시했습니다. 다음 작업부터 수신을 자동 확인합니다." : <>Codex의 Hook 설정에서 이 앱의 실행을 허용해 주세요. CLI에서는 <code>/hooks</code>를 사용합니다.</>}</p></div>{!reviewDone && <button className="button secondary small" disabled={disabled} onClick={() => void run("검토 상태 저장", () => api.reportHookReview())}>Codex에서 검토했어요</button>}</section>}
+    {(installed || applied) && !receiving && <section className="section-card hook-review"><div><h2>Codex에서 Hook 검토</h2><p>{reviewDone ? "검토 완료로 표시했습니다. 다음 작업부터 수신을 자동 확인합니다." : <>CLI에서 <code>/hooks</code>를 열어 이 앱의 Hook을 확인하고 허용해 주세요.</>}</p></div>{!reviewDone && <button className="button secondary small" disabled={disabled} onClick={() => void run("검토 상태 저장", () => api.reportHookReview())}>Codex에서 검토했어요</button>}</section>}
     {warnings.length > 0 && <div className="notice warning"><ul className="connection-warnings">{warnings.map(code => <li key={code}>{reasonText(code)}</li>)}</ul></div>}
     <details className="section-card setup-advanced"><summary>고급 설정</summary><div className="advanced-content">
       <h2>연결 위치</h2>

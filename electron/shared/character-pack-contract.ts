@@ -27,11 +27,12 @@ export type CharacterPackManifest = {
 }
 export type CharacterEntry = {
   id: string; name: string; source: "builtin" | "external"; version: string; revision: string
-  manifestUrl: string; status: "ready" | "disabled"; error?: string; author?: string
+  manifestUrl: string; status: "ready" | "pending" | "disabled"; error?: string; author?: string
   thumbnailUrl?: string; bytes: number; poseCount: number; previousVersion?: string
   profile?: "trial" | "full"; unsupportedReactions?: string[]
 }
 export type CharacterSnapshot = { generation: number; entries: CharacterEntry[]; storageBytes: number; storageLimitBytes: number; warning?: string }
+export type PackProgress = { phase: "extract" | "files" | "rig"; completed: number; total: number }
 export type ImportPreview = {
   token: string; entry: CharacterEntry; kind: "install" | "update" | "installed"
   previousVersion?: string; expiresAt: number; compatible: true
@@ -40,7 +41,7 @@ export type CharacterSelection = { id: string; revision: string }
 export const CHARACTER_IPC = {
   list: "characters.list", choose: "characters.choose-import", commit: "characters.commit-import",
   cancel: "characters.cancel-import", select: "characters.select", remove: "characters.remove",
-  rollback: "characters.rollback", changed: "characters.changed", loadFailed: "characters.load-failed",
+  rollback: "characters.rollback", changed: "characters.changed", loadFailed: "characters.load-failed", progress: "characters.progress",
 } as const
 export interface CharacterReadApi {
   list(): Promise<CharacterSnapshot>
@@ -48,6 +49,7 @@ export interface CharacterReadApi {
   onChanged(listener: (value: CharacterSnapshot) => void): () => void
 }
 export interface CharacterManageApi extends CharacterReadApi {
+  onProgress(listener: (value: PackProgress) => void): () => void
   chooseImport(): Promise<ImportPreview | null>
   commitImport(token: string): Promise<CharacterEntry>
   cancelImport(): Promise<void>

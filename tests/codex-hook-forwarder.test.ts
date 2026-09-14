@@ -1,6 +1,7 @@
+import { publishHookEndpoint } from "../adapter/codex/hooks/HookEndpoint"
 import { spawn } from "node:child_process"
 import { createServer, type Server } from "node:http"
-import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { mkdtemp, rm, writeFile, realpath, link } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
@@ -51,6 +52,35 @@ const dataDirectory = async (prefix = "forwarder-"): Promise<string> => {
 }
 
 describe("hook-forwarder", () => {
+  it("discovers the current port again after an adapter restart without changing the installed command", async () => {
+    const dataDir = await realpath(await dataDirectory()), seen: string[] = []
+    const receiver = (label: string) => createServer((request, response) => { seen.push(label); request.resume(); response.end() })
+    const first = await listen(receiver("first"), "127.0.0.1"), second = await listen(receiver("second"), "127.0.0.1")
+    const env = { ...process.env, CODEX_PET_DATA_DIR: dataDir, CODEX_PET_HOOK_URL: "discover" }
+    await publishHookEndpoint(dataDir, first)
+    expect(await runForwarder(input, env)).toEqual({ stdout: "{}\n", stderr: "" })
+    await publishHookEndpoint(dataDir, second)
+    expect(await runForwarder(input, env)).toEqual({ stdout: "{}\n", stderr: "" })
+    expect(seen).toEqual(["first", "second"])
+    await writeFile(join(dataDir, "hook-endpoint"), "https://example.invalid/hook")
+    expect(await runForwarder(input, env)).toEqual({ stdout: "{}\n", stderr: "" })
+    expect(seen).toHaveLength(2)
+  })
+  it("rejects linked endpoint files and linked tokens", async () => {
+    const dataDir = await realpath(await dataDirectory())
+    let requests = 0
+    const port = await listen(createServer((request, response) => { requests++; request.resume(); response.end() }), "127.0.0.1")
+    await publishHookEndpoint(dataDir, port)
+    await link(join(dataDir, "hook-endpoint"), join(dataDir, "endpoint-alias"))
+    await expect(publishHookEndpoint(dataDir, port)).rejects.toThrow("UNSAFE_FILE")
+    const env = { ...process.env, CODEX_PET_DATA_DIR: dataDir, CODEX_PET_HOOK_URL: "discover" }
+    expect(await runForwarder(input, env)).toEqual({ stdout: "{}\n", stderr: "" })
+    await rm(join(dataDir, "endpoint-alias"))
+    await link(join(dataDir, "adapter-token"), join(dataDir, "token-alias"))
+    expect(await runForwarder(input, env)).toEqual({ stdout: "{}\n", stderr: "" })
+    expect(requests).toBe(0)
+  })
+
   it("accepts only HTTP loopback /hook URLs and clamps timeouts", () => {
     for (const value of ["http://127.0.0.1:4175/hook", "http://localhost:4175/hook", "http://[::1]:4175/hook", "http://127.0.0.1:80/hook"]) {
       expect(parseLoopbackHookUrl(value)?.pathname).toBe("/hook")

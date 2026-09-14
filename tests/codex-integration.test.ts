@@ -36,7 +36,8 @@ async function fixture(temporaryLocation = false, platform: NodeJS.Platform = "d
   const make = () => {
     const controller = new CodexIntegrationController({
       userData, packaged: true, platform, appVersion: "0.2.0", doctor: doctor as unknown as HookSetupDoctor,
-      launchSpec: { mode: "packaged-electron-node", executablePath: join(root, "Pet.app/Contents/MacOS/Pet"), forwarderPath: join(root, "Pet.app/Contents/Resources/codex/hook-forwarder.mjs"), dataDir: join(root, "data"), hookEndpoint: adapter.hookEndpoint },
+      launchSpec: { mode: process.platform === "win32" ? "packaged-windows-host" : "packaged-electron-node", executablePath: join(root, process.platform === "win32" ? "Pet/resources/codex/hook-host.exe" : "Pet.app/Contents/MacOS/Pet"), forwarderPath: join(root, process.platform === "win32" ? "Pet/resources/codex/hook-forwarder.mjs" : "Pet.app/Contents/Resources/codex/hook-forwarder.mjs"), dataDir: join(root, "data"), hookEndpoint: adapter.hookEndpoint },
+      getDesktopConnection: () => ({ connected: true, activeRunCount: 0 }),
       getAdapterDiagnostics: () => structuredClone(adapter), getFreshAdapterDiagnostics: async () => structuredClone(adapter),
       inspectHost: async () => ({ ...host }),
       selfTest: async () => ({ ...notTestedHost(), status: "passed", checkedAt: Date.now(), hostFingerprint: host.fingerprint, coldStartMs: 100, receiverVerified: true, sanitized: true }),
@@ -52,16 +53,20 @@ async function fixture(temporaryLocation = false, platform: NodeJS.Platform = "d
   return { root, home, userData, original, discovery, doctor, adapter, host, controller, owner, make }
 }
 
-it("uses Windows Desktop connection without CLI probes, Hook installation or a false host PASS", async () => {
+it("separates Windows Desktop connection from optional CLI Hook preparation", async () => {
   const f = await fixture(false, "win32")
   const status = await f.controller.prepareConnection(f.owner)
   expect(status.app.platform).toBe("win32")
   expect(status.adapter).toMatchObject({ state: "READY", ownership: "OWNED_UTILITY" })
-  expect(status.discovery).toBeNull()
-  expect(status.host.available).toBe(false)
-  expect(status.hostSelfTest.status).toBe("not-tested")
-  expect(f.doctor.inspect).not.toHaveBeenCalled()
-  await expect(f.controller.planHooks("install", f.owner)).rejects.toThrow("CONFIGURATION_UNAVAILABLE")
+  expect(status.desktop?.connected).toBe(true)
+  expect(status.discovery?.capability.contractId).toBe("test-fixture")
+  expect(status.hostSelfTest.status).toBe("passed") // injected synthetic host result
+  expect(f.doctor.inspect).toHaveBeenCalled()
+  expect((await f.controller.planHooks("install", f.owner)).conflicts).not.toContain("PACKAGED_APP_REQUIRED")
+  const rendered = renderToStaticMarkup(createElement(ConnectionPage, { status, api: {} as SettingsDesktopApi, busy: null, run: async () => undefined }))
+  expect(rendered).toContain("데스크톱 연결됨")
+  expect(rendered).toContain("CLI Hook 설정")
+  expect(rendered).toContain("Hook 미설정")
   expect(await readFile(join(f.home, "hooks.json"), "utf8")).toBe(f.original)
   await f.controller.dismissOnboarding("skipped", f.owner)
   const reopened = f.make()

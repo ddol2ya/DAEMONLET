@@ -1,3 +1,4 @@
+import type { StartupWindow } from "./StartupWindow"
 import { runHybridBubbleSmoke } from "./HybridBubbleSmoke"
 import { runDialogueSmoke } from "./DialogueSmoke"
 import { app, dialog, ipcMain, powerMonitor, screen, session, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron"
@@ -86,7 +87,7 @@ export class AppController {
   private smokeFinishing = false
   private readonly smokeReadyCharacters = new Set<string>()
 
-  constructor(private readonly dirname: string, private readonly characters: CharacterRegistry, private readonly setupSmoke?: SetupSmokeContext) {
+  constructor(private readonly dirname: string, private readonly characters: CharacterRegistry, private readonly setupSmoke?: SetupSmokeContext, private readonly startup?: StartupWindow) {
     this.adapterConfig = createDesktopAdapterRuntimeConfig()
     this.protocol = new ProtocolBridge(this.adapterConfig.protocolEndpoint)
     const preload = (name: string) => join(dirname, `${name}-preload.cjs`)
@@ -122,11 +123,12 @@ export class AppController {
       userData: app.getPath("userData"), appVersion: app.getVersion(), packaged: app.isPackaged,
       // Calculate the application executable here in Main, never in the utility worker.
       launchSpec: {
-        mode: app.isPackaged ? "packaged-electron-node" : "development-node",
-        executablePath: app.isPackaged ? process.execPath : process.env.CODEX_PET_DEV_NODE_PATH ?? process.env.npm_node_execpath ?? process.execPath,
+        mode: app.isPackaged ? process.platform === "win32" ? "packaged-windows-host" : "packaged-electron-node" : "development-node",
+        executablePath: app.isPackaged ? process.platform === "win32" ? join(process.resourcesPath, "codex", "hook-host.exe") : process.execPath : process.env.CODEX_PET_DEV_NODE_PATH ?? process.env.npm_node_execpath ?? process.execPath,
         forwarderPath: app.isPackaged ? join(process.resourcesPath, "codex", "hook-forwarder.mjs") : join(dirname, "codex", "hook-forwarder.mjs"),
-        dataDir: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
+        dataDir: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
       },
+      getDesktopConnection: () => { const value = this.taskControl.snapshot(); return { connected: value.source === "desktop" && value.connection === "ready", activeRunCount: value.threads.filter(item => item.state === "running").length } },
       getAdapterDiagnostics: () => this.adapter.getDiagnostics(),
       getFreshAdapterDiagnostics: () => this.adapter.requestFreshDiagnostics(),
       ...(__SETUP_SMOKE__ ? setupSmoke?.integrationOptions : {}),
@@ -157,6 +159,9 @@ export class AppController {
   async start(): Promise<void> {
     const loaded = await this.store.load(isCharacterId)
     this.settings = loaded.value
+    const selected = this.characters.get(this.settings.characterId)
+    if (selected?.status === "pending") await this.characters.ensureReady(selected, value => this.startup?.progress(value)).catch(() => {})
+    this.startup?.message("캐릭터를 화면에 준비하고 있어요.")
     if (!this.characters.isAvailable(this.settings.characterId)) { this.unavailableSelection = this.settings.characterId; this.settings.characterId = "gpichan"; this.warn("저장된 캐릭터를 사용할 수 없어 기본 캐릭터를 표시합니다. 원래 선택은 보존됩니다.") }
     if (loaded.warning) this.warn(loaded.warning)
     this.settings.bounds = this.recover(this.settings.bounds)
@@ -167,6 +172,7 @@ export class AppController {
     this.activityIpc.register()
     this.bubbleIpc.register()
     this.taskControlIpc.register()
+    this.subscriptions.push(this.taskControl.subscribe(() => this.integration.notifyAdapterChanged()))
     this.taskControl.connectDesktop()
     this.subscriptions.push(this.activity.subscribe(value => { this.rebuildTray(); this.activityBubble.update(value) }))
     await this.activity.start()
@@ -221,6 +227,7 @@ export class AppController {
   async quit(): Promise<void> {
     if (this.quitting) return
     this.quitting = true
+    this.startup?.close()
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = null
     if (this.trayVisibilityTimer) clearTimeout(this.trayVisibilityTimer)
@@ -277,6 +284,7 @@ export class AppController {
       this.lastReady = { id: requested.id, revision: requested.revision }
       for (const waiter of this.readyWaiters) if (waiter.selection.id === requested.id && waiter.selection.revision === requested.revision) waiter.finish()
       if (process.env.ELECTRON_SMOKE_TEST === "1") this.smokeReadyCharacters.add(info.characterId)
+      this.startup?.close()
       this.pet.reportReady()
       this.pet.send(IPC.adapterStatus, this.adapter.getStatus())
       if (process.env.ELECTRON_SMOKE_TEST === "1") void this.finishSmoke(info.characterId)
@@ -373,7 +381,7 @@ export class AppController {
 
   private savedSettings(): DesktopSettingsV1 { return { ...this.settings, characterId: this.unavailableSelection ?? this.settings.characterId } }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
-    this.characters.requireSelection(selection)
+    await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
     if (this.lastReady?.id === selection.id && this.lastReady.revision === selection.revision && this.settings.characterId === selection.id) { this.updateSettings({ characterId: selection.id }); return }
     await new Promise<void>((resolveReady, reject) => {
       const waiter = { selection, finish: (error?: Error) => { clearTimeout(timer); this.readyWaiters.delete(waiter); error ? reject(error) : resolveReady() } }
@@ -418,7 +426,9 @@ export class AppController {
       toggleVisible: () => this.updateSettings({ visible: !this.settings.visible }),
       setLayout: (enabled) => { if (enabled && !this.settings.visible) this.updateSettings({ visible: true }); this.setLayoutMode(enabled) },
       resetPosition: () => this.resetPosition(),
-      updateSettings: (patch) => { const validated = validateDesktopSettingsPatch(patch, this.characters.isAvailable); if (validated) this.updateSettings(validated) },
+      updateSettings: (patch) => {
+        if (patch.characterId) { const entry = this.characters.get(patch.characterId); if (entry) void this.selectCharacter(entry).catch(() => this.warn("캐릭터를 준비하지 못했습니다.")); return }
+        const validated = validateDesktopSettingsPatch(patch, this.characters.isAvailable); if (validated) this.updateSettings(validated) },
       openMotionLab: () => this.lab.open(),
       openSettings: () => this.settingsWindow.open(),
       reloadPet: () => this.pet.reload(),
@@ -746,7 +756,7 @@ export class AppController {
           speechWindow: () => this.activityBubble.speech.window,
           evidenceDirectory: process.env.ELECTRON_SMOKE_DIALOGUE_EVIDENCE,
           dataDirectory: this.adapterConfig.dataDir,
-          hookEndpoint: this.adapterConfig.hookEndpoint,
+          hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
           updateSettings: (patch) => { this.updateSettings(patch) },
           selectCharacter: async (id) => {
             this.smokeReadyCharacters.delete(id)
@@ -775,7 +785,7 @@ export class AppController {
         activityValidation = await runActivitySmoke({
           activity: this.activity, window: this.activityWindow, bubble: this.activityBubble, pet: win,
           evidenceDirectory: process.env.ELECTRON_SMOKE_ACTIVITY_EVIDENCE, userData: app.getPath("userData"),
-          dataDirectory: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
+          dataDirectory: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
           updateSettings: patch => { this.updateSettings(patch) },
           selectCharacter: async id => {
             this.smokeReadyCharacters.delete(id)
@@ -788,7 +798,7 @@ export class AppController {
           stopAdapter: () => this.adapter.stop(true), startAdapter: async () => { await this.adapter.start() },
           verifyRestart: process.env.ELECTRON_SMOKE_RESTART_EVIDENCE ? () => runRestartDetectionSmoke({
             activity: this.activity, bubble: this.activityBubble, list: this.activityWindow, pet: win, launcher: this.threadLauncher,
-            home: process.env.CODEX_HOME!, dataDir: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
+            home: process.env.CODEX_HOME!, dataDir: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
             evidenceDirectory: process.env.ELECTRON_SMOKE_RESTART_EVIDENCE!,
             reloadPet: reload,
           }) : undefined,
@@ -810,7 +820,7 @@ export class AppController {
         }
         hybridValidation = await runHybridBubbleSmoke({
           pet: win, bubble: this.activityBubble, list: this.activityWindow, activity: this.activity, dictation: this.dictation,
-          evidenceDirectory: process.env.ELECTRON_SMOKE_HYBRID_EVIDENCE, dataDirectory: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
+          evidenceDirectory: process.env.ELECTRON_SMOKE_HYBRID_EVIDENCE, dataDirectory: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
           updateSettings: patch => { this.updateSettings(patch) }, setLayout: value => this.setLayoutMode(value), reloadPet: reload,
           selectCharacter: async id => {
             if (id === this.settings.characterId) return

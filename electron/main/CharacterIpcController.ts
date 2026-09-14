@@ -44,7 +44,9 @@ export class CharacterIpcController {
       const picked = await dialog.showOpenDialog(o.settings.window!, { title: "캐릭터 추가", filters: [{ name: "캐릭터 팩", extensions: ["petchar", "zip"] }], properties: ["openFile"] })
       if (picked.canceled || !picked.filePaths[0]) return null
       if (o.settings.currentOwner() !== owner) throw new Error("PACK_TRANSACTION")
-      return o.registry.prepareImport(picked.filePaths[0], owner)
+      return o.registry.prepareImport(picked.filePaths[0], owner, value => {
+        if (o.settings.currentOwner() === owner) o.settings.send(CHARACTER_IPC.progress, value)
+      })
     }))
     this.bind(CHARACTER_IPC.commit, 1, true, (owner, [token]) => {
       if (typeof token !== "string" || token.length !== 36) throw new Error("PACK_TRANSACTION")

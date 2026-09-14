@@ -1,7 +1,7 @@
 import { constants, createReadStream } from "node:fs"
 import { access, lstat, realpath } from "node:fs/promises"
 import { createHash } from "node:crypto"
-import { dirname, join, posix, sep } from "node:path"
+import { dirname, join, posix, win32, sep } from "node:path"
 import { getCurrentFuseWire, FuseV1Options, FuseState } from "@electron/fuses"
 
 export const HOOK_MARKER = "daemonlet-codex-pet-adapter"
@@ -13,7 +13,7 @@ export const HOOK_SYSTEM_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 export const PACKAGED_HOOK_TIMEOUT_SECONDS = 2
 
 export type HookLaunchSpec = {
-  mode: "development-node" | "packaged-electron-node"
+  mode: "development-node" | "packaged-electron-node" | "packaged-windows-host"
   executablePath: string
   forwarderPath: string
   dataDir: string
@@ -39,6 +39,15 @@ export function quotePosix(value: string): string {
 }
 
 export function validateLaunchSpec(spec: HookLaunchSpec): void {
+  if (spec.mode === "packaged-windows-host") {
+    for (const value of [spec.executablePath, spec.forwarderPath, spec.dataDir]) {
+      if (!/^[a-z]:\\/i.test(value) || win32.resolve(value) !== value || /[\x00-\x1f"%!]/.test(value) || value.length > 2048) throw new Error("INVALID_LAUNCH_PATH")
+    }
+    if (win32.basename(spec.executablePath) !== "hook-host.exe" || spec.forwarderPath !== win32.join(win32.dirname(spec.executablePath), "hook-forwarder.mjs") || !win32.dirname(spec.executablePath).endsWith("\\resources\\codex")) throw new Error("INVALID_PACKAGE_LAYOUT")
+    if (spec.hookEndpoint !== "discover" && !/^http:\/\/127\.0\.0\.1:([1-9]\d{0,4})\/hook$/.test(spec.hookEndpoint)) throw new Error("INVALID_HOOK_ENDPOINT")
+    if (spec.hookEndpoint !== "discover" && Number(new URL(spec.hookEndpoint).port) > 65535) throw new Error("INVALID_HOOK_ENDPOINT")
+    return
+  }
   // This factory emits a POSIX shell command, including when a Windows host
   // inspects a saved macOS handler. Its grammar must not follow the test OS.
   if (!["development-node", "packaged-electron-node"].includes(spec.mode)) throw new Error("INVALID_LAUNCH_MODE")
@@ -61,6 +70,7 @@ export function validateLaunchSpec(spec: HookLaunchSpec): void {
 
 export function createHookCommand(spec: HookLaunchSpec): string {
   validateLaunchSpec(spec)
+  if (spec.mode === "packaged-windows-host") return `"${spec.executablePath}" ${windowsHookArguments(spec).join(" ")}`
   const environment = [
     `PATH=${HOOK_SYSTEM_PATH}`,
     ...(spec.mode === "packaged-electron-node" ? ["ELECTRON_RUN_AS_NODE=1"] : []),
@@ -70,6 +80,13 @@ export function createHookCommand(spec: HookLaunchSpec): string {
   ]
   return `/usr/bin/env -i ${[...environment, spec.executablePath, spec.forwarderPath, HOOK_ARGUMENT].map(quotePosix).join(" ")}`
 }
+
+export function windowsHookArguments(spec: HookLaunchSpec): string[] {
+  validateLaunchSpec(spec)
+  const encode = (value: string) => Array.from({ length: value.length }, (_, i) => value.charCodeAt(i).toString(16).padStart(4, "0")).join("")
+  return [encode(spec.dataDir), encode(spec.hookEndpoint), HOOK_ARGUMENT]
+}
+export function windowsElectronPath(spec: HookLaunchSpec): string { return win32.join(win32.dirname(win32.dirname(win32.dirname(spec.executablePath))), "Daemonlet for Codex.exe") }
 
 export function legacyHookCommands(executablePath: string, forwarderPath: string): { command: string; commandWindows: string } {
   const quoteWindows = (value: string) => `"${value.replaceAll('"', '\\"')}"`
@@ -88,7 +105,7 @@ export async function hashFile(path: string): Promise<string> {
 }
 
 export function isTemporaryInstallPath(path: string): boolean {
-  return /(?:^|\/)(?:tmp|private\/tmp|var\/folders|private\/var\/folders|Volumes|AppTranslocation|Downloads|out|work|worktrees|\.worktrees|dist-electron)(?:\/|$)/i.test(path)
+  return /(?:^|\/)(?:tmp|private\/tmp|var\/folders|private\/var\/folders|Volumes|AppTranslocation|Downloads|out|work|worktrees|\.worktrees|dist-electron)(?:\/|$)/i.test(path.replaceAll("\\", "/"))
 }
 
 export type HookHostInspection = {
@@ -101,6 +118,7 @@ export type HookHostInspection = {
 
 export async function hookHostRevision(spec: HookLaunchSpec): Promise<string> {
   const paths = [spec.executablePath, spec.forwarderPath]
+  if (spec.mode === "packaged-windows-host") paths.push(windowsElectronPath(spec))
   if (spec.mode === "packaged-electron-node") paths.push(join(dirname(dirname(spec.executablePath)), "Frameworks/Electron Framework.framework/Electron Framework"))
   try {
     const values = await Promise.all(paths.map(async (path) => {
@@ -121,9 +139,9 @@ export async function inspectHookHost(spec: HookLaunchSpec): Promise<HookHostIns
   try {
     validateLaunchSpec(spec)
     if (spec.mode === "development-node" && /\.app\/Contents\/MacOS\//.test(spec.executablePath)) return result
-    for (const [path, permission] of [[spec.executablePath, constants.X_OK], [spec.forwarderPath, constants.R_OK]] as const) {
+    for (const [path, permission] of [[spec.executablePath, constants.X_OK], [spec.forwarderPath, constants.R_OK], ...(spec.mode === "packaged-windows-host" ? [[windowsElectronPath(spec), constants.X_OK] as const] : [])] as const) {
       const stat = await lstat(path)
-      if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o022) !== 0 || await realpath(path) !== path) return result
+      if (!stat.isFile() || stat.isSymbolicLink() || process.platform !== "win32" && (stat.mode & 0o022) !== 0 || await realpath(path) !== path) return result
       await access(path, permission)
     }
     let frameworkFingerprint = ""
@@ -138,6 +156,13 @@ export async function inspectHookHost(spec: HookLaunchSpec): Promise<HookHostIns
       const framework = await realpath(join(bundle, "Contents/Frameworks/Electron Framework.framework/Electron Framework"))
       if (!framework.startsWith(`${bundle}${sep}`)) return result
       frameworkFingerprint = await hashFile(framework)
+    }
+    if (spec.mode === "packaged-windows-host") {
+      if (process.platform !== "win32") return result
+      const wire = await getCurrentFuseWire(windowsElectronPath(spec))
+      if (wire[FuseV1Options.RunAsNode] !== FuseState.ENABLE) return { ...result, runAsNode: "disabled", reason: "run-as-node-disabled" }
+      result.runAsNode = "enabled"
+      frameworkFingerprint = await hashFile(windowsElectronPath(spec))
     }
     result.fingerprint = hashText(JSON.stringify({ spec, executable: await hashFile(spec.executablePath), resource: await hashFile(spec.forwarderPath), frameworkFingerprint }))
     return { ...result, available: true, reason: "ready" }

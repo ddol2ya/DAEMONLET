@@ -131,7 +131,7 @@ export async function createSetupSmokeContext(): Promise<SetupSmokeContext> {
         check("skip_is_not_connection_success", (await getStatus()).onboarding === "skipped" && (await getStatus()).live.status === "not-tested")
         check("manual_checks_hidden_on_default_connection_page", await evaluate<boolean>("!document.querySelector('.setup-advanced[open]') && !document.querySelector('#observation-surface').checkVisibility()"))
         const hooksBeforePreparation = await readFile(join(home, "hooks.json"), "utf8")
-        await click(pass === "fresh" ? "연결 준비" : "연결 확인")
+        await click(pass === "fresh" ? "CLI Hook 설정" : "Hook 확인")
         await waitFor(async () => (await getStatus()).hostSelfTest.status === "passed", "HOST_SELFTEST")
         await waitFor(() => evaluate<boolean>("document.querySelector('.operation-status')?.textContent === ''"), "SELFTEST_UI_SETTLED")
         check("selftest_does_not_increment_live_evidence", (await getStatus()).live.events.every((item) => item.count === 0) && (await getStatus()).live.desktopStopAttempt === "not-tested" && (await getStatus()).reception.status === "waiting")

@@ -184,3 +184,10 @@ select { padding: 8px 30px 8px 11px; border: 1px solid #dfe4d9; border-radius: 7
 .pack-dialog { width: min(510px, calc(100vw - 50px)); }
 .pack-dialog h3 { font-size: 19px; margin: 0 0 14px; overflow-wrap: anywhere; }
 .character-packs > .notice { margin-top: 14px; }
+
+.loading-dialog { max-width: 420px; padding: 32px; text-align: center; }
+.loading-dialog h2 { margin: 16px 0; }
+.loading-dialog progress { width: 100%; accent-color: var(--accent, #286857); }
+.loading-spinner { justify-self: center; display: inline-block; width: 28px; height: 28px; border: 3px solid #dce4dd; border-top-color: #286857; border-radius: 50%; animation: loading-spin .9s linear infinite; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }

@@ -34,6 +34,13 @@ export const VERIFIED_HOOK_CONTRACTS: readonly HookSupportContract[] = [{
     SubagentStart: "supported", SubagentStop: "supported", Stop: "supported", Interrupt: "supported",
   },
   featureKey: "hooks", eventTimeoutSeconds: 2,
+}, {
+  id: "codex-cli-0.151.0-win32-x64", version: "codex-cli 0.151.0",
+  artifactSha256: "cf68265897197ac5f3bff6a10c168eec159842b353129726da5e3ed6b91ef0f4",
+  surface: "cli", source: "installed-artifact-and-fixtures",
+  // All nine embedded input schemas match the reviewed macOS wire format.
+  // Actual delivery/trust is separate from this parser compatibility evidence.
+  events: allEventSupport("supported"), featureKey: "hooks", eventTimeoutSeconds: 2,
 }]
 
 export function hookContractFor(artifactSha256: string | null, version: string | null, contracts: readonly HookSupportContract[] = VERIFIED_HOOK_CONTRACTS): HookSupportContract | null {
