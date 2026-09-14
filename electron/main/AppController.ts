@@ -605,9 +605,9 @@ export class AppController {
         const select = await waitFor(() => [...document.querySelectorAll('select')].find(node => [...node.options].some(option => option.value === 'CODEX_ADAPTER')));
         select.value = 'CODEX_ADAPTER';
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        const button = await waitFor(() => [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Connect'));
+        const button = await waitFor(() => document.querySelector('[data-testid="protocol-connect"]'));
         button.click();
-        await waitFor(() => [...document.querySelectorAll('.metric')].some(node => node.querySelector('dt')?.textContent === 'Connection' && node.querySelector('dd')?.textContent === 'READY'));
+        await waitFor(() => document.querySelector('[data-testid="protocol-connection"] dd')?.textContent === 'READY');
         return true;
       })()`)
       if (bellEvidenceDirectory && characterId === "bell") {
@@ -621,14 +621,14 @@ export class AppController {
             }
             throw new Error('Memo Check evidence timed out');
           };
-          [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Manual pose')?.click();
+          document.querySelector('[data-testid="behavior-manual"]')?.click();
           const select = await waitFor(() => document.querySelector('[data-testid="pose-selector"]:not([disabled])'));
           select.value = 'memo-check';
           select.dispatchEvent(new Event('change', { bubbles: true }));
-          [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Load pose')?.click();
-          await waitFor(() => [...document.querySelectorAll('.metric')].some(node => node.querySelector('dt')?.textContent === 'Load' && node.querySelector('dd')?.textContent === 'ready'));
-          [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Enter')?.click();
-          await waitFor(() => [...document.querySelectorAll('.metric')].some(node => node.querySelector('dt')?.textContent === 'State' && node.querySelector('dd')?.textContent === 'ACTIVE_LOOP'));
+          document.querySelector('[data-testid="pose-load"]')?.click();
+          await waitFor(() => document.querySelector('[data-testid="pose-load-status"] dd')?.textContent === 'ready');
+          document.querySelector('[data-testid="pose-enter"]')?.click();
+          await waitFor(() => document.querySelector('[data-testid="pose-state"] dd')?.textContent === 'ACTIVE_LOOP');
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           return true;
         })()`)

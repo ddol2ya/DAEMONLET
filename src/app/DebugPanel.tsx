@@ -14,8 +14,8 @@ import { ProtocolDebugPanel, type ProtocolDebugApi } from "./ProtocolDebugPanel"
 
 const PARAMS: Anime25DParameter[] = ["angleX", "angleY", "angleZ", "eyeX", "eyeY", "eyeOpenL", "eyeOpenR", "mouthOpen", "mouthForm", "body", "armY", "armPos"]
 
-function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "warn" }) {
-  return <div className="metric"><dt>{label}</dt><dd className={tone ? `tone-${tone}` : ""}>{value}</dd></div>
+function Metric({ label, value, tone, testId }: { label: string; value: string | number; tone?: "good" | "warn"; testId?: string }) {
+  return <div className="metric" data-testid={testId}><dt>{label}</dt><dd className={tone ? `tone-${tone}` : ""}>{value}</dd></div>
 }
 
 function formatPoint(point?: { cx: number; cy: number }) {
@@ -253,9 +253,9 @@ export function DebugPanel({ diagnostics, runtime, behavior, behaviorDiagnostics
         <dl className="metrics-grid">
           <Metric label={t("포즈 ID")} value={diagnostics.pose.id ?? "—"} />
           <Metric label={t("포즈 PSD")} value={diagnostics.pose.psd ?? "—"} />
-          <Metric label={t("로드")} value={diagnostics.pose.loadStatus} tone={diagnostics.pose.loadStatus === "ready" ? "good" : diagnostics.pose.loadStatus === "rejected" || diagnostics.pose.loadStatus === "error" ? "warn" : undefined} />
+          <Metric testId="pose-load-status" label={t("로드")} value={diagnostics.pose.loadStatus} tone={diagnostics.pose.loadStatus === "ready" ? "good" : diagnostics.pose.loadStatus === "rejected" || diagnostics.pose.loadStatus === "error" ? "warn" : undefined} />
           <Metric label={t("정합")} value={diagnostics.pose.registrationStatus} tone={diagnostics.pose.registrationStatus === "accepted" ? "good" : diagnostics.pose.registrationStatus === "rejected" ? "warn" : undefined} />
-          <Metric label={t("상태")} value={diagnostics.pose.state} />
+          <Metric testId="pose-state" label={t("상태")} value={diagnostics.pose.state} />
           <Metric label={t("진행 / 혼합")} value={`${diagnostics.pose.progress.toFixed(3)} / ${diagnostics.pose.mix.toFixed(3)}`} />
           <Metric label={t("활성 포즈 레이어")} value={diagnostics.pose.activeLayerCount} />
           <Metric label={t("기본 / 포즈 GPU")} value={`${diagnostics.pose.baseGpuResources} / ${diagnostics.pose.poseGpuResources}`} />
@@ -272,8 +272,8 @@ export function DebugPanel({ diagnostics, runtime, behavior, behaviorDiagnostics
         <div className="quality-controls">
           <label className="select-label"><span>{t("포즈")}</span><select data-testid="pose-selector" value={selectedPoseId} onChange={(event) => onSelectPose(event.target.value)} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}><option value="">{t("없음 / 기본")}</option>{poses.map((pose) => <option key={pose.id} value={pose.id}>{pose.label}</option>)}</select></label>
           <div className="button-row">
-            <button className="button button-quiet" type="button" onClick={onLoadPose} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("포즈 로드")}</button>
-            <button className="button button-quiet" type="button" onClick={onEnterPose} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("진입")}</button>
+            <button className="button button-quiet" type="button" data-testid="pose-load" onClick={onLoadPose} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("포즈 로드")}</button>
+            <button className="button button-quiet" type="button" data-testid="pose-enter" onClick={onEnterPose} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("진입")}</button>
             <button className="button button-quiet" type="button" onClick={() => runtime.exitPose()} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("이탈")}</button>
             <button className="button button-quiet" type="button" onClick={onTogglePose} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("전환")}</button>
             <button className="button button-quiet" type="button" onClick={() => runtime.resetPose()} disabled={behaviorDiagnostics.controlMode !== "MANUAL_POSE"}>{t("초기화")}</button>

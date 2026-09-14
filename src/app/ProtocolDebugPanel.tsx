@@ -37,8 +37,8 @@ const EMPTY_DIAGNOSTICS: ProtocolDiagnostics = {
   activeRuns: [], activeTaskCount: 0, lastError: null, lastRejectionReason: null,
 }
 
-function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "warn" }) {
-  return <div className="metric"><dt>{label}</dt><dd className={tone ? `tone-${tone}` : ""}>{value}</dd></div>
+function Metric({ label, value, tone, testId }: { label: string; value: string | number; tone?: "good" | "warn"; testId?: string }) {
+  return <div className="metric" data-testid={testId}><dt>{label}</dt><dd className={tone ? `tone-${tone}` : ""}>{value}</dd></div>
 }
 
 const downloadJson = (name: string, value: unknown) => {
@@ -183,13 +183,13 @@ export function ProtocolDebugPanel({ controller, directSource, connectSource, on
       {mode === "CODEX_ADAPTER" && <div className="warning"><b>Codex Adapter</b><span>{t("예상 소스: codex-adapter ·")} {electronProtocol ? "secure Electron IPC transport" : "ws://127.0.0.1:4174/events"}</span>{!electronProtocol && <a href="http://127.0.0.1:4175/healthz" target="_blank" rel="noreferrer">{t("Hook 관찰 상태")}</a>}</div>}
       {electronProtocol && mode === "PROTOCOL_WEBSOCKET" && <div className="warning"><b>{t("사용 불가")}</b><span>{t("사용자 지정 WebSocket 엔드포인트는 브라우저 모션 실험실에서만 사용할 수 있습니다.")}</span></div>}
       <div className="button-row">
-        <button className="button button-quiet" type="button" onClick={connect} disabled={mode === "DIRECT_MOCK"}>{t("연결")}</button>
+        <button className="button button-quiet" type="button" data-testid="protocol-connect" onClick={connect} disabled={mode === "DIRECT_MOCK"}>{t("연결")}</button>
         <button className="button button-quiet" type="button" onClick={() => runtime()?.client.disconnect()} disabled={mode === "DIRECT_MOCK"}>{t("연결 해제")}</button>
         <button className="button button-quiet" type="button" onClick={() => runtime()?.client.requestSnapshot("manual")} disabled={mode === "DIRECT_MOCK"}>{t("스냅샷 요청")}</button>
       </div>
       <dl className="metrics-grid">
         <Metric label={t("모드")} value={mode} />
-        <Metric label={t("연결 상태")} value={diagnostics.connectionState} tone={diagnostics.connectionState === "READY" ? "good" : diagnostics.connectionState === "ERROR" || diagnostics.connectionState === "DESYNCED" ? "warn" : undefined} />
+        <Metric testId="protocol-connection" label={t("연결 상태")} value={diagnostics.connectionState} tone={diagnostics.connectionState === "READY" ? "good" : diagnostics.connectionState === "ERROR" || diagnostics.connectionState === "DESYNCED" ? "warn" : undefined} />
         <Metric label={t("연결 세대")} value={diagnostics.connectionEpoch} />
         <Metric label={t("엔드포인트")} value={diagnostics.endpoint ?? "—"} />
         <Metric label={t("프로토콜 / 소스")} value={`${diagnostics.protocolVersion ?? "—"} / ${diagnostics.source ?? "—"}`} />
@@ -224,7 +224,7 @@ export function ProtocolDebugPanel({ controller, directSource, connectSource, on
           <button className="button button-quiet" type="button" onClick={() => loopback()?.sendSnapshot()}>{t("기준 스냅샷")}</button>
           <button className="button button-quiet" type="button" onClick={() => loopback()?.restartSource()}>{t("소스 인스턴스 재시작")}</button>
           <button className="button button-quiet" type="button" onClick={() => (runtime()?.transport as InMemoryProtocolTransport | undefined)?.drop()}>{t("연결 끊기")}</button>
-          <button className="button button-quiet" type="button" onClick={connect}>{t("재연결")}</button>
+          <button className="button button-quiet" type="button" data-testid="protocol-connect" onClick={connect}>{t("재연결")}</button>
           <button className="button button-quiet" type="button" onClick={() => loopback()?.sendMalformed()}>{t("잘못된 JSON")}</button>
           <button className="button button-quiet" type="button" onClick={() => loopback()?.sendInvalidProgress()}>{t("잘못된 진행률")}</button>
           <button className="button button-quiet" type="button" onClick={() => loopback()?.sendUnsupportedVersion()}>{t("지원하지 않는 버전")}</button>

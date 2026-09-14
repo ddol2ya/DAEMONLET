@@ -45,7 +45,7 @@ export function BehaviorDebugPanel({ controller, source, diagnostics }: {
     <div className="quality-controls behavior-controls">
       <div className="mode-grid">
         <button className={`button button-quiet ${diagnostics.controlMode === "AUTO_BEHAVIOR" ? "is-on" : ""}`} type="button" onClick={() => controller.setControlMode("AUTO_BEHAVIOR")}>{t("자동 동작")}</button>
-        <button className={`button button-quiet ${diagnostics.controlMode === "MANUAL_POSE" ? "is-on" : ""}`} type="button" onClick={() => controller.setControlMode("MANUAL_POSE")}>{t("수동 포즈")}</button>
+        <button className={`button button-quiet ${diagnostics.controlMode === "MANUAL_POSE" ? "is-on" : ""}`} type="button" data-testid="behavior-manual" onClick={() => controller.setControlMode("MANUAL_POSE")}>{t("수동 포즈")}</button>
       </div>
       <dl className="metrics-grid">
         <Metric label={t("제어 모드")} value={diagnostics.controlMode} />
