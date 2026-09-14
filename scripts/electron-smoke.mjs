@@ -192,7 +192,7 @@ try {
       && result.petHiddenBeforeActivate
       && result.dockActivateShowedPet
       && result.visibleSetting
-      && result.trayLabel === "Hide Character"
+      && result.trayLabel === (result.language === "en" ? "Hide character" : "캐릭터 숨기기")
     if (!dockRecoveryValid) throw new Error(`Dock recovery smoke assertions failed: ${JSON.stringify(result)}`)
   }
   if (recoveryLifecycle) {

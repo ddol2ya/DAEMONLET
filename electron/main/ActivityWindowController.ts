@@ -1,3 +1,4 @@
+import { appText, bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow } from "electron"
 import { expectedRendererUrl, secureWebContents } from "./SecurityPolicy"
 
@@ -12,10 +13,10 @@ export class ActivityWindowController {
     }
     const win = new BrowserWindow({
       width: 850, height: 800, minWidth: 640, minHeight: 560,
-      title: "Daemonlet 작업 목록", show: false, backgroundColor: "#f7f8fa",
-      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.preloadPath },
+      title: appText("Daemonlet 작업 목록"), show: false, backgroundColor: "#f7f8fa",
+      webPreferences: { additionalArguments: languageArguments(), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.preloadPath },
     })
-    this.window = win
+    bindWindowLanguage(win, "Daemonlet 작업 목록"); this.window = win
     secureWebContents(win.webContents, "activity", this.devServerUrl)
     win.once("ready-to-show", () => { if (!win.isDestroyed()) win.show() })
     win.once("closed", () => { if (this.window === win) this.window = null })

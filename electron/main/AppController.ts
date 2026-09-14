@@ -1,3 +1,4 @@
+import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
 import type { StartupWindow } from "./StartupWindow"
 import { runHybridBubbleSmoke } from "./HybridBubbleSmoke"
 import { runDialogueSmoke } from "./DialogueSmoke"
@@ -94,7 +95,7 @@ export class AppController {
     this.activity = new ActivityService(createActivityClient(this.adapterConfig.protocolEndpoint), new ActivityHistoryStore(app.getPath("userData")))
     this.activityTitles = new ActivityConversationTitles(() => readDesktopThreadCatalog(process.env.CODEX_HOME ?? join(homedir(), ".codex")), titles => this.activity.setConversationTitles(titles))
     this.activityWindow = new ActivityWindowController(preload("activity"), this.devServerUrl)
-    this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"))
+    this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"), undefined, process.platform, appLanguage)
     this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel())
     this.bubbleIpc = new BubblePresentationIpcController(this.activityBubble, this.devServerUrl)
     this.taskControlIpc = new TaskControlIpcController(this.activityBubble, this.taskControl, this.dictation, this.devServerUrl, Date.now, this.threadLauncher)
@@ -159,6 +160,7 @@ export class AppController {
   async start(): Promise<void> {
     const loaded = await this.store.load(isCharacterId)
     this.settings = loaded.value
+    setAppLanguage(this.settings.language)
     const selected = this.characters.get(this.settings.characterId)
     if (selected?.status === "pending") await this.characters.ensureReady(selected, value => this.startup?.progress(value)).catch(() => {})
     this.startup?.message("캐릭터를 화면에 준비하고 있어요.")
@@ -324,6 +326,7 @@ export class AppController {
     if (patch.characterId !== undefined && patch.characterId !== this.settings.characterId) this.activityBubble.presentation.begin()
     const previousScale = this.settings.scale
     Object.assign(this.settings, patch)
+    if (patch.language !== undefined) setAppLanguage(this.settings.language)
     if (patch.scale !== undefined && patch.scale !== previousScale) {
       const size = windowSizeForScale(patch.scale)
       const current = this.pet.window?.getBounds() ?? this.settings.bounds
@@ -447,7 +450,7 @@ export class AppController {
       const diagnostics = await this.adapter.requestFreshDiagnostics()
       if (!diagnostics || diagnostics.adapterOwnership === "EXTERNAL_PROCESS") return { restarted: false }
       if (diagnostics.activeRunCount > 0) {
-        const choice = await dialog.showMessageBox({ type: "warning", title: "Adapter 재시작", message: "진행 중인 작업의 Pet 표시가 끊길 수 있습니다.", detail: "Codex 작업은 강제로 취소하지 않습니다. 작업이 끝난 뒤 재시작할 수도 있습니다.", buttons: ["취소", "재시작"], defaultId: 0, cancelId: 0 })
+        const choice = await dialog.showMessageBox({ type: "warning", title: appText("Adapter 재시작"), message: appText("진행 중인 작업의 Pet 표시가 끊길 수 있습니다."), detail: appText("Codex 작업은 강제로 취소하지 않습니다. 작업이 끝난 뒤 재시작할 수도 있습니다."), buttons: [appText("취소"), appText("재시작")], defaultId: 0, cancelId: 0 })
         if (choice.response !== 1) return { restarted: false }
       }
       await this.adapter.restart()
@@ -602,9 +605,9 @@ export class AppController {
         const select = await waitFor(() => [...document.querySelectorAll('select')].find(node => [...node.options].some(option => option.value === 'CODEX_ADAPTER')));
         select.value = 'CODEX_ADAPTER';
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        const button = await waitFor(() => [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Connect'));
+        const button = await waitFor(() => document.querySelector('[data-testid="protocol-connect"]'));
         button.click();
-        await waitFor(() => [...document.querySelectorAll('.metric')].some(node => node.querySelector('dt')?.textContent === 'Connection' && node.querySelector('dd')?.textContent === 'READY'));
+        await waitFor(() => document.querySelector('[data-testid="protocol-connection"] dd')?.textContent === 'READY');
         return true;
       })()`)
       if (bellEvidenceDirectory && characterId === "bell") {
@@ -618,14 +621,14 @@ export class AppController {
             }
             throw new Error('Memo Check evidence timed out');
           };
-          [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Manual pose')?.click();
+          document.querySelector('[data-testid="behavior-manual"]')?.click();
           const select = await waitFor(() => document.querySelector('[data-testid="pose-selector"]:not([disabled])'));
           select.value = 'memo-check';
           select.dispatchEvent(new Event('change', { bubbles: true }));
-          [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Load pose')?.click();
-          await waitFor(() => [...document.querySelectorAll('.metric')].some(node => node.querySelector('dt')?.textContent === 'Load' && node.querySelector('dd')?.textContent === 'ready'));
-          [...document.querySelectorAll('button')].find(node => node.textContent?.trim() === 'Enter')?.click();
-          await waitFor(() => [...document.querySelectorAll('.metric')].some(node => node.querySelector('dt')?.textContent === 'State' && node.querySelector('dd')?.textContent === 'ACTIVE_LOOP'));
+          document.querySelector('[data-testid="pose-load"]')?.click();
+          await waitFor(() => document.querySelector('[data-testid="pose-load-status"] dd')?.textContent === 'ready');
+          document.querySelector('[data-testid="pose-enter"]')?.click();
+          await waitFor(() => document.querySelector('[data-testid="pose-state"] dd')?.textContent === 'ACTIVE_LOOP');
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
           return true;
         })()`)
@@ -882,7 +885,8 @@ export class AppController {
       petHiddenBeforeActivate: visibilitySync.petHiddenBeforeActivate,
       dockActivateShowedPet: visibilitySync.dockActivateShowedPet,
       visibleSetting: this.settings.visible,
-      trayLabel: this.settings.visible ? "Hide Character" : "Show Character",
+      language: this.settings.language,
+      trayLabel: appText(this.settings.visible ? "캐릭터 숨기기" : "캐릭터 표시"),
       recoveryValidation,
       dialogueValidation,
       hybridValidation,

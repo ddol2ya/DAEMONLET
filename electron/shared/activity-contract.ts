@@ -1,3 +1,5 @@
+import { createTranslator } from "./translations"
+import type { AppLanguage } from "./app-language"
 import type { ProtocolCompletionConfidence, ProtocolConnectionState, ProtocolTaskKind } from "../../src/protocol/types"
 
 export const ACTIVITY_HISTORY_LIMIT = 100
@@ -76,7 +78,8 @@ export function validateActivityAck(value: unknown): ActivityAckRequest | null {
   return { targets }
 }
 
-export function activitySummary(value: Pick<ActivitySnapshot, "connection" | "counts">): string {
+export function activitySummary(value: Pick<ActivitySnapshot, "connection" | "counts">, language: AppLanguage = "ko"): string {
+  const t = createTranslator(language)
   const { running, waiting, failed, completed } = value.counts
-  return `${value.connection === "READY" ? "" : "재확인 중 · 마지막 관찰: "}입력 필요 ${waiting} · 미확인 실패 ${failed} · 미확인 종료 ${completed} · 실행 중 ${running}`
+  return `${value.connection === "READY" ? "" : t("재확인 중 · 마지막 관찰: ")}${t`입력 필요 ${waiting} · 미확인 실패 ${failed} · 미확인 종료 ${completed} · 실행 중 ${running}`}`
 }

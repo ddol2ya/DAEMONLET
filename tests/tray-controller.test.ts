@@ -65,18 +65,18 @@ describe("tray menu", () => {
 
   it("reflects visibility, character, scale, window, click-through, adapter, and quit state", async () => {
     const { buildTrayMenu } = await import("../electron/main/TrayController")
-    const settings = { ...defaultDesktopSettings(), characterId: "gpichan" as const, scale: 1.25, visible: false, clickThrough: false }
+    const settings = { ...defaultDesktopSettings(), language: "en" as const, characterId: "gpichan" as const, scale: 1.25, visible: false, clickThrough: false }
     const actions = {
       toggleVisible: vi.fn(), setLayout: vi.fn(), resetPosition: vi.fn(), updateSettings: vi.fn(), openMotionLab: vi.fn(), reloadPet: vi.fn(), restartAdapter: vi.fn(), diagnostics: vi.fn(() => ({})), quit: vi.fn(),
     }
     const menu = buildTrayMenu(settings, { state: "READY", message: null, restartCount: 0 }, actions as never) as Array<Record<string, any>>
-    expect(menu[0].label).toBe("Show Character")
+    expect(menu[0].label).toBe("Show character")
     expect(menu.find((item) => item.label === "Character")!.submenu).toMatchObject([{ label: "지피쨩", checked: true }])
     expect(menu.find((item) => item.label === "Character")!.submenu).toHaveLength(1)
     menu.find((item) => item.label === "Character")!.submenu[0].click()
     expect(actions.updateSettings).toHaveBeenCalledWith({ characterId: "gpichan" })
-    expect(menu.find((item) => item.label === "Scale")!.submenu.find((item: Record<string, unknown>) => item.label === "125%")).toMatchObject({ checked: true })
-    expect(menu.find((item) => item.label === "Click-through")!.submenu[1]).toMatchObject({ label: "Disabled", checked: true })
+    expect(menu.find((item) => item.label === "Size")!.submenu.find((item: Record<string, unknown>) => item.label === "125%")).toMatchObject({ checked: true })
+    expect(menu.find((item) => item.label === "Click through transparent areas")!.submenu[1]).toMatchObject({ label: "Disabled", checked: true })
     expect(menu.find((item) => item.label === "Codex Adapter")!.submenu[0].label).toBe("Status: READY (Owned)")
     expect(menu.at(-1)?.label).toBe("Quit")
   })
@@ -87,9 +87,23 @@ describe("speech bubble Tray toggle", () => {
     const { buildTrayMenu } = await import("../electron/main/TrayController")
     const updateSettings = vi.fn()
     const menu = buildTrayMenu({ ...defaultDesktopSettings(), speechBubblesEnabled }, { state: "READY", message: null, restartCount: 0 }, { updateSettings } as never)
-    const toggle = menu.find((item) => item.label === "Show Speech Bubbles")!
+    const toggle = menu.find((item) => item.label === "캐릭터 대사 표시")!
     expect(toggle).toMatchObject({ type: "checkbox", checked: speechBubblesEnabled })
     toggle.click?.({} as never, {} as never, {} as never)
     expect(updateSettings).toHaveBeenCalledWith({ speechBubblesEnabled: !speechBubblesEnabled })
+  })
+})
+
+
+describe("tray language choice", () => {
+  it("offers both languages without translating character names", async () => {
+    const { buildTrayMenu } = await import("../electron/main/TrayController")
+    const updateSettings = vi.fn()
+    const actions = { updateSettings, characters: () => [{ id: "user-pack", name: "작업 중", status: "ready" }] }
+    const menu = buildTrayMenu({ ...defaultDesktopSettings(), language: "en" }, { state: "READY", message: null, restartCount: 0 }, actions as never) as Array<Record<string, any>>
+    const languages = menu.find(item => item.label === "언어 / Language")!.submenu
+    expect(languages).toMatchObject([{ label: "한국어", checked: false }, { label: "English", checked: true }])
+    languages[0].click(); expect(updateSettings).toHaveBeenCalledWith({ language: "ko" })
+    expect(menu.find(item => item.label === "Character")!.submenu[0].label).toBe("작업 중")
   })
 })

@@ -1,3 +1,4 @@
+import type {} from "../../electron/shared/app-language"
 import type { SpeechBubbleFrame } from "../../electron/shared/bubble-presentation"
 import { SPEECH_WINDOW_PADDING } from "../../electron/shared/speech-bubble"
 import "../pet/speech-bubble.css"
@@ -19,3 +20,7 @@ window.petSpeech.subscribe(frame => {
   bubble.style.width = `${frame.content.width}px`
   bubble.style.setProperty("--bubble-fade", `${frame.content.fadeMs}ms`)
 })
+
+const updateLanguage = () => { document.documentElement.lang = window.appLanguage?.current() ?? "ko" }
+updateLanguage()
+window.appLanguage?.onChanged(updateLanguage)

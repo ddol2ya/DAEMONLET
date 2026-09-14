@@ -17,8 +17,8 @@ vi.mock("electron", () => ({
 describe("Motion Lab preload", () => {
   it("exposes platform, typed protocol and read/select character APIs", async () => {
     await import("../electron/preload/lab-preload")
-    expect(mocks.exposeInMainWorld).toHaveBeenCalledOnce()
-    const [name, api] = mocks.exposeInMainWorld.mock.calls[0] as [string, Record<string, unknown>]
+    expect(mocks.exposeInMainWorld.mock.calls.map(([name]) => name).sort()).toEqual(["appLanguage", "motionLabDesktop"])
+    const [name, api] = mocks.exposeInMainWorld.mock.calls.find(([name]) => name === "motionLabDesktop")! as [string, Record<string, unknown>]
     expect(name).toBe("motionLabDesktop")
     expect(Object.keys(api).sort()).toEqual(["characters", "platform", "protocol"])
     expect(Object.keys(api.protocol as object).sort()).toEqual(["connect", "disconnect", "onMessage", "onStatus", "send"])

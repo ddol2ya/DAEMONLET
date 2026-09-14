@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useLanguage"
 import TaskControlPanel from "./TaskControlPanel"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { ActivityApi, ActivityResponse, ActivitySnapshot } from "../../electron/shared/activity-contract"
@@ -8,6 +9,7 @@ const labels = { waiting: "입력 필요", running: "작업 중", completed: "�
 const categories = { command: "명령 실행", "file-change": "파일 변경", tool: "도구 사용", "web-search": "웹 검색", subtask: "하위 작업", review: "검토", other: "작업 진행" }
 
 export default function ActivityBubbleApp() {
+  const t = useT()
   const [snapshot, setSnapshot] = useState<ActivitySnapshot | null>(null)
   const [attention, setAttention] = useState({ waiting: 0, unread: 0 })
   const [selected, setSelected] = useState<string | null>(null)
@@ -107,7 +109,7 @@ export default function ActivityBubbleApp() {
   const cycle = (delta: number) => { if (entries.length) { setSelected(entries[(index + delta + entries.length) % entries.length].activityId); setError("") } }
   const release = (reason: string) => { if (releaseTimer.current) clearTimeout(releaseTimer.current); releaseTimer.current = setTimeout(() => { releaseTimer.current = null; hold(reason, false) }, 0) }
   const target = entry && { activityId: entry.activityId, revision: entry.revision }
-  return <><div className="activity-view" hidden={view !== "activity"}><main ref={main} className={`bubble-shell task-bubble ${collapsed ? "compact" : ""}`} data-state={entry?.state ?? "unknown"} data-activity-id={entry?.activityId} aria-label="작업 말풍선"
+  return <><div className="activity-view" hidden={view !== "activity"}><main ref={main} className={`bubble-shell task-bubble ${collapsed ? "compact" : ""}`} data-state={entry?.state ?? "unknown"} data-activity-id={entry?.activityId} aria-label={t("작업 말풍선")}
     onPointerDownCapture={event => {
       if (!(event.target instanceof Element)) return
       const button = event.target.closest("button, summary")
@@ -124,27 +126,27 @@ export default function ActivityBubbleApp() {
     onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) hold("focus", false) }}
     onKeyDown={event => { if (["Enter", " "].includes(event.key)) { hold("keyboard", true); hold("native", false) } if (event.key === "Escape") { if (menuOpen) { event.preventDefault(); closeMenu(); menu.current?.querySelector("summary")?.focus() } else if (!collapsed) toggle() } }}
     onKeyUp={() => release("keyboard")}>
-    {collapsed ? <button className="mini-task-chip" aria-label="작업 알림 펼치기" aria-expanded="false" title={`${entry?.name ?? "작업 알림"} · ${entry ? labels[entry.state] : ""} · 입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`} disabled={pending || !api} onClick={toggle}>
+    {collapsed ? <button className="mini-task-chip" aria-label={t("작업 알림 펼치기")} aria-expanded="false" title={t`${entry?.name ?? t("작업 알림")} · ${entry ? t(labels[entry.state]) : ""} · 입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`} disabled={pending || !api} onClick={toggle}>
       <span className="mini-task-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></svg><span className={`task-dot ${stale ? "stale" : ""}`} /></span>
       {attention.waiting + attention.unread > 0 && <span className="mini-task-count" aria-hidden="true">{Math.min(99, attention.waiting + attention.unread)}{attention.waiting + attention.unread > 99 ? "+" : ""}</span>}
-      <span className="sr-label" role="status" aria-live="polite">입력 필요 {attention.waiting} · 미확인 {attention.unread}</span>
+      <span className="sr-label" role="status" aria-live="polite">{t`입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`}</span>
     </button> : <><div className="bubble-top">
       <span className={`task-dot ${stale ? "stale" : ""}`} aria-hidden="true" />
-      <div className="task-heading"><strong>{stale ? "작업 재확인 중" : entry ? labels[entry.state] : "작업 알림"}</strong>{!collapsed && entry && (entry.unread || entry.category || entry.state === "waiting" || stale) && <span>· {entry.unread ? "미확인" : entry.state === "running" && entry.category ? categories[entry.category] : entry.state === "waiting" ? "대화에서 응답" : "마지막 관찰"}</span>}</div>
-      <button className="text-button" aria-label="작업 목록 열기" disabled={pending || !api} onClick={() => api && void perform(() => api.openList())}>목록</button>
-      <details ref={menu} className="bubble-menu" open={menuOpen} onToggle={event => { setMenuOpen(event.currentTarget.open); hold("menu", event.currentTarget.open) }}><summary aria-label="작업 말풍선 메뉴" onClick={event => hold("menu", !(event.currentTarget.parentElement as HTMLDetailsElement).open)}>···</summary><div className="bubble-menu-panel">
-        {window.taskControlDesktop && <button disabled={pending} onClick={() => { closeMenu(); void window.taskControlDesktop!.setView("control", false) }}>Codex 제어</button>}
-        <button disabled={pending || !api} onClick={toggle}>{collapsed ? "펼치기" : "접기"}</button>
-        {entry?.unread && entry.canOpenConversation && <button disabled={pending || !api} onClick={() => { closeMenu(); if (api && target) void perform(() => api.openResult(target), receive) }}>열고 확인</button>}
+      <div className="task-heading"><strong>{stale ? t("작업 재확인 중") : entry ? t(labels[entry.state]) : t("작업 알림")}</strong>{!collapsed && entry && (entry.unread || entry.category || entry.state === "waiting" || stale) && <span>· {entry.unread ? t("미확인") : entry.state === "running" && entry.category ? t(categories[entry.category]) : entry.state === "waiting" ? t("대화에서 응답") : t("마지막 관찰")}</span>}</div>
+      <button className="text-button" aria-label={t("작업 목록 열기")} disabled={pending || !api} onClick={() => api && void perform(() => api.openList())}>{t("목록")}</button>
+      <details ref={menu} className="bubble-menu" open={menuOpen} onToggle={event => { setMenuOpen(event.currentTarget.open); hold("menu", event.currentTarget.open) }}><summary aria-label={t("작업 말풍선 메뉴")} onClick={event => hold("menu", !(event.currentTarget.parentElement as HTMLDetailsElement).open)}>···</summary><div className="bubble-menu-panel">
+        {window.taskControlDesktop && <button disabled={pending} onClick={() => { closeMenu(); void window.taskControlDesktop!.setView("control", false) }}>{t("Codex 제어")}</button>}
+        <button disabled={pending || !api} onClick={toggle}>{collapsed ? t("펼치기") : t("접기")}</button>
+        {entry?.unread && entry.canOpenConversation && <button disabled={pending || !api} onClick={() => { closeMenu(); if (api && target) void perform(() => api.openResult(target), receive) }}>{t("열고 확인")}</button>}
       </div></details>
     </div>
-    <div className="bubble-bottom"><span className="task-name" title={entry?.name}>{entry?.name ?? "새 작업을 기다려요"}</span><div className="task-links">
-      {entry?.canOpenConversation && <button className="text-button" disabled={pending || !api} onClick={() => api && target && void perform(() => api.openConversation(target))}>대화 열기 <span aria-hidden="true">↗</span></button>}
-      {entry?.unread && <button className="text-button confirm" disabled={pending || !api} onClick={() => api && target && void perform(() => api.acknowledge({ targets: [target] }), receive)}>확인</button>}
+    <div className="bubble-bottom"><span className="task-name" title={entry?.name}>{entry?.name ?? t("새 작업을 기다려요")}</span><div className="task-links">
+      {entry?.canOpenConversation && <button className="text-button" disabled={pending || !api} onClick={() => api && target && void perform(() => api.openConversation(target))}>{t("대화 열기 ")}<span aria-hidden="true">↗</span></button>}
+      {entry?.unread && <button className="text-button confirm" disabled={pending || !api} onClick={() => api && target && void perform(() => api.acknowledge({ targets: [target] }), receive)}>{t("확인")}</button>}
     </div></div>
-    <div className="bubble-summary"><span role="status" aria-live="polite" aria-atomic="true">{attention.waiting ? `입력 필요 ${attention.waiting}` : ""}{attention.waiting && attention.unread ? " · " : ""}{attention.unread ? `미확인 ${attention.unread}` : ""}</span>
-      {entries.length > 1 && <div className="task-pager" aria-label="작업 선택"><button className="text-button" aria-label="이전 작업" disabled={pending} onClick={() => cycle(-1)}>‹</button><span>{index + 1}/{entries.length}</span><button className="text-button" aria-label="다음 작업" disabled={pending} onClick={() => cycle(1)}>›</button></div>}
+    <div className="bubble-summary"><span role="status" aria-live="polite" aria-atomic="true">{attention.waiting ? t`입력 필요 ${attention.waiting}` : ""}{attention.waiting && attention.unread ? " · " : ""}{attention.unread ? t`미확인 ${attention.unread}` : ""}</span>
+      {entries.length > 1 && <div className="task-pager" aria-label={t("작업 선택")}><button className="text-button" aria-label={t("이전 작업")} disabled={pending} onClick={() => cycle(-1)}>‹</button><span>{index + 1}/{entries.length}</span><button className="text-button" aria-label={t("다음 작업")} disabled={pending} onClick={() => cycle(1)}>›</button></div>}
     </div>
-    {(error || snapshot?.storage === "error") && <p className="task-error" role="alert">{error || "이력 저장 실패 · 작업 목록에서 확인해 주세요."}</p>}</>}
+    {(error || snapshot?.storage === "error") && <p className="task-error" role="alert">{t(error) || t("이력 저장 실패 · 작업 목록에서 확인해 주세요.")}</p>}</>}
   </main></div><TaskControlPanel hidden={view !== "control"} collapsed={collapsed} /></>
 }

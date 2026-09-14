@@ -1,3 +1,4 @@
+import { appText, bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow } from "electron"
 import { expectedRendererUrl, secureWebContents } from "./SecurityPolicy"
 
@@ -14,6 +15,7 @@ export class LabWindowController {
     if (this.window && !this.window.isDestroyed()) { this.window.show(); this.window.focus(); return this.window }
     const win = new BrowserWindow({
       width: 1280,
+      title: appText("모션 실험실"),
       height: 820,
       show: false,
       frame: true,
@@ -21,7 +23,7 @@ export class LabWindowController {
       backgroundColor: "#08090d",
       skipTaskbar: false,
       alwaysOnTop: false,
-      webPreferences: {
+      webPreferences: { additionalArguments: languageArguments(),
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
@@ -33,7 +35,7 @@ export class LabWindowController {
         preload: this.preloadPath,
       },
     })
-    this.window = win
+    bindWindowLanguage(win, "모션 실험실"); this.window = win
     secureWebContents(win.webContents, "lab", this.devServerUrl)
     if (process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {

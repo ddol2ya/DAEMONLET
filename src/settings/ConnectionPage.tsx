@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useLanguage"
 import { useState } from "react"
 import { HOOK_EVENTS, type HookApplySummary, type HookPlanAction, type HookPlanSummary, type ObservationSurface, type SetupConfigurationStatus } from "../../electron/shared/codex-integration-contract"
 import type { SettingsPageProps } from "./SettingsApp"
@@ -5,9 +6,10 @@ import { HookPlanPreview } from "./HookPlanPreview"
 import { configurationLabels, reasonText, supportLabels } from "./labels"
 
 const needsInstall = (state: SetupConfigurationStatus) => ["not-installed", "installed-legacy", "partially-installed", "repair-needed"].includes(state)
-const time = (value: number) => new Date(value).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })
 
 export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
+  const t = useT()
+  const time = (value: number) => new Date(value).toLocaleTimeString(t.locale, { hour: "2-digit", minute: "2-digit" })
   const [plan, setPlan] = useState<HookPlanSummary | null>(null)
   const [applied, setApplied] = useState<HookApplySummary | null>(null)
   const [surface, setSurface] = useState<ObservationSurface>("desktop")
@@ -16,7 +18,7 @@ export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
   const installed = status.configurationStatus === "installed-current"
   const receiving = status.reception.status === "receiving"
   const found = discovery?.executable.probeStatus === "verified"
-  const hookHeading = receiving ? "Hook 이벤트 수신 중" : installed ? "Hook 설정됨" : status.configurationStatus === "not-installed" ? "Hook 미설정" : "Hook 확인 필요"
+  const hookHeading = receiving ? t("Hook 이벤트 수신 중") : installed ? t("Hook 설정됨") : status.configurationStatus === "not-installed" ? t("Hook 미설정") : t("Hook 확인 필요")
   const reviewDone = status.hookReviewStatus === "user-reported-reviewed"
   const prepare = async () => {
     setApplied(null)
@@ -42,39 +44,39 @@ export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
   const connected = status.desktop?.connected === true
 
   return <>
-    <header className="page-header"><h1>Codex 연결</h1><button className="button secondary small" disabled={disabled} onClick={() => void run("상태 확인", () => api.refreshStatus())}>새로 확인</button></header>
-    <section className="section-card connection-summary" aria-label="Codex Desktop 연결 상태">
-      <div className="connection-heading"><span className={`connection-indicator ${connected ? "connected" : ""}`} aria-hidden="true">{connected ? "✓" : "◎"}</span><div><h2>{connected ? "데스크톱 연결됨" : "데스크톱 연결 대기"}</h2><p>{connected ? "Codex 앱과 자동으로 연결되었습니다." : "같은 사용자 계정에서 Codex 앱을 실행해 주세요."}</p></div></div>
-      <p>데스크톱 앱은 별도 Hook 설정 없이 사용할 수 있습니다. ‘Codex 제어’에서 대화를 선택하세요.</p>
-      {status.adapter.state !== "READY" && <button className="button secondary" disabled={disabled || status.adapter.ownership === "EXTERNAL_PROCESS"} onClick={() => void run("연결 재시작", async () => { await api.restartAdapter(); return api.refreshStatus() })}>연결 다시 시작</button>}
+    <header className="page-header"><h1>{t("Codex 연결")}</h1><button className="button secondary small" disabled={disabled} onClick={() => void run("상태 확인", () => api.refreshStatus())}>{t("새로 확인")}</button></header>
+    <section className="section-card connection-summary" aria-label={t("Codex Desktop 연결 상태")}>
+      <div className="connection-heading"><span className={`connection-indicator ${connected ? "connected" : ""}`} aria-hidden="true">{connected ? "✓" : "◎"}</span><div><h2>{connected ? t("데스크톱 연결됨") : t("데스크톱 연결 대기")}</h2><p>{connected ? t("Codex 앱과 자동으로 연결되었습니다.") : t("같은 사용자 계정에서 Codex 앱을 실행해 주세요.")}</p></div></div>
+      <p>{t("데스크톱 앱은 별도 Hook 설정 없이 사용할 수 있습니다. ‘Codex 제어’에서 대화를 선택하세요.")}</p>
+      {status.adapter.state !== "READY" && <button className="button secondary" disabled={disabled || status.adapter.ownership === "EXTERNAL_PROCESS"} onClick={() => void run("연결 재시작", async () => { await api.restartAdapter(); return api.refreshStatus() })}>{t("연결 다시 시작")}</button>}
     </section>
-    <section className="section-card connection-summary" aria-label="CLI Hook 설정">
-      <h2>CLI Hook 설정 <span className="source-label">선택 사항</span></h2>
-      <p>터미널에서 Codex CLI를 사용할 때 설정하세요. 데스크톱 연결과 별도로 관리됩니다.</p>
-      <p className="fine-print">Codex CLI만 단독으로 사용하면 Daemonlet이 정상 작동하지 않을 수 있습니다. Codex 데스크톱 앱을 함께 실행해 주세요.</p>
-      <div className="connection-heading"><span className={`connection-indicator ${receiving ? "connected" : ""}`} aria-hidden="true">{receiving ? "✓" : "◎"}</span><div><h2>{hookHeading}</h2><p>{receiving ? `최근 수신 ${time(status.reception.lastReceivedAt!)}` : installed ? "CLI에서 Hook을 허용한 뒤 작업하면 수신 상태가 갱신됩니다." : "CLI 위치와 Hook 실행 환경을 확인합니다."}</p></div></div>
-      <dl className="connection-checks"><div><dt>Codex CLI</dt><dd>{found ? discovery.executable.version?.replace("codex-cli ", "v") : discovery?.executable.path ? "확인 필요" : discovery ? "찾지 못함" : "찾는 중…"}</dd></div><div><dt>Hook</dt><dd>{installed ? "설정됨" : configurationLabels[status.configurationStatus]}</dd></div><div><dt>이벤트 수신</dt><dd>{receiving ? "확인됨" : status.reception.status === "waiting" ? "자동 확인 중" : "연결 대기"}</dd></div></dl>
-      <div className="button-row"><button className="button primary" disabled={disabled} onClick={() => void prepare()}>{installed ? "Hook 확인" : "CLI Hook 설정"}</button>{discovery && !discovery.executable.path && <button className="button secondary" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>Codex 앱 선택</button>}</div>
+    <section className="section-card connection-summary" aria-label={t("CLI Hook 설정")}>
+      <h2>{t("CLI Hook 설정 ")}<span className="source-label">{t("선택 사항")}</span></h2>
+      <p>{t("터미널에서 Codex CLI를 사용할 때 설정하세요. 데스크톱 연결과 별도로 관리됩니다.")}</p>
+      <p className="fine-print">{t("Codex CLI만 단독으로 사용하면 Daemonlet이 정상 작동하지 않을 수 있습니다. Codex 데스크톱 앱을 함께 실행해 주세요.")}</p>
+      <div className="connection-heading"><span className={`connection-indicator ${receiving ? "connected" : ""}`} aria-hidden="true">{receiving ? "✓" : "◎"}</span><div><h2>{hookHeading}</h2><p>{receiving ? t`최근 수신 ${time(status.reception.lastReceivedAt!)}` : installed ? t("CLI에서 Hook을 허용한 뒤 작업하면 수신 상태가 갱신됩니다.") : t("CLI 위치와 Hook 실행 환경을 확인합니다.")}</p></div></div>
+      <dl className="connection-checks"><div><dt>Codex CLI</dt><dd>{found ? discovery.executable.version?.replace("codex-cli ", "v") : discovery?.executable.path ? t("확인 필요") : discovery ? t("찾지 못함") : t("찾는 중…")}</dd></div><div><dt>Hook</dt><dd>{installed ? t("설정됨") : t(configurationLabels[status.configurationStatus])}</dd></div><div><dt>{t("이벤트 수신")}</dt><dd>{receiving ? t("확인됨") : status.reception.status === "waiting" ? t("자동 확인 중") : t("연결 대기")}</dd></div></dl>
+      <div className="button-row"><button className="button primary" disabled={disabled} onClick={() => void prepare()}>{installed ? t("Hook 확인") : t("CLI Hook 설정")}</button>{discovery && !discovery.executable.path && <button className="button secondary" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>{t("Codex 앱 선택")}</button>}</div>
     </section>
-    {status.issue && <div className="notice warning" role="alert">{reasonText(status.issue)}</div>}
-    {applied && applied.status !== "no-change" && (applied.status !== "applied" || !receiving) && <div className={`notice ${applied.status === "applied" ? "success" : "warning"}`} role="status">{applied.status === "applied-with-receipt-warning" ? "Hook 설정은 저장됐지만 설치 기록을 저장하지 못했습니다. 진단에서 확인해 주세요." : applied.status === "committed-conflict" ? "설정 저장 후 다른 변경이 발견됐습니다. 진단에서 확인해 주세요." : "Hook 설정을 저장했습니다. Codex에서 변경 내용을 검토해 주세요."}</div>}
-    {discovery?.manualFeatureInstruction && <section className="section-card"><h2>Hook 기능 켜기</h2><p><code>config.toml</code>에 아래 설정을 추가한 뒤 Codex를 다시 실행해 주세요.</p><pre>{discovery.manualFeatureInstruction}</pre></section>}
-    {(installed || applied) && !receiving && <section className="section-card hook-review"><div><h2>Codex에서 Hook 검토</h2><p>{reviewDone ? "검토 완료로 표시했습니다. 다음 작업부터 수신을 자동 확인합니다." : <>CLI에서 <code>/hooks</code>를 열어 이 앱의 Hook을 확인하고 허용해 주세요.</>}</p></div>{!reviewDone && <button className="button secondary small" disabled={disabled} onClick={() => void run("검토 상태 저장", () => api.reportHookReview())}>Codex에서 검토했어요</button>}</section>}
-    {warnings.length > 0 && <div className="notice warning"><ul className="connection-warnings">{warnings.map(code => <li key={code}>{reasonText(code)}</li>)}</ul></div>}
-    <details className="section-card setup-advanced"><summary>고급 설정</summary><div className="advanced-content">
-      <h2>연결 위치</h2>
-      <div className="path-row"><div><span className="label">Codex 실행 파일 <span className="source-label">{discovery?.executable.source === "selected" ? "직접 선택" : "자동 탐색"}</span></span><code>{discovery?.executable.path ?? "찾지 못함"}</code></div><button className="button secondary small" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>변경</button></div>
-      <div className="path-row"><div><span className="label">Codex 데이터 폴더</span><code>{discovery?.home.path ?? "확인 중…"}</code></div><button className="button secondary small" disabled={disabled} onClick={() => void run("Codex 폴더 선택", () => api.chooseCodexHome())}>폴더 변경</button></div>
-      <div className="self-test-row"><div><strong>Hook 실행 검사</strong><p>{status.hostSelfTest.status === "passed" ? `검사 통과 · ${status.hostSelfTest.coldStartMs}ms` : status.hostSelfTest.status === "failed" ? "검사 실패" : "연결 준비 시 자동으로 실행합니다."}</p></div><button className="button secondary small" disabled={disabled || !status.host.available} onClick={() => void run("Hook 실행 검사", () => api.runHostSelfTest())}>다시 검사</button></div>
-      <div className="button-row"><button className="button secondary small" disabled={disabled || !discovery} onClick={() => void preview("install")}>설치 미리보기</button><button className="button secondary small" disabled={disabled || !discovery} onClick={() => void preview("repair")}>수리 미리보기</button><button className="button quiet small" disabled={disabled || !status.hasRevert} onClick={() => void preview("revert-owned-change")}>마지막 변경 되돌리기</button><button className="button quiet small destructive-text" disabled={disabled || !discovery} onClick={() => void preview("uninstall")}>연동 제거</button></div>
-      <p className="fine-print">앱 위치가 바뀌면 수리가 필요할 수 있습니다.</p>
+    {status.issue && <div className="notice warning" role="alert">{t(reasonText(status.issue))}</div>}
+    {applied && applied.status !== "no-change" && (applied.status !== "applied" || !receiving) && <div className={`notice ${applied.status === "applied" ? "success" : "warning"}`} role="status">{applied.status === "applied-with-receipt-warning" ? t("Hook 설정은 저장됐지만 설치 기록을 저장하지 못했습니다. 진단에서 확인해 주세요.") : applied.status === "committed-conflict" ? t("설정 저장 후 다른 변경이 발견됐습니다. 진단에서 확인해 주세요.") : t("Hook 설정을 저장했습니다. Codex에서 변경 내용을 검토해 주세요.")}</div>}
+    {discovery?.manualFeatureInstruction && <section className="section-card"><h2>{t("Hook 기능 켜기")}</h2><p>{t("config.toml에 아래 설정을 추가한 뒤 Codex를 다시 실행해 주세요.")}</p><pre>{discovery.manualFeatureInstruction}</pre></section>}
+    {(installed || applied) && !receiving && <section className="section-card hook-review"><div><h2>{t("Codex에서 Hook 검토")}</h2><p>{reviewDone ? t("검토 완료로 표시했습니다. 다음 작업부터 수신을 자동 확인합니다.") : t("CLI에서 /hooks를 열어 이 앱의 Hook을 확인하고 허용해 주세요.")}</p></div>{!reviewDone && <button className="button secondary small" disabled={disabled} onClick={() => void run("검토 상태 저장", () => api.reportHookReview())}>{t("Codex에서 검토했어요")}</button>}</section>}
+    {warnings.length > 0 && <div className="notice warning"><ul className="connection-warnings">{warnings.map(code => <li key={code}>{t(reasonText(code))}</li>)}</ul></div>}
+    <details className="section-card setup-advanced"><summary>{t("고급 설정")}</summary><div className="advanced-content">
+      <h2>{t("연결 위치")}</h2>
+      <div className="path-row"><div><span className="label">{t("Codex 실행 파일 ")}<span className="source-label">{discovery?.executable.source === "selected" ? t("직접 선택") : t("자동 탐색")}</span></span><code>{discovery?.executable.path ?? t("찾지 못함")}</code></div><button className="button secondary small" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>{t("변경")}</button></div>
+      <div className="path-row"><div><span className="label">{t("Codex 데이터 폴더")}</span><code>{discovery?.home.path ?? t("확인 중…")}</code></div><button className="button secondary small" disabled={disabled} onClick={() => void run("Codex 폴더 선택", () => api.chooseCodexHome())}>{t("폴더 변경")}</button></div>
+      <div className="self-test-row"><div><strong>{t("Hook 실행 검사")}</strong><p>{status.hostSelfTest.status === "passed" ? t`검사 통과 · ${status.hostSelfTest.coldStartMs}ms` : status.hostSelfTest.status === "failed" ? t("검사 실패") : t("연결 준비 시 자동으로 실행합니다.")}</p></div><button className="button secondary small" disabled={disabled || !status.host.available} onClick={() => void run("Hook 실행 검사", () => api.runHostSelfTest())}>{t("다시 검사")}</button></div>
+      <div className="button-row"><button className="button secondary small" disabled={disabled || !discovery} onClick={() => void preview("install")}>{t("설치 미리보기")}</button><button className="button secondary small" disabled={disabled || !discovery} onClick={() => void preview("repair")}>{t("수리 미리보기")}</button><button className="button quiet small" disabled={disabled || !status.hasRevert} onClick={() => void preview("revert-owned-change")}>{t("마지막 변경 되돌리기")}</button><button className="button quiet small destructive-text" disabled={disabled || !discovery} onClick={() => void preview("uninstall")}>{t("연동 제거")}</button></div>
+      <p className="fine-print">{t("앱 위치가 바뀌면 수리가 필요할 수 있습니다.")}</p>
     </div></details>
-    <details className="section-card setup-advanced"><summary>이벤트 수신 내역</summary><div className="advanced-content">
-      <table className="event-table"><thead><tr><th scope="col">이벤트</th><th scope="col">지원</th><th scope="col">수신</th></tr></thead><tbody>{HOOK_EVENTS.map(event => {
+    <details className="section-card setup-advanced"><summary>{t("이벤트 수신 내역")}</summary><div className="advanced-content">
+      <table className="event-table"><thead><tr><th scope="col">{t("이벤트")}</th><th scope="col">{t("지원")}</th><th scope="col">{t("수신")}</th></tr></thead><tbody>{HOOK_EVENTS.map(event => {
         const receipt = status.reception.events.find(item => item.event === event)
-        return <tr key={event}><th scope="row"><code>{event}</code></th><td>{supportLabels[discovery?.capability.events[event] ?? "unknown"]}</td><td>{receipt?.count ? `${receipt.count}회` : "—"}</td></tr>
+        return <tr key={event}><th scope="row"><code>{event}</code></th><td>{t(supportLabels[discovery?.capability.events[event] ?? "unknown"])}</td><td>{receipt?.count ? t`${receipt.count}회` : "—"}</td></tr>
       })}</tbody></table>
-      <details className="manual-observation"><summary>특정 작업 진단</summary><p>문제 재현이 필요할 때만 사용합니다. 일반 연결에는 필요하지 않습니다.</p><div className="observation-controls"><label htmlFor="observation-surface">실행 환경<select id="observation-surface" value={surface} disabled={disabled || status.live.active} onChange={event => setSurface(event.target.value as ObservationSurface)}><option value="desktop">Codex Desktop</option><option value="cli">Codex CLI</option></select></label><button className="button secondary small" disabled={disabled || status.adapter.state !== "READY" || status.adapter.ownership !== "OWNED_UTILITY"} onClick={() => void run("진단", () => status.live.active ? api.stopLiveObservation() : api.startLiveObservation(surface))}>{status.live.active ? "진단 종료" : "진단 시작"}</button></div><p>{status.live.status === "observed" ? "진단 중 시작·완료 수신" : status.live.status === "partial" ? "진단 중 일부 이벤트 수신" : "진단 중 수신 없음"}</p>{status.live.active && status.live.surface === "desktop" && <button className="button secondary small" disabled={disabled} onClick={() => void run("중단 검사 기록", () => api.reportDesktopStopAttempt())}>Desktop 중단 버튼을 눌렀어요</button>}<p className="fine-print">실행 환경과 중단 버튼 사용 여부는 직접 기재한 정보입니다.</p></details>
+      <details className="manual-observation"><summary>{t("특정 작업 진단")}</summary><p>{t("문제 재현이 필요할 때만 사용합니다. 일반 연결에는 필요하지 않습니다.")}</p><div className="observation-controls"><label htmlFor="observation-surface">{t("실행 환경")}<select id="observation-surface" value={surface} disabled={disabled || status.live.active} onChange={event => setSurface(event.target.value as ObservationSurface)}><option value="desktop">Codex Desktop</option><option value="cli">Codex CLI</option></select></label><button className="button secondary small" disabled={disabled || status.adapter.state !== "READY" || status.adapter.ownership !== "OWNED_UTILITY"} onClick={() => void run("진단", () => status.live.active ? api.stopLiveObservation() : api.startLiveObservation(surface))}>{status.live.active ? t("진단 종료") : t("진단 시작")}</button></div><p>{status.live.status === "observed" ? t("진단 중 시작·완료 수신") : status.live.status === "partial" ? t("진단 중 일부 이벤트 수신") : t("진단 중 수신 없음")}</p>{status.live.active && status.live.surface === "desktop" && <button className="button secondary small" disabled={disabled} onClick={() => void run("중단 검사 기록", () => api.reportDesktopStopAttempt())}>{t("Desktop 중단 버튼을 눌렀어요")}</button>}<p className="fine-print">{t("실행 환경과 중단 버튼 사용 여부는 직접 기재한 정보입니다.")}</p></details>
     </div></details>
     {plan && <HookPlanPreview plan={plan} busy={disabled} onClose={closePreview} onApply={() => void apply()} />}
   </>

@@ -24,6 +24,9 @@ pre { margin: 10px 0; white-space: pre-wrap; overflow-wrap: anywhere; padding: 1
 .settings-nav button > span { font-size: 19px; line-height: 1; width: 20px; text-align: center; }
 .sidebar-bottom { margin-top: auto; padding: 0 12px; font-size: 12px; color: #61705f; }
 .sidebar-bottom small { display: block; color: #737d6e; font-size: 11px; margin: 4px 0 0 14px; }
+.language-preference { display: grid; gap: 8px; margin-bottom: 8px; color: #293d34; }
+.language-preference select { width: 100%; min-height: 36px; }
+.sidebar-bottom .language-help { margin: 0 0 20px; line-height: 1.5; }
 .settings-content { padding: 35px 32px 36px; width: 100%; max-width: 1000px; }
 .page-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 25px; }
 .page-header p { margin-top: 9px; font-size: 13px; }

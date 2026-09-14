@@ -1,3 +1,4 @@
+import { createTranslator } from "../shared/translations"
 import { APP_NAME } from "../shared/app-identity.mjs"
 import { Menu, Tray, dialog, nativeImage, type BrowserWindow, type MenuItemConstructorOptions, type NativeImage, type Rectangle } from "electron"
 import type { DesktopSettingsV1 } from "../shared/desktop-settings"
@@ -48,24 +49,25 @@ export type TrayActions = {
 }
 
 export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatus, actions: TrayActions): MenuItemConstructorOptions[] {
+  const t = createTranslator(settings.language)
   const adapterLabel = adapter.state === "READY" ? "READY (Owned)" : adapter.state
   return [
-    { label: settings.visible ? "Hide Character" : "Show Character", click: actions.toggleVisible },
+    { label: settings.visible ? t("캐릭터 숨기기") : t("캐릭터 표시"), click: actions.toggleVisible },
     ...(actions.openActivity ? [
-      { label: "작업 목록", click: actions.openActivity },
-      ...(actions.activity ? [{ label: activitySummary(actions.activity()), enabled: false }] : []),
+      { label: t("작업 목록"), click: actions.openActivity },
+      ...(actions.activity ? [{ label: activitySummary(actions.activity(), settings.language), enabled: false }] : []),
     ] : []),
     { type: "separator" },
-    { label: "Move / Resize Character", click: () => actions.setLayout(true) },
-    { label: "Reset Position", click: actions.resetPosition },
+    { label: t("캐릭터 이동·크기 조절"), click: () => actions.setLayout(true) },
+    { label: t("위치 초기화"), click: actions.resetPosition },
     {
-      label: "Character",
+      label: t("캐릭터"),
       submenu: [
         ...(actions.characters?.() ?? CHARACTER_IDS.map(id => ({ id, name: CHARACTER_NAMES[id], status: "ready" }))).map(entry => ({ label: entry.name, enabled: entry.status !== "disabled", type: "radio" as const, checked: settings.characterId === entry.id, click: () => actions.updateSettings({ characterId: entry.id }) })),
       ],
     },
     {
-      label: "Scale",
+      label: t("크기"),
       submenu: SCALE_PRESETS.map((scale) => ({
         label: `${Math.round(scale * 100)}%`,
         type: "radio" as const,
@@ -74,36 +76,40 @@ export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatu
       })),
     },
     { type: "separator" },
-    ...(actions.openTaskControl ? [{ label: "Codex 제어 · 음성 입력", click: actions.openTaskControl }] : []),
-    { label: "Always on Top", type: "checkbox", checked: settings.alwaysOnTop, click: () => actions.updateSettings({ alwaysOnTop: !settings.alwaysOnTop }) },
-    { label: "Show Speech Bubbles", type: "checkbox", checked: settings.speechBubblesEnabled, click: () => actions.updateSettings({ speechBubblesEnabled: !settings.speechBubblesEnabled }) },
-    { label: "작업 말풍선 표시", type: "checkbox", checked: settings.taskBubblesEnabled, click: () => actions.updateSettings({ taskBubblesEnabled: !settings.taskBubblesEnabled }) },
-    { label: "Show on All Workspaces", type: "checkbox", checked: settings.showOnAllWorkspaces, visible: process.platform === "darwin", click: () => actions.updateSettings({ showOnAllWorkspaces: !settings.showOnAllWorkspaces }) },
-    { label: "Show over Fullscreen", type: "checkbox", checked: settings.showOverFullScreen, visible: process.platform === "darwin", click: () => actions.updateSettings({ showOverFullScreen: !settings.showOverFullScreen }) },
+    ...(actions.openTaskControl ? [{ label: t("Codex 제어 · 음성 입력"), click: actions.openTaskControl }] : []),
+    { label: t("항상 위에 표시"), type: "checkbox", checked: settings.alwaysOnTop, click: () => actions.updateSettings({ alwaysOnTop: !settings.alwaysOnTop }) },
+    { label: t("캐릭터 대사 표시"), type: "checkbox", checked: settings.speechBubblesEnabled, click: () => actions.updateSettings({ speechBubblesEnabled: !settings.speechBubblesEnabled }) },
+    { label: t("작업 말풍선 표시"), type: "checkbox", checked: settings.taskBubblesEnabled, click: () => actions.updateSettings({ taskBubblesEnabled: !settings.taskBubblesEnabled }) },
+    { label: t("모든 데스크톱에서 표시"), type: "checkbox", checked: settings.showOnAllWorkspaces, visible: process.platform === "darwin", click: () => actions.updateSettings({ showOnAllWorkspaces: !settings.showOnAllWorkspaces }) },
+    { label: t("전체 화면 앱 위에 표시"), type: "checkbox", checked: settings.showOverFullScreen, visible: process.platform === "darwin", click: () => actions.updateSettings({ showOverFullScreen: !settings.showOverFullScreen }) },
     {
-      label: "Click-through",
+      label: t("투명한 영역의 클릭 통과"),
       submenu: [
-        { label: "Auto", type: "radio", checked: settings.clickThrough, click: () => actions.updateSettings({ clickThrough: true }) },
-        { label: "Disabled", type: "radio", checked: !settings.clickThrough, click: () => actions.updateSettings({ clickThrough: false }) },
+        { label: t("자동"), type: "radio", checked: settings.clickThrough, click: () => actions.updateSettings({ clickThrough: true }) },
+        { label: t("사용 안 함"), type: "radio", checked: !settings.clickThrough, click: () => actions.updateSettings({ clickThrough: false }) },
       ],
     },
     { type: "separator" },
     {
-      label: "Codex Adapter",
+      label: t("Codex Adapter"),
       submenu: [
-        { label: `Status: ${adapterLabel}`, enabled: false },
-        { label: "Restart", click: actions.restartAdapter },
-        { label: "Open Diagnostics", click: () => {
+        { label: t`상태: ${adapterLabel}`, enabled: false },
+        { label: t("재시작"), click: actions.restartAdapter },
+        { label: t("진단 열기"), click: () => {
           const value = actions.diagnostics()
-          void dialog.showMessageBox({ type: value.state === "ERROR" ? "error" : "info", title: "Codex Adapter Diagnostics", message: value.state, detail: JSON.stringify(value, null, 2) })
+          void dialog.showMessageBox({ type: value.state === "ERROR" ? "error" : "info", title: t("Codex Adapter 진단"), message: value.state, detail: JSON.stringify(value, null, 2) })
         } },
       ],
     },
-    { label: "Settings…", click: actions.openSettings },
-    { label: "Open Motion Lab", click: actions.openMotionLab },
-    { label: "Reload Pet", click: actions.reloadPet },
+    { label: "언어 / Language", submenu: [
+      { label: "한국어", type: "radio", checked: settings.language === "ko", click: () => actions.updateSettings({ language: "ko" }) },
+      { label: "English", type: "radio", checked: settings.language === "en", click: () => actions.updateSettings({ language: "en" }) },
+    ] },
+    { label: t("설정…"), click: actions.openSettings },
+    { label: t("모션 실험실 열기"), click: actions.openMotionLab },
+    { label: t("캐릭터 새로고침"), click: actions.reloadPet },
     { type: "separator" },
-    { label: "Quit", role: "quit", click: actions.quit },
+    { label: t("종료"), role: "quit", click: actions.quit },
   ]
 }
 
@@ -130,7 +136,7 @@ export class TrayController {
     this.tray?.setContextMenu(this.menu)
     const activity = actions.activity?.()
     if (activity) {
-      this.tray?.setToolTip(`${APP_NAME}\n${activitySummary(activity)}${activity.storage === "error" ? "\n이력 저장 실패" : ""}`)
+      this.tray?.setToolTip(`${APP_NAME}\n${activitySummary(activity, settings.language)}${activity.storage === "error" ? `\n${createTranslator(settings.language)("이력 저장 실패")}` : ""}`)
       if (process.platform === "darwin") this.tray?.setTitle(activity.counts.attention ? `${activity.connection === "READY" ? "" : "?"}${activity.counts.attention}` : "")
     }
   }

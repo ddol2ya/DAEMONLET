@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { ReactElement, ReactNode } from "react"
+import { createTranslator } from "../electron/shared/translations"
+vi.mock("../src/i18n/useLanguage", () => ({ useT: () => createTranslator("ko") }))
 import App from "../src/app/App"
 import { DebugPanel } from "../src/app/DebugPanel"
 import { FileDropZone } from "../src/app/FileDropZone"

@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useLanguage"
 import type { TaskEventSource } from "../behavior/TaskEventSource"
 import { useEffect, useRef, useState } from "react"
 import type { CharacterBehaviorController } from "../behavior/CharacterBehaviorController"
@@ -36,8 +37,8 @@ const EMPTY_DIAGNOSTICS: ProtocolDiagnostics = {
   activeRuns: [], activeTaskCount: 0, lastError: null, lastRejectionReason: null,
 }
 
-function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "warn" }) {
-  return <div className="metric"><dt>{label}</dt><dd className={tone ? `tone-${tone}` : ""}>{value}</dd></div>
+function Metric({ label, value, tone, testId }: { label: string; value: string | number; tone?: "good" | "warn"; testId?: string }) {
+  return <div className="metric" data-testid={testId}><dt>{label}</dt><dd className={tone ? `tone-${tone}` : ""}>{value}</dd></div>
 }
 
 const downloadJson = (name: string, value: unknown) => {
@@ -55,6 +56,7 @@ export function ProtocolDebugPanel({ controller, directSource, connectSource, on
   directSource: MockTaskEventSource
   onApiChange?: (api: ProtocolDebugApi | null) => void
 }) {
+  const t = useT()
   const [mode, setMode] = useState<SourceMode>("DIRECT_MOCK")
   const [endpointDraft, setEndpointDraft] = useState("ws://127.0.0.1:4174/events")
   const [endpoint, setEndpoint] = useState(endpointDraft)
@@ -168,85 +170,85 @@ export function ProtocolDebugPanel({ controller, directSource, connectSource, on
   }
 
   return <details open data-testid="protocol-debug-panel">
-    <summary>External event protocol v1</summary>
+    <summary>{t("외부 이벤트 프로토콜 v1")}</summary>
     <div className="quality-controls protocol-controls">
-      <label className="select-label"><span>Source mode</span><select value={mode} onChange={(event) => setMode(event.target.value as SourceMode)}>
-        <option value="DIRECT_MOCK">Direct mock</option>
-        <option value="PROTOCOL_LOOPBACK">Protocol loopback</option>
-        {!electronProtocol && <option value="PROTOCOL_WEBSOCKET">Protocol WebSocket</option>}
+      <label className="select-label"><span>{t("소스 모드")}</span><select value={mode} onChange={(event) => setMode(event.target.value as SourceMode)}>
+        <option value="DIRECT_MOCK">{t("직접 모의 실행")}</option>
+        <option value="PROTOCOL_LOOPBACK">{t("프로토콜 루프백")}</option>
+        {!electronProtocol && <option value="PROTOCOL_WEBSOCKET">{t("프로토콜 WebSocket")}</option>}
         <option value="CODEX_ADAPTER">Codex Adapter</option>
-        <option value="PROTOCOL_REPLAY">Protocol replay</option>
+        <option value="PROTOCOL_REPLAY">{t("프로토콜 재생")}</option>
       </select></label>
-      {mode === "PROTOCOL_WEBSOCKET" && <div className="protocol-endpoint"><label className="select-label"><span>Endpoint</span><input value={endpointDraft} onChange={(event) => setEndpointDraft(event.target.value)} /></label><button className="button button-quiet" type="button" onClick={() => setEndpoint(endpointDraft.trim())}>Apply</button></div>}
-      {mode === "CODEX_ADAPTER" && <div className="warning"><b>Codex Adapter</b><span>Expected source: codex-adapter · {electronProtocol ? "secure Electron IPC transport" : "ws://127.0.0.1:4174/events"}</span>{!electronProtocol && <a href="http://127.0.0.1:4175/healthz" target="_blank" rel="noreferrer">Hook observer health</a>}</div>}
-      {electronProtocol && mode === "PROTOCOL_WEBSOCKET" && <div className="warning"><b>Unavailable</b><span>Custom WebSocket endpoint is available in browser Motion Lab only.</span></div>}
+      {mode === "PROTOCOL_WEBSOCKET" && <div className="protocol-endpoint"><label className="select-label"><span>{t("엔드포인트")}</span><input value={endpointDraft} onChange={(event) => setEndpointDraft(event.target.value)} /></label><button className="button button-quiet" type="button" onClick={() => setEndpoint(endpointDraft.trim())}>{t("적용")}</button></div>}
+      {mode === "CODEX_ADAPTER" && <div className="warning"><b>Codex Adapter</b><span>{t("예상 소스: codex-adapter ·")} {electronProtocol ? "secure Electron IPC transport" : "ws://127.0.0.1:4174/events"}</span>{!electronProtocol && <a href="http://127.0.0.1:4175/healthz" target="_blank" rel="noreferrer">{t("Hook 관찰 상태")}</a>}</div>}
+      {electronProtocol && mode === "PROTOCOL_WEBSOCKET" && <div className="warning"><b>{t("사용 불가")}</b><span>{t("사용자 지정 WebSocket 엔드포인트는 브라우저 모션 실험실에서만 사용할 수 있습니다.")}</span></div>}
       <div className="button-row">
-        <button className="button button-quiet" type="button" onClick={connect} disabled={mode === "DIRECT_MOCK"}>Connect</button>
-        <button className="button button-quiet" type="button" onClick={() => runtime()?.client.disconnect()} disabled={mode === "DIRECT_MOCK"}>Disconnect</button>
-        <button className="button button-quiet" type="button" onClick={() => runtime()?.client.requestSnapshot("manual")} disabled={mode === "DIRECT_MOCK"}>Request snapshot</button>
+        <button className="button button-quiet" type="button" data-testid="protocol-connect" onClick={connect} disabled={mode === "DIRECT_MOCK"}>{t("연결")}</button>
+        <button className="button button-quiet" type="button" onClick={() => runtime()?.client.disconnect()} disabled={mode === "DIRECT_MOCK"}>{t("연결 해제")}</button>
+        <button className="button button-quiet" type="button" onClick={() => runtime()?.client.requestSnapshot("manual")} disabled={mode === "DIRECT_MOCK"}>{t("스냅샷 요청")}</button>
       </div>
       <dl className="metrics-grid">
-        <Metric label="Mode" value={mode} />
-        <Metric label="Connection" value={diagnostics.connectionState} tone={diagnostics.connectionState === "READY" ? "good" : diagnostics.connectionState === "ERROR" || diagnostics.connectionState === "DESYNCED" ? "warn" : undefined} />
-        <Metric label="Connection epoch" value={diagnostics.connectionEpoch} />
-        <Metric label="Endpoint" value={diagnostics.endpoint ?? "—"} />
-        <Metric label="Protocol / source" value={`${diagnostics.protocolVersion ?? "—"} / ${diagnostics.source ?? "—"}`} />
-        <Metric label="Source instance" value={diagnostics.sourceInstanceId ?? "—"} />
-        <Metric label="Session" value={diagnostics.sessionId ?? "—"} />
-        <Metric label="Last sequence" value={diagnostics.lastAppliedSequence} />
-        <Metric label="Heartbeat age" value={diagnostics.heartbeatAgeMs === null ? "—" : `${Math.round(diagnostics.heartbeatAgeMs)} ms`} />
-        <Metric label="Accepted / rejected" value={`${diagnostics.acceptedCount} / ${diagnostics.rejectedCount}`} />
-        <Metric label="Duplicate / stale" value={`${diagnostics.duplicateCount} / ${diagnostics.staleCount}`} />
-        <Metric label="Gaps / buffered" value={`${diagnostics.gapCount} / ${diagnostics.bufferedFrameCount}`} />
-        <Metric label="Snapshots / reconnects" value={`${diagnostics.snapshotCount} / ${diagnostics.reconnectCount}`} />
-        <Metric label="Snapshot pending" value={diagnostics.snapshotRequestPending ? "yes" : "no"} tone={diagnostics.snapshotRequestPending ? "warn" : undefined} />
+        <Metric label={t("모드")} value={mode} />
+        <Metric testId="protocol-connection" label={t("연결 상태")} value={diagnostics.connectionState} tone={diagnostics.connectionState === "READY" ? "good" : diagnostics.connectionState === "ERROR" || diagnostics.connectionState === "DESYNCED" ? "warn" : undefined} />
+        <Metric label={t("연결 세대")} value={diagnostics.connectionEpoch} />
+        <Metric label={t("엔드포인트")} value={diagnostics.endpoint ?? "—"} />
+        <Metric label={t("프로토콜 / 소스")} value={`${diagnostics.protocolVersion ?? "—"} / ${diagnostics.source ?? "—"}`} />
+        <Metric label={t("소스 인스턴스")} value={diagnostics.sourceInstanceId ?? "—"} />
+        <Metric label={t("세션")} value={diagnostics.sessionId ?? "—"} />
+        <Metric label={t("최근 순번")} value={diagnostics.lastAppliedSequence} />
+        <Metric label={t("하트비트 경과")} value={diagnostics.heartbeatAgeMs === null ? "—" : `${Math.round(diagnostics.heartbeatAgeMs)} ms`} />
+        <Metric label={t("수락 / 거부")} value={`${diagnostics.acceptedCount} / ${diagnostics.rejectedCount}`} />
+        <Metric label={t("중복 / 오래됨")} value={`${diagnostics.duplicateCount} / ${diagnostics.staleCount}`} />
+        <Metric label={t("누락 / 버퍼")} value={`${diagnostics.gapCount} / ${diagnostics.bufferedFrameCount}`} />
+        <Metric label={t("스냅샷 / 재연결")} value={`${diagnostics.snapshotCount} / ${diagnostics.reconnectCount}`} />
+        <Metric label={t("스냅샷 대기")} value={diagnostics.snapshotRequestPending ? "yes" : "no"} tone={diagnostics.snapshotRequestPending ? "warn" : undefined} />
       </dl>
-      {replayLoadError && <div className="warning"><b>Replay load failed</b><span>{replayLoadError}</span></div>}
-      {(diagnostics.lastRejectionReason || diagnostics.lastError) && <div className="warning"><b>Protocol diagnostics</b>{diagnostics.lastRejectionReason && <span>Rejected: {diagnostics.lastRejectionReason}</span>}{diagnostics.lastError && <span>Error: {diagnostics.lastError}</span>}</div>}
-      {mode === "CODEX_ADAPTER" && diagnostics.source && diagnostics.source !== "codex-adapter" && <div className="warning"><b>Unexpected source</b><span>Received {diagnostics.source}; expected codex-adapter.</span></div>}
-      {!!diagnostics.activeRuns.length && <div className="warning"><b>Active runs</b>{diagnostics.activeRuns.map((run) => <span key={run.runId}>{run.runId} · {run.progress === undefined ? "—" : `${Math.round(run.progress * 100)}%`} · tasks [{run.runningTaskIds.join(", ") || "—"}] · failed [{run.failedTaskIds.join(", ") || "—"}]</span>)}</div>}
+      {replayLoadError && <div className="warning"><b>{t("재생 로드 실패")}</b><span>{replayLoadError}</span></div>}
+      {(diagnostics.lastRejectionReason || diagnostics.lastError) && <div className="warning"><b>{t("프로토콜 진단")}</b>{diagnostics.lastRejectionReason && <span>{t("거부:")} {diagnostics.lastRejectionReason}</span>}{diagnostics.lastError && <span>{t("오류:")} {diagnostics.lastError}</span>}</div>}
+      {mode === "CODEX_ADAPTER" && diagnostics.source && diagnostics.source !== "codex-adapter" && <div className="warning"><b>{t("예상하지 않은 소스")}</b><span>{t("수신값")} {diagnostics.source}{t("; 예상값 codex-adapter.")}</span></div>}
+      {!!diagnostics.activeRuns.length && <div className="warning"><b>{t("진행 중 Run")}</b>{diagnostics.activeRuns.map((run) => <span key={run.runId}>{run.runId} · {run.progress === undefined ? "—" : `${Math.round(run.progress * 100)}%`}  {t("· 작업 [")}{run.runningTaskIds.join(", ") || "—"}{t("] · 실패 [")}{run.failedTaskIds.join(", ") || "—"}]</span>)}</div>}
 
       {mode === "PROTOCOL_LOOPBACK" && <>
-        <label className="select-label"><span>Run ID</span><input value={runId} onChange={(event) => setRunId(event.target.value)} /></label>
-        <label className="select-label"><span>Child task ID</span><input value={taskId} onChange={(event) => setTaskId(event.target.value)} /></label>
+        <label className="select-label"><span>{t("Run ID")}</span><input value={runId} onChange={(event) => setRunId(event.target.value)} /></label>
+        <label className="select-label"><span>{t("하위 작업 ID")}</span><input value={taskId} onChange={(event) => setTaskId(event.target.value)} /></label>
         <div className="button-row behavior-buttons">
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.startRun(runId)}>Valid Run Start</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.waitRun(runId)}>Valid Run Waiting</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.resumeRun(runId)}>Valid Run Resume</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.completeRun(runId)}>Valid Run Complete</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.failRun(runId)}>Valid Run Fail</button>
-          <button className="button button-quiet" type="button" onClick={() => { loopback()?.startTask(runId, taskId); loopback()?.failTask(runId, taskId) }}>Child Task Fail</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.duplicateLast()}>Duplicate Last Frame</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendOutOfOrder()}>Out-of-order Frame</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendGap()}>Sequence Gap</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendSnapshot()}>Authoritative Snapshot</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.restartSource()}>Restart Source Instance</button>
-          <button className="button button-quiet" type="button" onClick={() => (runtime()?.transport as InMemoryProtocolTransport | undefined)?.drop()}>Drop Connection</button>
-          <button className="button button-quiet" type="button" onClick={connect}>Reconnect</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendMalformed()}>Malformed JSON</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendInvalidProgress()}>Invalid Progress</button>
-          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendUnsupportedVersion()}>Unsupported Version</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.startRun(runId)}>{t("정상 Run 시작")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.waitRun(runId)}>{t("정상 Run 대기")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.resumeRun(runId)}>{t("정상 Run 재개")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.completeRun(runId)}>{t("정상 Run 완료")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.failRun(runId)}>{t("정상 Run 실패")}</button>
+          <button className="button button-quiet" type="button" onClick={() => { loopback()?.startTask(runId, taskId); loopback()?.failTask(runId, taskId) }}>{t("하위 작업 실패")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.duplicateLast()}>{t("마지막 프레임 중복")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendOutOfOrder()}>{t("순서가 뒤바뀐 프레임")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendGap()}>{t("순번 누락")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendSnapshot()}>{t("기준 스냅샷")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.restartSource()}>{t("소스 인스턴스 재시작")}</button>
+          <button className="button button-quiet" type="button" onClick={() => (runtime()?.transport as InMemoryProtocolTransport | undefined)?.drop()}>{t("연결 끊기")}</button>
+          <button className="button button-quiet" type="button" data-testid="protocol-connect" onClick={connect}>{t("재연결")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendMalformed()}>{t("잘못된 JSON")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendInvalidProgress()}>{t("잘못된 진행률")}</button>
+          <button className="button button-quiet" type="button" onClick={() => loopback()?.sendUnsupportedVersion()}>{t("지원하지 않는 버전")}</button>
         </div>
       </>}
 
       {mode === "PROTOCOL_REPLAY" && <>
-        <label className="select-label"><span>Replay JSON / JSONL</span><input type="file" accept=".json,.jsonl,application/json" onChange={(event) => {
+        <label className="select-label"><span>{t("JSON / JSONL 재생")}</span><input type="file" accept=".json,.jsonl,application/json" onChange={(event) => {
           const input = event.currentTarget
           void loadReplay(input.files?.[0]).finally(() => { input.value = "" })
         }} /></label>
         <div className="button-row">
-          <button className="button button-quiet" type="button" onClick={() => replay()?.play()}>Play</button>
-          <button className="button button-quiet" type="button" onClick={() => replay()?.pause()}>Pause</button>
-          <button className="button button-quiet" type="button" onClick={() => replay()?.step()}>Step</button>
-          <button className="button button-quiet" type="button" onClick={resetReplay}>Reset</button>
+          <button className="button button-quiet" type="button" onClick={() => replay()?.play()}>{t("재생")}</button>
+          <button className="button button-quiet" type="button" onClick={() => replay()?.pause()}>{t("일시 중지")}</button>
+          <button className="button button-quiet" type="button" onClick={() => replay()?.step()}>{t("한 단계")}</button>
+          <button className="button button-quiet" type="button" onClick={resetReplay}>{t("초기화")}</button>
           {([0.5, 1, 2] as const).map((speed) => <button key={speed} className="button button-quiet" type="button" onClick={() => replay()?.setSpeed(speed)}>{speed}x</button>)}
         </div>
       </>}
 
       <div className="button-row">
-        <button className="button button-quiet" type="button" onClick={() => runtime() && downloadJson("protocol-trace.json", runtime()!.client.exportTrace())} disabled={mode === "DIRECT_MOCK"}>Export protocol trace</button>
-        <button className="button button-quiet" type="button" onClick={() => runtime() && downloadJson("protocol-snapshot.json", runtime()!.client.getRuntimeSnapshot())} disabled={mode === "DIRECT_MOCK"}>Export current snapshot</button>
-        <button className="button button-quiet" type="button" onClick={() => downloadJson("protocol-diagnostics.json", diagnostics)} disabled={mode === "DIRECT_MOCK"}>Export diagnostics</button>
+        <button className="button button-quiet" type="button" onClick={() => runtime() && downloadJson("protocol-trace.json", runtime()!.client.exportTrace())} disabled={mode === "DIRECT_MOCK"}>{t("프로토콜 추적 내보내기")}</button>
+        <button className="button button-quiet" type="button" onClick={() => runtime() && downloadJson("protocol-snapshot.json", runtime()!.client.getRuntimeSnapshot())} disabled={mode === "DIRECT_MOCK"}>{t("현재 스냅샷 내보내기")}</button>
+        <button className="button button-quiet" type="button" onClick={() => downloadJson("protocol-diagnostics.json", diagnostics)} disabled={mode === "DIRECT_MOCK"}>{t("진단 내보내기")}</button>
       </div>
     </div>
   </details>

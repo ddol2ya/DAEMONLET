@@ -7,8 +7,8 @@ vi.mock("electron", () => ({ contextBridge: { exposeInMainWorld: mocks.expose },
 describe("Settings preload", () => {
   it("exposes a frozen narrow API without shell, filesystem, protocol, raw invoke or Electron events", async () => {
     await import("../electron/preload/settings-preload")
-    expect(mocks.expose).toHaveBeenCalledOnce()
-    const [name, api] = mocks.expose.mock.calls[0] as [string, SettingsDesktopApi]
+    expect(mocks.expose.mock.calls.map(([name]) => name).sort()).toEqual(["appLanguage", "settingsDesktop"])
+    const [name, api] = mocks.expose.mock.calls.find(([name]) => name === "settingsDesktop")! as [string, SettingsDesktopApi]
     expect(name).toBe("settingsDesktop")
     expect(Object.isFrozen(api)).toBe(true)
     expect(Object.isFrozen(api.characters)).toBe(true)
@@ -21,7 +21,7 @@ describe("Settings preload", () => {
     expect(mocks.invoke).toHaveBeenCalledWith(SETUP_IPC.apply, "one-main-plan-id")
     const listener = vi.fn()
     const unsubscribe = api.onStatusChanged(listener)
-    const wrapped = mocks.on.mock.calls[0][1]
+    const wrapped = mocks.on.mock.calls.find(([channel]) => channel === SETUP_IPC.statusChanged)![1]
     wrapped({ sensitive: "PRIVATE_IPC_EVENT_CANARY" }, { step: "observed" })
     expect(listener).toHaveBeenCalledExactlyOnceWith({ step: "observed" })
     unsubscribe()

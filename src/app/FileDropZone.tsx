@@ -1,13 +1,15 @@
+import { useT } from "../i18n/useLanguage"
 import { useRef, useState, type DragEvent } from "react"
 
 export function FileDropZone({ onFile, disabled = false }: { onFile: (file: File) => Promise<void>; disabled?: boolean }) {
+  const t = useT()
   const inputRef = useRef<HTMLInputElement>(null)
   const [active, setActive] = useState(false)
 
   const open = () => inputRef.current?.click()
   const accept = async (file?: File) => {
     if (!file) return
-    if (!/\.psd$/i.test(file.name)) throw new Error("PSD 파일만 로드할 수 있습니다.")
+    if (!/\.psd$/i.test(file.name)) throw new Error(t("PSD 파일만 로드할 수 있습니다."))
     await onFile(file)
   }
   const drop = (event: DragEvent) => {
@@ -25,8 +27,8 @@ export function FileDropZone({ onFile, disabled = false }: { onFile: (file: File
       onDrop={drop}
     >
       <input ref={inputRef} type="file" accept=".psd,image/vnd.adobe.photoshop" hidden onChange={(event) => void accept(event.target.files?.[0])} />
-      <button className="button button-primary" type="button" onClick={open} disabled={disabled}>See-through PSD 열기</button>
-      <span>또는 PSD를 캔버스에 드롭</span>
+      <button className="button button-primary" type="button" onClick={open} disabled={disabled}>{t("See-through PSD 열기")}</button>
+      <span>{t("또는 PSD를 캔버스에 드롭")}</span>
     </div>
   )
 }

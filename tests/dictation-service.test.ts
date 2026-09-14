@@ -50,7 +50,7 @@ describe("dictation lifecycle", () => {
     service.start("old"); service.cancel(); service.start("new")
     old.stdout.write(JSON.stringify({ type: "final", text: "must not replace the new draft" }) + "\n")
     expect(service.snapshot()).toMatchObject({ sessionId: "new", text: "" })
-    expect(launch).toHaveBeenCalledWith("/bundled/helper")
+    expect(launch).toHaveBeenCalledWith("/bundled/helper", ["--dictate", "--locale", "ko-KR"])
     service.dispose(); expect(next.kill).toHaveBeenCalled()
   })
   it("stops only its recording, reports permission failure, and clears timers", () => {
@@ -68,5 +68,34 @@ describe("dictation lifecycle", () => {
     service.start("one"); child.stdout.write("x".repeat(70_000))
     expect(service.snapshot()).toMatchObject({ state: "error", error: "RECOGNITION_FAILED", text: "" })
     service.dispose()
+  })
+})
+
+describe("selected dictation language", () => {
+  it("changes locale only for the next recording and preserves the current transcript on stop", () => {
+    let language: "ko" | "en" = "en"
+    const english = fakeProcess(), korean = fakeProcess()
+    const launch = vi.fn().mockReturnValueOnce(english).mockReturnValueOnce(korean)
+    const service = new DictationService("/bundled/helper", launch, "darwin", () => language)
+    service.start("english")
+    expect(launch).toHaveBeenLastCalledWith("/bundled/helper", ["--dictate", "--locale", "en-US"])
+    english.stdout.write(JSON.stringify({ type: "partial", text: "Keep this draft." }) + "\n")
+    language = "ko"
+    expect(english.kill).not.toHaveBeenCalled()
+    expect(service.snapshot().text).toBe("Keep this draft.")
+    service.stop("english")
+    english.stdout.write(JSON.stringify({ type: "final", text: "" }) + "\n")
+    expect(service.snapshot()).toMatchObject({ state: "idle", text: "Keep this draft." })
+    service.start("korean")
+    expect(launch).toHaveBeenLastCalledWith("/bundled/helper", ["--dictate", "--locale", "ko-KR"])
+    expect(service.snapshot().text).toBe("")
+    korean.stdout.write(JSON.stringify({ type: "final", text: "새 문장" }) + "\n")
+    expect(service.snapshot()).toMatchObject({ state: "idle", text: "새 문장" })
+    service.dispose()
+  })
+  it("keeps Windows dictation unavailable instead of reporting a false success", () => {
+    const launch = vi.fn(), service = new DictationService("/unused", launch, "win32", () => "en")
+    expect(() => service.start("one")).toThrow("UNAVAILABLE")
+    expect(launch).not.toHaveBeenCalled(); service.dispose()
   })
 })

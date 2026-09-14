@@ -1,3 +1,5 @@
+import { exposeAppLanguage } from "./app-language"
+exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import { ACTIVITY_IPC, type ActivityApi, type ActivitySnapshot } from "../shared/activity-contract"
 import { BUBBLE_IPC } from "../shared/bubble-presentation"

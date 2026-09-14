@@ -1,3 +1,5 @@
+import { exposeAppLanguage } from "./app-language"
+exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import { IPC, type AdapterStatus, type PetDesktopApi, type ProtocolBridgeStatus, type ProtocolConnectResult, type SanitizedAdapterDiagnostics } from "../shared/ipc-contract"
 import type { DesktopSettingsPatch, DesktopSettingsV1 } from "../shared/desktop-settings"
