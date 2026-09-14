@@ -2,7 +2,7 @@ import { extractFile, listPackage } from "@electron/asar"
 import { FuseState, FuseV1Options, getCurrentFuseWire } from "@electron/fuses"
 import { lstat, realpath } from "node:fs/promises"
 import { isAbsolute, join, relative } from "node:path"
-import { APP_NAME, BUNDLE_ID, assertEntitlements, isDictationCode, assertProduction, parseSignature, requireMac } from "./policy.mjs"
+import { APP_NAME, BUNDLE_ID, assertEntitlements, entitlementRole, assertProduction, parseSignature, requireMac } from "./policy.mjs"
 import { hashFile, hashObject, inventory, run, within, writeJSON } from "./io.mjs"
 import { checkCandidate } from "../release/check.mjs"
 import { checkExternalNotices } from "../release/check-notices.mjs"
@@ -48,7 +48,7 @@ export async function verifyApp(requestedApp, expected, { evidence, requireTicke
     const entitlementsResult = await run("/usr/bin/codesign", ["--display", "--entitlements", ":-", target])
     let entitlements = {}
     if (entitlementsResult.stdout.trim()) entitlements = JSON.parse((await run("/usr/bin/plutil", ["-convert", "json", "-o", "-", "--", "-"], { input: entitlementsResult.stdout })).stdout)
-    const keys = assertEntitlements(entitlements, isDictationCode(target))
+    const keys = assertEntitlements(entitlements, entitlementRole(target))
     signedCode.push({ path: relative(app, target) || ".", ...signature, entitlements: keys })
     if (evidence) await writeJSON(join(evidence, `code-${index}.json`), { display, entitlementsResult })
   }

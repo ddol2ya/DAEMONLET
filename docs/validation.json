@@ -212,8 +212,19 @@
       "characterRights": "User states the base character is open; existing attribution and the exact contribution-grant scope are preserved. This is not an independent legal attestation.",
       "externalModelTerms": "External user downloads only; missing model license remains disclosed in the external workflow. No model bundled or newly installed.",
       "gitHistory": "Read-only review completed; existing retained historical objects remain pending publication review",
-      "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or merge performed in this follow-up"
-    }
+      "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or merge performed in this follow-up",
+      "microphoneAcceptance": "FAIL on the named old final ZIP; correction requires a new candidate and fresh permission-recovery test"
+    },
+    "acceptanceFindings": [
+      {
+        "candidateId": "91207dc2-75bd-4a2f-b29f-379231bf1430",
+        "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492",
+        "microphoneRecovery": "FAIL",
+        "speechDenialMessage": "PASS: user denial produced the expected inline guidance without an app crash",
+        "cause": "After the user enabled Speech Recognition, macOS TCC refused the microphone prompt because the responsible main app lacked com.apple.security.device.audio-input. The native helper already had it.",
+        "resolution": "Signing policy now requires JIT plus audio input on the main app, audio input on dictation only, JIT on other Electron helpers and no process entitlements on frameworks/libraries. New signed candidate and native acceptance required."
+      }
+    ]
   },
   "recordType": "public-validation-summary",
   "previousCandidateReview": {

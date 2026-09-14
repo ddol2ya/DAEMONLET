@@ -191,3 +191,23 @@ Ctrl+C signal; all failed logs are retained. The successful attempt explicitly
 enabled Ctrl+C inheritance in the new test console and verified that every console
 process belonged to that test before signaling. It did not signal an existing
 user console or task. Test processes and scheduled-task entries were cleaned up.
+
+### User-assisted microphone finding
+
+The user denied Speech Recognition and the final `7857cf7` app displayed the
+expected permission guidance without crashing. After the user enabled that
+permission and restarted, microphone recovery failed: no microphone prompt or
+System Settings entry appeared. macOS TCC identified the responsible main app
+as missing `com.apple.security.device.audio-input`; the native helper already
+had this entitlement. This is an application signing defect, not an instruction
+to repeatedly change the user's settings. Apple's
+[audio input entitlement](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.device.audio-input)
+is required for Hardened Runtime microphone access.
+
+The signing policy now assigns JIT and audio input to the main app, audio input
+alone to the dictation helper, JIT alone to other Electron helpers, and no process
+entitlements to frameworks/libraries. Verification rejects missing required keys
+as well as extra keys. Regression coverage checks the actual selected plist
+contents for bundle and executable paths. A new signed candidate and fresh
+microphone acceptance are required; the earlier ZIP and its notarization history
+remain unchanged, with this failed recovery recorded separately.

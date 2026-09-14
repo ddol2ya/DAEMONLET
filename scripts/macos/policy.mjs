@@ -7,6 +7,11 @@ export const NOTARY_PROFILE = "daemonlet-notary"
 export const JIT_ENTITLEMENT = "com.apple.security.cs.allow-jit"
 export const AUDIO_INPUT_ENTITLEMENT = "com.apple.security.device.audio-input"
 export const isDictationCode = file => /\/native\/DaemonletDictation\.app(?:\/Contents\/MacOS\/DaemonletDictation)?$/.test(file)
+export function entitlementRole(file) {
+  if (isDictationCode(file)) return "dictation"
+  if (file.endsWith(`/${APP_NAME}.app`) || file.endsWith(`/${APP_NAME}.app/Contents/MacOS/${APP_NAME}`)) return "main"
+  return file.endsWith(".app") || file.includes("/Contents/MacOS/") ? "electron" : "resource"
+}
 
 export function requireMac(platform = process.platform) {
   if (platform !== "darwin") throw new Error("This explicit signing/notarization command requires macOS. Unsigned builds remain available.")
@@ -46,9 +51,10 @@ export function signedForgeConfig(base, identity, platform = process.platform) {
         // Those are resources sealed by their enclosing bundle, not individual code.
         ignore: (file) => !isSigningTarget(file),
         optionsForFile: (file) => ({
-          // Main/Helper processes run V8. Frameworks and dylibs receive no process entitlements.
+          // TCC attributes the native helper's microphone request to the main app.
+          // Only that app and the dictation helper need audio input; other V8 helpers retain JIT only.
           entitlements: resolve(import.meta.dirname, "../../electron/build/entitlements",
-            isDictationCode(file) ? "dictation.plist" : file.endsWith(".app") || file.includes("/Contents/MacOS/") ? "jit.plist" : "empty.plist"),
+            ({ main: "main.plist", dictation: "dictation.plist", electron: "jit.plist", resource: "empty.plist" })[entitlementRole(file)]),
           hardenedRuntime: true,
           // Omitting timestamp uses Apple's secure timestamp server in osx-sign 2.7.0.
         }),
@@ -83,11 +89,12 @@ export function parseSignature(display, expected, { root = false, bundleId = BUN
   return { identifier: field("Identifier"), cdhash, runtime: true, timestamp: true }
 }
 
-export function assertEntitlements(entitlements, dictation = false) {
-  const allowed = dictation ? AUDIO_INPUT_ENTITLEMENT : JIT_ENTITLEMENT
-  if (Object.entries(entitlements).some(([key, value]) => key !== allowed || value !== true)) {
+export function assertEntitlements(entitlements, role = "electron") {
+  const required = { main: [JIT_ENTITLEMENT, AUDIO_INPUT_ENTITLEMENT], dictation: [AUDIO_INPUT_ENTITLEMENT], electron: [JIT_ENTITLEMENT], resource: [] }[role]
+  if (!required || Object.entries(entitlements).some(([key, value]) => !required.includes(key) || value !== true)) {
     throw new Error("Unexpected signed entitlement for this process role.")
   }
+  if (required.some(key => entitlements[key] !== true)) throw new Error("Missing required signed entitlement for this process role.")
   return Object.keys(entitlements).sort()
 }
 

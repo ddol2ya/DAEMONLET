@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
+import { readFileSync } from "node:fs"
 import base from "../forge.config.mjs"
-import { APP_NAME, BUNDLE_ID, JIT_ENTITLEMENT, AUDIO_INPUT_ENTITLEMENT, isDictationCode, assertCanSubmit, assertEntitlements, assertProduction, assertUploadApproval, notaryStatus, parseSignature, publicSummary, requireMac, selectIdentity, signedForgeConfig } from "../scripts/macos/policy.mjs"
+import { APP_NAME, BUNDLE_ID, JIT_ENTITLEMENT, AUDIO_INPUT_ENTITLEMENT, isDictationCode, entitlementRole, assertCanSubmit, assertEntitlements, assertProduction, assertUploadApproval, notaryStatus, parseSignature, publicSummary, requireMac, selectIdentity, signedForgeConfig } from "../scripts/macos/policy.mjs"
 
 const fingerprint = "A".repeat(40)
 const team = "ABCDEFGHIJ"
@@ -26,7 +27,7 @@ describe("explicit signing policy", () => {
     expect(config.packagerConfig.osxSign).toMatchObject({ identity: fingerprint, continueOnError: false, strictVerify: true, identityValidation: true, preEmbedProvisioningProfile: false })
     expect(config.packagerConfig).not.toHaveProperty("osxNotarize")
     const options = config.packagerConfig.osxSign.optionsForFile
-    for (const file of [`/a/${APP_NAME}.app`, "/a/Helper (Renderer).app", "/a/Contents/MacOS/Helper"]) {
+    for (const file of ["/a/Helper (Renderer).app", "/a/Contents/MacOS/Helper"]) {
       expect(options(file)).toMatchObject({ hardenedRuntime: true, entitlements: expect.stringContaining("jit.plist") })
       expect(options(file)).not.toHaveProperty("timestamp")
     }
@@ -75,7 +76,7 @@ describe("production and signature verification", () => {
     }
   })
   it("does not permit debug or hardware/library-validation exceptions", () => {
-    expect(assertEntitlements({})).toEqual([])
+    expect(assertEntitlements({}, "resource")).toEqual([])
     expect(assertEntitlements({ [JIT_ENTITLEMENT]: true })).toEqual([JIT_ENTITLEMENT])
     for (const key of ["com.apple.security.get-task-allow", "com.apple.security.cs.disable-library-validation", "com.apple.security.device.camera", "com.apple.security.device.audio-input"]) {
       expect(() => assertEntitlements({ [key]: true })).toThrow("Unexpected")
@@ -104,12 +105,40 @@ describe("submission and evidence boundaries", () => {
 
 
 describe("dictation process entitlements", () => {
-  it("allows microphone only on the bundled native helper, without JIT or relaxed sandboxing", () => {
+  it("gives the responsible main app and native helper the required microphone entitlement", () => {
     expect(isDictationCode("/App.app/Contents/Resources/native/DaemonletDictation.app")).toBe(true)
     expect(isDictationCode("/App.app/Contents/Resources/native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation")).toBe(true)
     expect(isDictationCode("/App.app/Contents/MacOS/DaemonletDictation")).toBe(false)
-    expect(assertEntitlements({ [AUDIO_INPUT_ENTITLEMENT]: true }, true)).toEqual([AUDIO_INPUT_ENTITLEMENT])
+    expect(assertEntitlements({ [AUDIO_INPUT_ENTITLEMENT]: true }, "dictation")).toEqual([AUDIO_INPUT_ENTITLEMENT])
     expect(() => assertEntitlements({ [AUDIO_INPUT_ENTITLEMENT]: true })).toThrow("Unexpected")
-    expect(() => assertEntitlements({ [JIT_ENTITLEMENT]: true }, true)).toThrow("Unexpected")
+    expect(() => assertEntitlements({ [JIT_ENTITLEMENT]: true }, "dictation")).toThrow("Unexpected")
+    expect(() => assertEntitlements({}, "dictation")).toThrow("Missing required")
+    expect(() => assertEntitlements({ [JIT_ENTITLEMENT]: true }, "main")).toThrow("Missing required")
+    expect(assertEntitlements({ [JIT_ENTITLEMENT]: true, [AUDIO_INPUT_ENTITLEMENT]: true }, "main")).toEqual([JIT_ENTITLEMENT, AUDIO_INPUT_ENTITLEMENT].sort())
+  })
+
+  it("checks the configured plist contents for each signed code role", () => {
+    const app = `/a/${APP_NAME}.app`
+    const examples = [
+      [app, "main"], [`${app}/Contents/MacOS/${APP_NAME}`, "main"],
+      [`${app}/Contents/Resources/native/DaemonletDictation.app`, "dictation"],
+      [`${app}/Contents/Resources/native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation`, "dictation"],
+      [`${app}/Contents/Frameworks/${APP_NAME} Helper (Renderer).app`, "electron"],
+      [`${app}/Contents/Frameworks/${APP_NAME} Helper.app/Contents/MacOS/${APP_NAME} Helper`, "electron"],
+      [`${app}/Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework`, "resource"],
+      [`${app}/Contents/Frameworks/libEGL.dylib`, "resource"],
+    ]
+    const options = signedForgeConfig(base, identity, "darwin").packagerConfig.osxSign.optionsForFile
+    for (const [file, role] of examples) {
+      expect(entitlementRole(file)).toBe(role)
+      const xml = readFileSync(options(file).entitlements, "utf8")
+      const keys = [...xml.matchAll(/<key>([^<]+)<\/key>\s*<true\/>/g)].map(match => match[1])
+      const values = Object.fromEntries(keys.map(key => [key, true]))
+      expect(() => assertEntitlements(values, role)).not.toThrow()
+      expect(keys.includes(AUDIO_INPUT_ENTITLEMENT)).toBe(role === "main" || role === "dictation")
+    }
+    for (const role of ["main", "dictation", "electron", "resource"]) {
+      expect(() => assertEntitlements({ "com.apple.security.cs.disable-library-validation": true }, role)).toThrow("Unexpected")
+    }
   })
 })
