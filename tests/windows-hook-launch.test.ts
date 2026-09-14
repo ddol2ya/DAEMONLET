@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { createHookCommand, validateLaunchSpec, windowsHookArguments, type HookLaunchSpec } from "../adapter/codex/hooks/HookLaunchSpec"
 import { classifyHandler, hookHandler } from "../adapter/codex/hooks/HookInstallPlan"
-const spec: HookLaunchSpec = { mode: "packaged-windows-host", executablePath: "C:\\Users\\Moon 한글 & O'Neil\\Programs\\Daemonlet for Codex\\resources\\codex\\hook-host.exe", forwarderPath: "C:\\Users\\Moon 한글 & O'Neil\\Programs\\Daemonlet for Codex\\resources\\codex\\hook-forwarder.mjs", dataDir: "C:\\Users\\Moon 한글 & O'Neil\\AppData\\Roaming\\Daemonlet for Codex\\adapter", hookEndpoint: "discover" }
+const spec: HookLaunchSpec = { mode: "packaged-windows-host", executablePath: "C:\\Test Apps\\한글 & O'Neil\\Daemonlet for Codex\\resources\\codex\\hook-host.exe", forwarderPath: "C:\\Test Apps\\한글 & O'Neil\\Daemonlet for Codex\\resources\\codex\\hook-forwarder.mjs", dataDir: "C:\\Test Data\\한글 & O'Neil\\Daemonlet for Codex\\adapter", hookEndpoint: "discover" }
 describe("packaged Windows Hook launch", () => {
   it("uses one quoted native launcher with encoded values and a stable endpoint", () => {
     const command = createHookCommand(spec), args = windowsHookArguments(spec)
