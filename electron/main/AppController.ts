@@ -756,7 +756,7 @@ export class AppController {
           speechWindow: () => this.activityBubble.speech.window,
           evidenceDirectory: process.env.ELECTRON_SMOKE_DIALOGUE_EVIDENCE,
           dataDirectory: this.adapterConfig.dataDir,
-          hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
+          hookEndpoint: this.adapterConfig.hookEndpoint,
           updateSettings: (patch) => { this.updateSettings(patch) },
           selectCharacter: async (id) => {
             this.smokeReadyCharacters.delete(id)
@@ -785,7 +785,7 @@ export class AppController {
         activityValidation = await runActivitySmoke({
           activity: this.activity, window: this.activityWindow, bubble: this.activityBubble, pet: win,
           evidenceDirectory: process.env.ELECTRON_SMOKE_ACTIVITY_EVIDENCE, userData: app.getPath("userData"),
-          dataDirectory: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
+          dataDirectory: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
           updateSettings: patch => { this.updateSettings(patch) },
           selectCharacter: async id => {
             this.smokeReadyCharacters.delete(id)
@@ -798,7 +798,7 @@ export class AppController {
           stopAdapter: () => this.adapter.stop(true), startAdapter: async () => { await this.adapter.start() },
           verifyRestart: process.env.ELECTRON_SMOKE_RESTART_EVIDENCE ? () => runRestartDetectionSmoke({
             activity: this.activity, bubble: this.activityBubble, list: this.activityWindow, pet: win, launcher: this.threadLauncher,
-            home: process.env.CODEX_HOME!, dataDir: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
+            home: process.env.CODEX_HOME!, dataDir: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
             evidenceDirectory: process.env.ELECTRON_SMOKE_RESTART_EVIDENCE!,
             reloadPet: reload,
           }) : undefined,
@@ -820,7 +820,7 @@ export class AppController {
         }
         hybridValidation = await runHybridBubbleSmoke({
           pet: win, bubble: this.activityBubble, list: this.activityWindow, activity: this.activity, dictation: this.dictation,
-          evidenceDirectory: process.env.ELECTRON_SMOKE_HYBRID_EVIDENCE, dataDirectory: this.adapterConfig.dataDir, hookEndpoint: process.platform === "win32" ? "discover" : this.adapterConfig.hookEndpoint,
+          evidenceDirectory: process.env.ELECTRON_SMOKE_HYBRID_EVIDENCE, dataDirectory: this.adapterConfig.dataDir, hookEndpoint: this.adapterConfig.hookEndpoint,
           updateSettings: patch => { this.updateSettings(patch) }, setLayout: value => this.setLayoutMode(value), reloadPet: reload,
           selectCharacter: async id => {
             if (id === this.settings.characterId) return
