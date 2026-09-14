@@ -51,6 +51,7 @@ export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
     <section className="section-card connection-summary" aria-label="CLI Hook 설정">
       <h2>CLI Hook 설정 <span className="source-label">선택 사항</span></h2>
       <p>터미널에서 Codex CLI를 사용할 때 설정하세요. 데스크톱 연결과 별도로 관리됩니다.</p>
+      <p className="fine-print">Codex CLI만 단독으로 사용하면 Daemonlet이 정상 작동하지 않을 수 있습니다. Codex 데스크톱 앱을 함께 실행해 주세요.</p>
       <div className="connection-heading"><span className={`connection-indicator ${receiving ? "connected" : ""}`} aria-hidden="true">{receiving ? "✓" : "◎"}</span><div><h2>{hookHeading}</h2><p>{receiving ? `최근 수신 ${time(status.reception.lastReceivedAt!)}` : installed ? "CLI에서 Hook을 허용한 뒤 작업하면 수신 상태가 갱신됩니다." : "CLI 위치와 Hook 실행 환경을 확인합니다."}</p></div></div>
       <dl className="connection-checks"><div><dt>Codex CLI</dt><dd>{found ? discovery.executable.version?.replace("codex-cli ", "v") : discovery?.executable.path ? "확인 필요" : discovery ? "찾지 못함" : "찾는 중…"}</dd></div><div><dt>Hook</dt><dd>{installed ? "설정됨" : configurationLabels[status.configurationStatus]}</dd></div><div><dt>이벤트 수신</dt><dd>{receiving ? "확인됨" : status.reception.status === "waiting" ? "자동 확인 중" : "연결 대기"}</dd></div></dl>
       <div className="button-row"><button className="button primary" disabled={disabled} onClick={() => void prepare()}>{installed ? "Hook 확인" : "CLI Hook 설정"}</button>{discovery && !discovery.executable.path && <button className="button secondary" disabled={disabled} onClick={() => void run("Codex 선택", () => api.chooseCodexExecutable())}>Codex 앱 선택</button>}</div>

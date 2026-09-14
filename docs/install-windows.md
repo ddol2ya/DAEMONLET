@@ -12,6 +12,8 @@ ZIP판은 폴더 전체를 압축 해제하고 `Daemonlet for Codex/Daemonlet fo
 
 ## 터미널의 Codex CLI 연결 (선택 사항)
 
+Codex CLI만 단독으로 사용하면 Daemonlet이 정상 작동하지 않을 수 있습니다. Codex 데스크톱 앱을 함께 실행해 주세요.
+
 1. **설정 → Codex 연결 → CLI Hook 설정**을 누릅니다. 앱이 지원하는 CLI와 Hook 실행 환경을 확인합니다.
 2. 설치 미리보기에서 변경할 이벤트를 확인하고 적용합니다. 다른 프로그램의 Hook은 보존됩니다.
 3. Codex CLI에서 `/hooks`를 열고 Daemonlet Hook의 실행을 허용합니다. 이후 새 작업으로 이벤트 수신을 확인합니다.

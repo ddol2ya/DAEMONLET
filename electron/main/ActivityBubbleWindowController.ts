@@ -102,7 +102,7 @@ export class ActivityBubbleWindowController {
       width: 276, height: 100, title: "Daemonlet 작업 말풍선", show: false,
       transparent: true, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
       skipTaskbar: true, hasShadow: false, backgroundColor: "#00000000",
-      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.preloadPath },
+      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, backgroundThrottling: false, preload: this.preloadPath },
     })
     this.window = win; this.ready = false
     win.setIgnoreMouseEvents(true, { forward: true })
@@ -129,7 +129,15 @@ export class ActivityBubbleWindowController {
     secureWebContents(win.webContents, "activity-bubble", this.devServerUrl)
     win.once("ready-to-show", () => { this.ready = true; this.sync() })
     win.once("closed", () => { if (this.window === win) { this.window = null; this.ready = false; if (this.view === "control") this.view = "activity" } this.onHidden(); release() })
-    win.webContents.on("did-finish-load", () => { if (this.snapshot) this.send(ACTIVITY_IPC.changed, this.snapshot); this.send(TASK_CONTROL_IPC.viewChanged, this.getView()) })
+    win.webContents.on("did-finish-load", () => {
+      if (this.snapshot) this.send(ACTIVITY_IPC.changed, this.snapshot)
+      this.send(TASK_CONTROL_IPC.viewChanged, this.getView())
+      // An initially hidden transparent Windows window may finish loading
+      // without emitting ready-to-show. Apply the existing visibility rules
+      // after load as well, including dialogue arbitration and hidden Pet.
+      this.ready = true
+      this.sync()
+    })
     void win.loadURL(expectedRendererUrl("activity-bubble", this.devServerUrl)).catch(() => {})
   }
   private applyWindowSettings(): void {
