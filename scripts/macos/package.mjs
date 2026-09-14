@@ -25,7 +25,7 @@ export async function buildSignedCandidate(output) {
   const evidence = join(root, "evidence-private")
   await mkdir(evidence, { mode: 0o700 })
   await writeJSON(join(root, "private-build-input.json"), { sourceCommit, signer, architecture: process.arch })
-  for (const name of ["jit", "empty"]) await run("/usr/bin/plutil", ["-lint", resolve(repository, `electron/build/entitlements/${name}.plist`)])
+  for (const name of ["main", "jit", "dictation", "empty"]) await run("/usr/bin/plutil", ["-lint", resolve(repository, `electron/build/entitlements/${name}.plist`)])
   await run("npm", ["run", "build:renderer"], { timeoutMs: 600_000, logPath: join(evidence, "build-renderer.json") })
   await run(process.execPath, ["electron/build/build-electron.mjs", "--production"], { timeoutMs: 180_000, logPath: join(evidence, "build-electron.json") })
   const expectedPayload = {}

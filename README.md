@@ -9,7 +9,7 @@ Codex 작업 상태에 반응하는 데스크톱 캐릭터 앱입니다. 저장�
 ## 앱 사용
 
 - **Windows x64:** 설치 EXE 또는 압축판. 같은 Windows 계정에서 Codex Desktop을 실행하면 Hook 설치 없이 연결됩니다. [설치 안내](docs/install-windows.md)
-- **Apple Silicon Mac:** 앱을 응용 프로그램 폴더로 옮긴 뒤 Codex 연결 메뉴에서 Hook 설치와 Codex의 실행 허용을 진행합니다. [설치 안내](docs/install-macos.md)
+- **Apple Silicon Mac:** 앱을 응용 프로그램 폴더로 옮깁니다. 데스크톱 앱의 Codex 작업은 Hook 없이 직접 연결하며, CLI 작업 이벤트도 받으려면 Hook 설치·신뢰 검토를 진행합니다. [설치 안내](docs/install-macos.md)
 - 사용 가능한 실행 파일은 [Releases](https://github.com/ddol2ya/DAEMONLET/releases)에 게시합니다. 서명·공증 여부는 각 릴리스 설명을 확인하세요. 소스를 빌드했다는 것만으로 서명이나 공증이 적용되지는 않습니다.
 
 앱 사용에는 ComfyUI, 모델 가중치 또는 제작용 NVIDIA GPU가 필요하지 않습니다. 앱은 기존 2D Live/Test 설치와 별도 이름·앱 ID·사용자 데이터 경로를 사용합니다.

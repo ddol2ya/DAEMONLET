@@ -30,3 +30,22 @@ jobs:
       - run: npm run release:verify
       - run: npm run creator:package -- --output outputs/creator-ci
       - run: npm run creator:verify -- outputs/creator-ci/Daemonlet-creator-skill-$(node -p "require('./package.json').version").zip
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+      - run: npm ci
+      - run: npm run electron:install
+      - run: npm run source:check
+      - run: npm run typecheck
+      # POSIX Hook host/permission cases are explicitly skipped on Windows;
+      # the existing Unix job still runs them. This is not native app acceptance.
+      - run: npm test
+      - run: npm run build:renderer
+      - run: npm run build:electron:production
+      - run: npm run release:verify

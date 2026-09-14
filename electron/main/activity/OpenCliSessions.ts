@@ -2,10 +2,11 @@ import { execFile } from "node:child_process"
 import { constants } from "node:fs"
 import { lstat, open, realpath } from "node:fs/promises"
 import { promisify } from "node:util"
-import { join } from "node:path"
+import { join, relative, sep } from "node:path"
 import { belongsToLocalCodexHome, isThreadUuid } from "../control/CodexThreadLauncher"
 import type { LiveSession } from "../../../adapter/codex/lifecycle/LiveActivity"
 import { rolloutSessionId } from "../../../adapter/codex/lifecycle/CodexRolloutPath"
+import { hasLocalFilePermissions } from "../../../adapter/codex/lifecycle/LocalFilePolicy"
 
 const exec = promisify(execFile)
 const MAX_LINE = 64 * 1024, MAX_TAIL = 2 * 1024 * 1024
@@ -33,16 +34,20 @@ export async function inspectOpenCodexRollout(home: string, path: string): Promi
   const sessionId = rolloutSessionId(path)
   if (!sessionId || !belongsToLocalCodexHome(path, sessionId, home) || await realpath(path) !== path) return null
   let directory = await realpath(home)
-  const parts = path.slice(directory.length + 1).split("/").slice(0, -1)
+  const parts = relative(directory, path).split(sep).slice(0, -1)
   for (const part of ["", ...parts]) {
     if (part) directory = join(directory, part)
     const info = await lstat(directory)
-    if (!info.isDirectory() || info.isSymbolicLink() || info.uid !== process.getuid?.() || info.mode & 0o022) return null
+    if (!info.isDirectory() || info.isSymbolicLink() || !hasLocalFilePermissions(info)) return null
   }
+  const named = await lstat(path)
+  if (!named.isFile() || named.isSymbolicLink() || !hasLocalFilePermissions(named) || named.nlink !== 1) return null
   const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
     const info = await file.stat()
-    if (!info.isFile() || info.uid !== process.getuid?.() || info.mode & 0o022 || info.nlink !== 1) return null
+    const after = await lstat(path)
+    if (!info.isFile() || !hasLocalFilePermissions(info) || info.nlink !== 1 || after.isSymbolicLink()
+      || named.dev !== info.dev || named.ino !== info.ino || after.dev !== info.dev || after.ino !== info.ino) return null
     const first = Buffer.alloc(Math.min(MAX_LINE, info.size))
     const headerRead = await file.read(first, 0, first.length, 0)
     const end = first.subarray(0, headerRead.bytesRead).indexOf(10)

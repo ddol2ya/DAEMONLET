@@ -158,6 +158,188 @@
           "kind": "testOnlySetupAsar"
         }
       ]
+    },
+    {
+      "label": "macos-regression-zip",
+      "schemaVersion": 1,
+      "candidateId": "ca901e05-43fd-4b6a-8844-233863698e1b",
+      "sourceCommit": "f0e7e968a86400ba1e6beb20691511ee97a6f95e",
+      "sourceTreeSha256": "bb6b231fa1fbd96d6d96f7532d63f93d0ed0bb561ce94379c34fcbd9810a6d16",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T03:51:09.582Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-macos-arm64.zip",
+          "bytes": 153570986,
+          "sha256": "6d8974e420c9c2bceebf64f022adb1fd1e1123324ed567c035d9d253564869e9",
+          "kind": "macosUnsignedZip"
+        }
+      ]
+    },
+    {
+      "label": "windows-regression-zip",
+      "schemaVersion": 1,
+      "candidateId": "d0fa6044-6147-402d-97f0-b43b984ef764",
+      "sourceCommit": "f0e7e968a86400ba1e6beb20691511ee97a6f95e",
+      "sourceTreeSha256": "f5a8210296a7e28ecdd957504f7a3d4b680f2055419f559c8933e795c72a12bb",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T03:48:23.477Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "osVersion": "Windows 11 Pro",
+        "nodeVersion": "v24.13.1",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-windows-x64.zip",
+          "bytes": 183254432,
+          "sha256": "d8f66f12faed3ccd9f65e50af7622e891f59efa012ea78f1083147d78ddb9e65",
+          "kind": "windowsPortableZip"
+        }
+      ]
+    },
+    {
+      "label": "windows-regression-installer",
+      "schemaVersion": 1,
+      "candidateId": "611d95dd-2aae-45f8-bbc3-3f17370554ec",
+      "sourceCommit": "f0e7e968a86400ba1e6beb20691511ee97a6f95e",
+      "sourceTreeSha256": "f5a8210296a7e28ecdd957504f7a3d4b680f2055419f559c8933e795c72a12bb",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T03:52:34.284Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "osVersion": "10.0.26200 (Windows 11 Pro)",
+        "nodeVersion": "v24.13.1",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe",
+          "bytes": 101003067,
+          "sha256": "1e7f4546c26d83b646169b1c7762486bf39f0f1cee0141b887dc47a460da8386",
+          "kind": "windowsInstallerExe"
+        }
+      ]
+    },
+    {
+      "label": "macos-notarized-final",
+      "schemaVersion": 1,
+      "candidateId": "91207dc2-75bd-4a2f-b29f-379231bf1430",
+      "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492",
+      "sourceTreeSha256": "3a48bf108c88a8de997e229eaeca389e4cdba53a7350e03474bf8f6bfa9164e7",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T05:16:44.780Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet for Codex-0.7.0-7857cf7768b3-darwin-arm64.zip",
+          "bytes": 153428334,
+          "sha256": "fa3b1c2f3d28b779ec00b990aee4be19d4fbb9035a2f950d1a27326de0c2361e",
+          "kind": "macosFinalZip"
+        }
+      ]
+    },
+    {
+      "label": "macos-microphone-candidate",
+      "schemaVersion": 1,
+      "candidateId": "aae5cee7-e570-47dc-9354-db19bec427a9",
+      "sourceCommit": "7fd4a735d263221ad06e2754689f3e147f6d540a",
+      "sourceTreeSha256": "96e0520d6a2f1ac0fd9d4c04a53ae930a1b54c2aac2cf03a2d2521d5620ecc2c",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T06:05:58.049Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "submission.zip",
+          "bytes": 153426373,
+          "sha256": "e67f686ad39abfbffe3ce0c25897cd747a344dce29830fab399cb472626f1cf5",
+          "kind": "macosZip"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "candidateId": "7bfbfcab-299c-4bc7-886b-4829a4581610",
+      "sourceCommit": "c6e7a4df7d3c38912b12397e84504b94362d0453",
+      "sourceTreeSha256": "1aab34cd62f6ca2e6159b5782f191079c0e82ddb87689ef6b92fcc96133adf21",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T06:20:55.660Z",
+      "timeZone": "Asia/Seoul",
+      "label": "macos-dictation-submission",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "submission.zip",
+          "bytes": 153426349,
+          "sha256": "c13950f1523b86757c0a0bf0fc637766225334ada402789434fdbb5246208e39",
+          "kind": "macosZip"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "candidateId": "de5be784-c813-4ff6-893b-2c0dc9c7b949",
+      "sourceCommit": "c6e7a4df7d3c38912b12397e84504b94362d0453",
+      "sourceTreeSha256": "1aab34cd62f6ca2e6159b5782f191079c0e82ddb87689ef6b92fcc96133adf21",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T06:33:41.455Z",
+      "timeZone": "Asia/Seoul",
+      "label": "macos-dictation-notarized-final",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet for Codex-0.7.0-c6e7a4df7d3c-darwin-arm64.zip",
+          "bytes": 153428329,
+          "sha256": "8c7e2c7cb06670d9675663752fd2f4c7f0d001b39981dc63edb0f1d76ca035c4",
+          "kind": "macosFinalZip"
+        }
+      ]
     }
   ]
 }

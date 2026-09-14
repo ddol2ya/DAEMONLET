@@ -1,15 +1,20 @@
 import { createServer, type Socket } from "node:net"
 import { randomUUID } from "node:crypto"
 import { DatabaseSync } from "node:sqlite"
-import { access, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { access, chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { windowsDesktopPipe } from "../../electron/shared/desktop-ipc-endpoint.mjs"
 
 /** Synthetic desktop owner for protocol/UI verification; refuses non-fixture homes. */
 export async function createDesktopControlFixture(options: { home?: string; fragmented?: boolean } = {}) {
-  const home = options.home ?? await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-fixture-"))
+  // Windows CI may provide an 8.3 alias in TEMP; production readers require
+  // canonical paths. Keep synthetic metadata canonical at its point of creation.
+  const home = options.home ?? await realpath(await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-fixture-")))
   if (!home.split(/[\\/]/).some(part => /^2dl-desktop-(fixture|home)-/.test(part))) throw new Error("Desktop fixture requires an isolated test home")
-  const ipcDir = join(home, "ipc"), socketPath = join(ipcDir, "ipc.sock"), databasePath = join(home, "state_5.sqlite")
+  if (process.platform === "win32" && process.env.ELECTRON_SMOKE_TEST !== "1") throw new Error("Windows fixture requires explicit smoke isolation")
+  const ipcDir = join(home, "ipc"), databasePath = join(home, "state_5.sqlite")
+  const socketPath = process.platform === "win32" ? windowsDesktopPipe(home, { ELECTRON_SMOKE_TEST: "1" }) : join(ipcDir, "ipc.sock")
   for (const path of [databasePath, socketPath]) if (await access(path).then(() => true, () => false)) throw new Error("Desktop fixture path already exists")
   await mkdir(ipcDir, { recursive: true, mode: 0o700 }); await mkdir(join(home, "sessions"), { recursive: true, mode: 0o700 })
   let owner = randomUUID()
@@ -87,7 +92,7 @@ export async function createDesktopControlFixture(options: { home?: string; frag
     if (!options.home) await rm(home, { recursive: true, force: true })
     else { for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`, ...paths]) await rm(path, { force: true }); await rm(ipcDir, { recursive: true, force: true }) }
   }
-  try { await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(socketPath, resolve) }); await chmod(socketPath, 0o600) }
+  try { await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(socketPath, resolve) }); if (process.platform !== "win32") await chmod(socketPath, 0o600) }
   catch (error) { server.close(); await cleanFiles(); throw error }
   return {
     home, socketPath, ids, get owner() { return owner }, turns, states, calls, discoveryReplies, owned,
@@ -110,7 +115,7 @@ export async function createDesktopControlFixture(options: { home?: string; frag
     async resumeBroker() {
       if (server.listening) return
       await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(socketPath, resolve) })
-      await chmod(socketPath, 0o600)
+      if (process.platform !== "win32") await chmod(socketPath, 0o600)
     },
     async close() {
       for (const socket of sockets.keys()) socket.destroy()

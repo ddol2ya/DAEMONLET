@@ -7,7 +7,7 @@ import { INSTALLED_HOOK_EVENTS, manageHooks } from "../adapter/codex/hooks/HookI
 const directories: string[] = []
 afterEach(async () => { await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true }))) })
 
-describe("HookInstaller", () => {
+describe.runIf(process.platform !== "win32")("[POSIX filesystem] HookInstaller", () => {
   it("dry-runs, preserves hooks, applies idempotently, backs up, and uninstalls only owned entries", async () => {
     expect(INSTALLED_HOOK_EVENTS).toHaveLength(9)
     expect(INSTALLED_HOOK_EVENTS).toContain("Interrupt")

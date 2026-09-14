@@ -68,9 +68,16 @@ export class ActivityHistoryStore implements ActivityPersistence {
     try { await this.prepare() } catch { return { data: null, issue: "error" } }
     let contents: string
     try {
+      // Windows does not supply O_NOFOLLOW. Check the named entry and compare
+      // it with the opened handle before reading or changing permissions.
+      const named = await lstat(this.path)
+      if (named.isSymbolicLink() || named.nlink !== 1) throw new Error("ACTIVITY_STORAGE")
       const file = await open(this.path, constants.O_RDONLY | constants.O_NOFOLLOW)
       try {
         const stat = await file.stat()
+        const after = await lstat(this.path)
+        if (after.isSymbolicLink() || stat.nlink !== 1 || named.dev !== stat.dev || named.ino !== stat.ino
+          || after.dev !== stat.dev || after.ino !== stat.ino) throw new Error("ACTIVITY_STORAGE")
         if (!stat.isFile()) throw new Error("ACTIVITY_CORRUPT")
         if (process.platform !== "win32") await file.chmod(0o600)
         if (stat.size > MAX_BYTES) throw new Error("ACTIVITY_CORRUPT")

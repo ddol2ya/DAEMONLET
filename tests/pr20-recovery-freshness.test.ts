@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, beforeAll, afterAll, vi } from "vitest"
 import { appendFile } from "node:fs/promises"
 import { join } from "node:path"
 import { CodexRunRegistry } from "../adapter/codex/CodexRunRegistry"
@@ -7,6 +7,11 @@ import { preferLiveSession, type LiveActivitySnapshot, type LiveSession } from "
 import { DesktopActivityObserver } from "../electron/main/activity/DesktopActivityObserver"
 import { inspectOpenCodexRollout } from "../electron/main/activity/OpenCliSessions"
 import { createDesktopControlFixture } from "../scripts/fixtures/desktop-control-fixture"
+
+// Each Vitest worker uses only its test profile's private Windows pipe.
+beforeAll(() => { if (process.platform === "win32") vi.stubEnv("ELECTRON_SMOKE_TEST", "1") })
+afterAll(() => vi.unstubAllEnvs())
+
 
 const sessionId = "11111111-1111-4111-8111-111111111111"
 const oldTurnId = "22222222-2222-4222-8222-222222222222"

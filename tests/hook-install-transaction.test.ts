@@ -8,7 +8,7 @@ import { allEventSupport, hookHandler } from "../adapter/codex/hooks/HookInstall
 import { HookInstallTransaction, readHookTarget, type HookTransactionOptions, type InstallationBinding } from "../adapter/codex/hooks/HookInstallTransaction.ts"
 
 const directories: string[] = [], installers: HookInstallTransaction[] = []
-const desiredHandler = hookHandler({ mode: "development-node", executablePath: process.execPath, forwarderPath: resolve("adapter/codex/hooks/hook-forwarder.mjs"), dataDir: "/test/data", hookEndpoint: "http://127.0.0.1:4175/hook" })
+const desiredHandler = hookHandler({ mode: "development-node", executablePath: "/fixture/node", forwarderPath: "/fixture/adapter/codex/hooks/hook-forwarder.mjs", dataDir: "/test/data", hookEndpoint: "http://127.0.0.1:4175/hook" })
 const foreign = { type: "command", command: "echo PRIVATE_FOREIGN_TOKEN_CANARY", statusMessage: "PRIVATE_METADATA_CANARY" }
 const original = JSON.stringify({ description: "PRIVATE_DESCRIPTION_CANARY", hooks: { Stop: [{ hooks: [foreign] }] }, extension: { preserved: true } })
 
@@ -33,7 +33,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
-describe("preview and protected transaction", () => {
+describe.runIf(process.platform !== "win32")("[POSIX filesystem] preview and protected transaction", () => {
   it("previews without files, applies once, and leaves exact reinstall/read status as a byte-preserving no-op", async () => {
     const f = await fixture(null)
     const preview = await f.installer.prepare("install", "window")

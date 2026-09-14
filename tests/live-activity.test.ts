@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, beforeAll, afterAll, vi } from "vitest"
 import { randomUUID } from "node:crypto"
-import { appendFile, chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { appendFile, chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { DesktopActivityObserver } from "../electron/main/activity/DesktopActivityObserver"
@@ -10,6 +10,11 @@ import { createDesktopControlFixture } from "../scripts/fixtures/desktop-control
 import { CodexRunRegistry } from "../adapter/codex/CodexRunRegistry"
 import { LiveActivityReconciler } from "../adapter/codex/lifecycle/LiveActivityReconciler"
 import type { LiveSession, LiveActivitySnapshot } from "../adapter/codex/lifecycle/LiveActivity"
+
+// Each Vitest worker uses only its test profile's private Windows pipe.
+beforeAll(() => { if (process.platform === "win32") vi.stubEnv("ELECTRON_SMOKE_TEST", "1") })
+afterAll(() => vi.unstubAllEnvs())
+
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
@@ -143,7 +148,7 @@ describe("live desktop and CLI activity", () => {
 
 describe("startup CLI proof", () => {
   it("reads ongoing progress when the initial start has left the tail and never revives terminal turns from later usage records", async () => {
-    const home = await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-progress-")); cleanups.push(() => rm(home, { recursive: true, force: true }))
+    const home = await realpath(await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-progress-"))); cleanups.push(() => rm(home, { recursive: true, force: true }))
     await mkdir(join(home, "sessions"), { mode: 0o700 })
     const id = randomUUID(), turnId = randomUUID(), path = join(home, "sessions", `rollout-test-${id}.jsonl`)
     const header = JSON.stringify({ type: "session_meta", payload: { id, source: "vscode" } }) + "\n"
@@ -159,7 +164,7 @@ describe("startup CLI proof", () => {
     expect(await inspectOpenCliRollout(home, path)).toBeNull()
   })
   it("recovers a continued file using its original conversation ID and verified header", async () => {
-    const home = await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-cli-continued-")); cleanups.push(() => rm(home, { recursive: true, force: true }))
+    const home = await realpath(await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-cli-continued-"))); cleanups.push(() => rm(home, { recursive: true, force: true }))
     await mkdir(join(home, "sessions"), { mode: 0o700 })
     const id = randomUUID(), segment = randomUUID(), turnId = randomUUID(), path = join(home, "sessions", `rollout-test-${id}_${segment}.jsonl`)
     const data = (headerId: string) => JSON.stringify({ type: "session_meta", payload: { id: headerId, source: "cli" } }) + "\n" + JSON.stringify({ timestamp: new Date().toISOString(), type: "event_msg", payload: { type: "task_started", turn_id: turnId } }) + "\n"
@@ -173,7 +178,7 @@ describe("startup CLI proof", () => {
     expect(cliRolloutPaths(output)).toEqual(["/private/live.jsonl"])
   })
   it("requires a safe CLI header, uses the latest lifecycle, and skips message bodies", async () => {
-    const home = await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-cli-proof-")); cleanups.push(() => rm(home,{recursive:true,force:true}))
+    const home = await realpath(await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-cli-proof-"))); cleanups.push(() => rm(home,{recursive:true,force:true}))
     await mkdir(join(home,"sessions"),{mode:0o700})
     const id = randomUUID(), turn = randomUUID(), path = join(home,"sessions",`rollout-test-${id}.jsonl`)
     const header = (source: unknown) => JSON.stringify({type:"session_meta",payload:{id,source}})+"\n"
