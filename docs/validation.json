@@ -68,6 +68,156 @@
   },
   "current": {
     "reviewedOn": "2026-09-14 (Asia/Seoul)",
+    "scope": "PR6 regression and candidate-specific native follow-up. Previous candidate outcomes are retained unchanged in previousCandidateReview; no result is transferred to a rebuilt or restapled artifact.",
+    "identityFile": "validation-candidates.json",
+    "codeSourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492",
+    "sourceChecks": {
+      "status": "PASS",
+      "ci": [
+        "https://github.com/ddol2ya/DAEMONLET/actions/runs/34805868776",
+        "https://github.com/ddol2ya/DAEMONLET/actions/runs/34805865085"
+      ],
+      "windows": {
+        "passed": 1276,
+        "skipped": 70,
+        "failed": 0
+      },
+      "linux": {
+        "passed": 1342,
+        "skipped": 4,
+        "failed": 0
+      },
+      "notes": "Both jobs execute source checks, typecheck, full npm test, both production builds and ASAR verification. Unix CI additionally executes Python and standalone creator checks. Windows platform skips are not Windows native PASS evidence."
+    },
+    "results": [
+      {
+        "label": "macos-regression-zip",
+        "candidateId": "ca901e05-43fd-4b6a-8844-233863698e1b",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "NOT_RUN",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "NOT_RUN",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "windows-regression-zip",
+        "candidateId": "d0fa6044-6147-402d-97f0-b43b984ef764",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "PASS",
+          "asar": "PASS",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "NOT_RUN",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "windows-regression-installer",
+        "candidateId": "611d95dd-2aae-45f8-bbc3-3f17370554ec",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "PASS",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "PASS",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "FAIL",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "macos-notarized-final",
+        "candidateId": "91207dc2-75bd-4a2f-b29f-379231bf1430",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "NOT_RUN",
+          "asar": "PASS",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "PASS",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "PASS",
+          "notarization": "PASS"
+        }
+      }
+    ],
+    "nativeObservations": [
+      {
+        "candidateId": "91207dc2-75bd-4a2f-b29f-379231bf1430",
+        "scope": "Exact final notarized ZIP",
+        "status": "PASS",
+        "steps": [
+          "Apple Accepted; ticket attachment, strict signature and Gatekeeper",
+          "Final ZIP extraction and Hook-host proof",
+          "Fresh packaged Gpichan/WebGL, three reloads, input/visibility/tray/adapter smoke and cleanup",
+          "Native file-dialog .petchar import/apply1.0.0, update1.1.0, restart persistence and rollback1.0.0; both revisions retained",
+          "New Applications test installation; normal LaunchServices first run, Later selection, relaunch persistence; test installation removed and isolated settings retained"
+        ]
+      },
+      {
+        "candidateId": "ca901e05-43fd-4b6a-8844-233863698e1b",
+        "scope": "Earlier f0e7e96 Mac ZIP only",
+        "status": "PASS within stated scope",
+        "steps": [
+          "Actual Codex CLI0.153.4 start, finish, cancellation, resume and Daemonlet restart observed with own session/turn correlation",
+          "Native .petchar import/update/rollback"
+        ],
+        "limits": "No full Desktop send/stop/trust test; not evidence for the final signed ZIP"
+      },
+      {
+        "candidateId": "d0fa6044-6147-402d-97f0-b43b984ef764",
+        "scope": "f0e7e96 Windows ZIP only",
+        "status": "PASS within stated scope",
+        "steps": [
+          "Exact extraction and packaged runtime smoke",
+          "Actual isolated CLI0.153.4 start/finish and Daemonlet crash/restart",
+          "Actual native CLI0.153.4 cancellation in a private console: task_started to turn_aborted, CLI exit1, app running to cancelled"
+        ],
+        "limits": "Existing installed CLI preserved; full Desktop send/stop/trust remains deferred. Three earlier console-harness failures are retained; only the corrected fourth attempt passed."
+      },
+      {
+        "candidateId": "611d95dd-2aae-45f8-bbc3-3f17370554ec",
+        "scope": "f0e7e96 Windows EXE only",
+        "status": "PASS within stated scope",
+        "steps": [
+          "Prior/current EXE install, all127 payload hashes, installed smoke, replacement, rollback, restoration and uninstall",
+          "Test settings and extra-pack sentinels retained"
+        ],
+        "limits": "Both actual candidates version0.7.0; not version-number upgrade acceptance. EXE remains NotSigned."
+      }
+    ],
+    "deferredUserChecks": [
+      "Microphone/speech permission prompt denial and recovery",
+      "Full real Codex Desktop send/stop/trust acceptance in the user environment"
+    ],
+    "remainingPrerequisites": [
+      "A distinct-version prior Daemonlet artifact is required for real version-upgrade/rollback acceptance; no artificial version-labelled candidate is substituted",
+      "Windows distribution signing identity is not available in the tested environment",
+      "Publication history treatment requires a separate maintainer decision; no history rewriting or branch deletion performed"
+    ],
+    "decisions": {
+      "technicalSource": "PASS for the named code source and CI runs",
+      "macosNotarization": "PASS for the named final ZIP only",
+      "windowsSigning": "FAIL: actual EXE NotSigned",
+      "characterRights": "User states the base character is open; existing attribution and the exact contribution-grant scope are preserved. This is not an independent legal attestation.",
+      "externalModelTerms": "External user downloads only; missing model license remains disclosed in the external workflow. No model bundled or newly installed.",
+      "gitHistory": "Read-only review completed; existing retained historical objects remain pending publication review",
+      "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or merge performed in this follow-up"
+    }
+  },
+  "recordType": "public-validation-summary",
+  "previousCandidateReview": {
+    "reviewedOn": "2026-09-14 (Asia/Seoul)",
     "identityFile": "validation-candidates.json",
     "results": [
       {
@@ -221,6 +371,5 @@
       "gitHistory": "BLOCKED for publication review: stale local main environment literals and unverified server-retained objects",
       "publication": "NOT_RUN: human decision required; no merge, visibility change, release, upload or notarization submission authorized"
     }
-  },
-  "recordType": "public-validation-summary"
+  }
 }

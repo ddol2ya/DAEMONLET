@@ -133,3 +133,61 @@ The existing Unix CI job is retained, and a Windows job runs source/type/unit,
 both production builds and ASAR verification. Unit and build results do not certify
 native installation, real Codex use, `.petchar` dialogs, signatures or notarization.
 New native candidates require their own source/file identities and fresh evidence.
+
+## Native follow-up and notarized final ZIP — 2026-09-14
+
+The corrected PR6 code at `7857cf7768b31777e2cd36fa4adaf88a5ece5492`
+passed both Unix and Windows CI on push and pull request. Windows passed 1,276
+unit tests with 70 explicit platform skips; Unix CI passed 1,342 with 4 skips.
+Both jobs ran source checks, typecheck, the full unit command, production builds
+and ASAR verification. The Unix job also ran the Python and standalone creator
+checks. Subsequent validation-summary edits do not change the packaged code SHA.
+
+| Actual candidate | Built source | Newly executed outcome |
+| --- | --- | --- |
+| Mac regression ZIP | `f0e7e968a86400ba1e6beb20691511ee97a6f95e` | Exact extraction/smoke and native pack import/update/rollback PASS; real CLI 0.153.4 start/finish/cancel/resume and app restart observed |
+| Windows regression ZIP/EXE | `f0e7e968a86400ba1e6beb20691511ee97a6f95e` | Runtime smoke and EXE install/replacement/rollback/uninstall PASS, including 127 installed payload hashes and test-data preservation; real CLI start/finish/cancel and app crash/restart observed; EXE remains unsigned |
+| Final notarized Mac ZIP | `7857cf7768b31777e2cd36fa4adaf88a5ece5492` | Apple Accepted, ticket/signature/Gatekeeper, final extraction/Hook host, fresh runtime smoke, native pack dialog workflow and isolated normal installation/relaunch/removal PASS |
+
+The final Mac ZIP has SHA-256
+`fa3b1c2f3d28b779ec00b990aee4be19d4fbb9035a2f950d1a27326de0c2361e`
+and is 153,428,334 bytes. Its new validation identity is
+`91207dc2-75bd-4a2f-b29f-379231bf1430`. Signing credentials, Apple submission
+identifiers, raw logs and original paths remain private. No binaries were published.
+
+The final ZIP's `.petchar` test used actual native file dialogs and a new profile:
+install/apply version 1.0.0, update to 1.1.0, restart with that version selected,
+and restore 1.0.0. Both revisions remained present. These fixtures copy the existing
+selected Gpichan assets and unchanged notices; no new artwork was produced. The
+rendered character was visually checked. A separate Applications test installation
+showed first-run onboarding through LaunchServices, preserved the “Later” selection
+on relaunch, and was removed while retaining its isolated test settings. No ordinary
+user installation, character pack, Codex configuration or Hook was replaced.
+
+The earlier direct-launch voice attempt was terminated by macOS privacy enforcement
+under the test host's responsibility. A normal LaunchServices retry with explicit
+null standard input subsequently launched successfully. This does not establish a
+successful microphone/speech denial test. The user deferred permission prompts and
+full Desktop send/stop/trust acceptance; those remain unrun. Real CLI observations
+from the older candidates are not copied into the final ZIP's integration result.
+
+The existing Windows install comparison used two real version-0.7.0 candidates.
+A distinct-version prior Daemonlet artifact is still needed to verify an actual
+version upgrade and downgrade; an artificial version label is not a substitute.
+Windows distribution signing remains unavailable. The read-only Git history review
+is complete, with retained old objects still requiring a separate publication
+decision. No history rewrite or branch deletion was performed.
+
+The [public summary](validation.json) retains its former candidate review unchanged
+under `previousCandidateReview`; the [identity inventory](validation-candidates.json)
+only appends new candidates. A complete native release or publication approval is
+not implied by these scoped outcomes.
+
+Windows CLI cancellation was also checked against the actual 0.153.4 executable
+in an isolated native console. The app observed `running` then `cancelled`, the CLI
+wrote `turn_aborted`, and the expected interrupted exit was 1. Earlier attempts
+could not attach a console, launch the console wrapper, or deliver an enabled
+Ctrl+C signal; all failed logs are retained. The successful attempt explicitly
+enabled Ctrl+C inheritance in the new test console and verified that every console
+process belonged to that test before signaling. It did not signal an existing
+user console or task. Test processes and scheduled-task entries were cleaned up.

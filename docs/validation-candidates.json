@@ -158,6 +158,110 @@
           "kind": "testOnlySetupAsar"
         }
       ]
+    },
+    {
+      "label": "macos-regression-zip",
+      "schemaVersion": 1,
+      "candidateId": "ca901e05-43fd-4b6a-8844-233863698e1b",
+      "sourceCommit": "f0e7e968a86400ba1e6beb20691511ee97a6f95e",
+      "sourceTreeSha256": "bb6b231fa1fbd96d6d96f7532d63f93d0ed0bb561ce94379c34fcbd9810a6d16",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T03:51:09.582Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-macos-arm64.zip",
+          "bytes": 153570986,
+          "sha256": "6d8974e420c9c2bceebf64f022adb1fd1e1123324ed567c035d9d253564869e9",
+          "kind": "macosUnsignedZip"
+        }
+      ]
+    },
+    {
+      "label": "windows-regression-zip",
+      "schemaVersion": 1,
+      "candidateId": "d0fa6044-6147-402d-97f0-b43b984ef764",
+      "sourceCommit": "f0e7e968a86400ba1e6beb20691511ee97a6f95e",
+      "sourceTreeSha256": "f5a8210296a7e28ecdd957504f7a3d4b680f2055419f559c8933e795c72a12bb",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T03:48:23.477Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "osVersion": "Windows 11 Pro",
+        "nodeVersion": "v24.13.1",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-windows-x64.zip",
+          "bytes": 183254432,
+          "sha256": "d8f66f12faed3ccd9f65e50af7622e891f59efa012ea78f1083147d78ddb9e65",
+          "kind": "windowsPortableZip"
+        }
+      ]
+    },
+    {
+      "label": "windows-regression-installer",
+      "schemaVersion": 1,
+      "candidateId": "611d95dd-2aae-45f8-bbc3-3f17370554ec",
+      "sourceCommit": "f0e7e968a86400ba1e6beb20691511ee97a6f95e",
+      "sourceTreeSha256": "f5a8210296a7e28ecdd957504f7a3d4b680f2055419f559c8933e795c72a12bb",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T03:52:34.284Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "win32",
+        "arch": "x64",
+        "osVersion": "10.0.26200 (Windows 11 Pro)",
+        "nodeVersion": "v24.13.1",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe",
+          "bytes": 101003067,
+          "sha256": "1e7f4546c26d83b646169b1c7762486bf39f0f1cee0141b887dc47a460da8386",
+          "kind": "windowsInstallerExe"
+        }
+      ]
+    },
+    {
+      "label": "macos-notarized-final",
+      "schemaVersion": 1,
+      "candidateId": "91207dc2-75bd-4a2f-b29f-379231bf1430",
+      "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492",
+      "sourceTreeSha256": "3a48bf108c88a8de997e229eaeca389e4cdba53a7350e03474bf8f6bfa9164e7",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T05:16:44.780Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet for Codex-0.7.0-7857cf7768b3-darwin-arm64.zip",
+          "bytes": 153428334,
+          "sha256": "fa3b1c2f3d28b779ec00b990aee4be19d4fbb9035a2f950d1a27326de0c2361e",
+          "kind": "macosFinalZip"
+        }
+      ]
     }
   ]
 }
