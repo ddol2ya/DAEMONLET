@@ -196,7 +196,7 @@
           "creatorExtraction": "NOT_RUN",
           "nativePackageSmoke": "PASS",
           "nativeInstall": "PASS",
-          "realCodexIntegration": "NOT_RUN",
+          "realCodexIntegration": "PASS",
           "signing": "PASS",
           "notarization": "PASS"
         }
@@ -269,11 +269,24 @@
           "Fresh Applications installation, normal first-run Later selection, quit/relaunch persistence and removal with isolated settings retained"
         ],
         "limits": "Voice and real Desktop controls were exercised on the separately identified signed submission ZIP; they were not rerun on this final ZIP. No distinct app-version upgrade acceptance or production Hook trust is implied."
+      },
+      {
+        "candidateId": "de5be784-c813-4ff6-893b-2c0dc9c7b949",
+        "scope": "Exact c6e7a4d final notarized ZIP; fresh actual Codex CLI 0.153.4 with isolated configuration",
+        "status": "PASS within stated scope",
+        "steps": [
+          "Actual packaged onboarding/preview installed nine app-owned Hook definitions into the isolated Codex home",
+          "User reviewed and trusted all nine in the actual CLI /hooks interface; app acknowledgement recorded afterward",
+          "User saw the actual require_escalated approval dialog and approved only one printf invocation; structured command output is DAEMONLET_APPROVAL_OK and exit0",
+          "Exact session/turn matches the app activity transition from running to completed",
+          "Fresh app UI refresh confirmed connected status and one event each for SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop and SessionEnd",
+          "User exited the test CLI; test app stopped, unchanged test Hook file and credential reference removed, original Codex config/Hook hashes unchanged",
+          "Full bundle, signature, attached ticket and Gatekeeper reverified after acceptance"
+        ],
+        "limits": "No Desktop approval-dialog result, final-ZIP voice/Desktop-control rerun, subagent/interrupt event, background settings repaint or GUI Hook-uninstall acceptance is implied. Test cleanup restored the initially absent Hook file reversibly."
       }
     ],
-    "deferredUserChecks": [
-      "Actual Codex approval-dialog handling and CLI Hook installation/trust acceptance; no such prompt occurred in the Desktop test"
-    ],
+    "deferredUserChecks": [],
     "remainingPrerequisites": [
       "Any additional release acceptance must name the actual final artifact; real voice and Desktop controls currently have evidence for the signed submission ZIP only"
     ],
@@ -286,7 +299,8 @@
       "gitHistory": "Read-only review completed. Maintainer chooses to retain existing history without rewriting; historical objects remain. This does not authorize public visibility or establish a clean-history attestation.",
       "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or PR6 merge. Apple submissions were separately approved for exact ZIP hashes.",
       "microphoneAcceptance": "7fd4a73: actual microphone prompt and denial guidance PASS, completed dictation FAIL. c6e7a4d signed submission: permission-enabled speech, stop-to-draft retention and editing PASS. Earlier failures unchanged.",
-      "desktopControls": "PASS for c6e7a4d signed submission only: send, turn interruption and resend. External process termination is not established; approval/CLI Hook trust remains unrun."
+      "desktopControls": "PASS for c6e7a4d signed submission only: send, turn interruption and resend. External process termination is not established; approval/CLI Hook trust remains unrun.",
+      "cliHookAcceptance": "PASS on the exact c6e7a4d final notarized ZIP: actual CLI trust, one-time command approval, matching command/app completion and six Hook events; original configuration preserved."
     },
     "acceptanceFindings": [
       {
@@ -347,7 +361,13 @@
       "windowsSigning": "Explicitly retain unsigned binaries; technical NotSigned findings unchanged.",
       "gitHistory": "Leave the existing history and branches in place; no rewrite or deletion.",
       "publication": "Still not authorized by this validation request."
-    }
+    },
+    "acceptanceLimits": [
+      "Desktop approval dialogs were not exercised; the actual CLI approval result is not a Desktop result.",
+      "Voice and Desktop send/stop/resend evidence remains bound to the signed submission ZIP; the new final-ZIP check covers actual CLI integration.",
+      "CLI SubagentStart, SubagentStop and Interrupt were not exercised in this follow-up; their parser/unit coverage is not native acceptance.",
+      "Settings counters were explicitly refreshed; GUI Hook uninstall was not certified by reversible test cleanup."
+    ]
   },
   "recordType": "public-validation-summary",
   "previousCandidateReview": {

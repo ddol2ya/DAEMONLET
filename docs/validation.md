@@ -298,3 +298,34 @@ decision does not supply a signature. The maintainer also elected to retain Git
 history without rewriting or branch deletion. The read-only findings remain
 available, and retained historical objects are not described as removed. Neither
 decision authorizes repository publication, a Release, a tag or app deployment.
+
+### Actual CLI trust and approval on the final ZIP
+
+The exact final `c6e7a4d` ZIP (`8c7e2c7c…035c4`, candidate
+`de5be784-c813-4ff6-893b-2c0dc9c7b949`) received a fresh native integration check.
+The packaged app previewed and installed nine Hooks into a new isolated Codex
+configuration. The user reviewed and trusted those definitions through the real
+CLI 0.153.4 `/hooks` interface, then confirmed a single command approval. No trust
+bypass flag or general permission change was used. The app's review acknowledgement
+was recorded only after the user completed the actual trust review.
+
+The approved command printed `DAEMONLET_APPROVAL_OK` and exited 0. Structured
+command evidence and the exact session/turn matched the app's running-to-completed
+activity. After an explicit UI refresh, the app reported connected and one event
+each for SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop and, after
+the user exited the CLI, SessionEnd. This is actual Hook delivery, independent of
+the earlier synthetic self-test and lifecycle-file observation alone.
+
+The test app was stopped; its unchanged test Hook file was retained in private
+evidence while restoring the initially absent target, and the temporary reference
+to the existing login was removed. Credential contents were not copied. The
+original Codex config and Hook files matched their pre-test hashes. Full bundle,
+signature, ticket and Gatekeeper checks still passed after the test. The final
+ZIP's integration result is now PASS with these new, candidate-specific grounds.
+
+This check covers the CLI approval dialog and user Hook trust. It does not certify
+a Desktop approval dialog, subagent/interrupt events in this CLI run, an automatic
+background settings repaint or GUI Hook removal. Voice and Desktop send/stop/resend
+remain scoped to the separately identified signed submission ZIP. The Mac install
+guide now separates Desktop task control from CLI Hook setup and explains that
+the app's review acknowledgement does not grant Codex trust.
