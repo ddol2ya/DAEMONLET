@@ -262,6 +262,32 @@
           "kind": "macosFinalZip"
         }
       ]
+    },
+    {
+      "label": "macos-microphone-candidate",
+      "schemaVersion": 1,
+      "candidateId": "aae5cee7-e570-47dc-9354-db19bec427a9",
+      "sourceCommit": "7fd4a735d263221ad06e2754689f3e147f6d540a",
+      "sourceTreeSha256": "96e0520d6a2f1ac0fd9d4c04a53ae930a1b54c2aac2cf03a2d2521d5620ecc2c",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T06:05:58.049Z",
+      "timeZone": "Asia/Seoul",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "submission.zip",
+          "bytes": 153426373,
+          "sha256": "e67f686ad39abfbffe3ce0c25897cd747a344dce29830fab399cb472626f1cf5",
+          "kind": "macosZip"
+        }
+      ]
     }
   ]
 }

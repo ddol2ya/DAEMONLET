@@ -211,3 +211,21 @@ as well as extra keys. Regression coverage checks the actual selected plist
 contents for bundle and executable paths. A new signed candidate and fresh
 microphone acceptance are required; the earlier ZIP and its notarization history
 remain unchanged, with this failed recovery recorded separately.
+
+### Dictation completion follow-up
+
+The corrected main-app entitlement allowed the real microphone prompt. The user
+confirmed denial guidance, enabled microphone access, restarted, and saw partial
+recognition text. The same user then reported that stopping erased that text, so
+completed dictation remains unaccepted for the `7fd4a73` candidate.
+
+A regression reproduces a nonempty partial followed by an empty or whitespace-only
+partial/final during stop. The service now retains the latest nonempty text in that
+recording while still accepting final corrections and clearing its state for the
+next recording. The old candidate's result remains separate; the fix needs another
+signed candidate and native stop-to-draft verification.
+
+One Windows CI run also exceeded the default five-second outer timeout in the
+source-change regression, which creates a Git repository and launches several
+Node/Git processes. The affected suite now has a bounded fifteen-second budget;
+its assertions and child-process limits are unchanged. The failed run is retained.

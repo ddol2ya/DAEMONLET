@@ -42,7 +42,9 @@ export class DictationService {
         if (value.type === "listening" && this.state.state !== "stopping") this.state.state = "listening"
         else if (["partial", "final"].includes(value.type)) {
           if (typeof value.text !== "string" || value.text.length > 4000 || value.text.includes("\0")) { finish("RECOGNITION_FAILED"); return }
-          this.state.text = value.text
+          // Ending audio can produce an empty result after a useful partial.
+          // Keep the latest recognized text in this session for the editable draft.
+          if (value.text.trim()) this.state.text = value.text
           if (value.type === "final") { final = true; finish(); return }
         } else if (value.type === "error") { finish(allowedErrors.has(value.code) ? value.code : "RECOGNITION_FAILED"); return }
         this.emit()

@@ -109,7 +109,9 @@ describe('init derives identity from actual artifacts', () => {
   })
 })
 
-describe.each(['unit', 'build'])('%s execution rechecks its source', kind => {
+// Each case creates a Git repository and runs several real Node/Git processes.
+// Keep the outer test budget above Windows process-startup cost; assertions and child limits stay unchanged.
+describe.each(['unit', 'build'])('%s execution rechecks its source', {timeout: 15_000}, kind => {
   async function setup(dirty = false) {
     const f = await repository(), output = join(f.root, 'outputs')
     if (dirty) await writeFile(join(f.root, 'source.txt'), 'already dirty\n')

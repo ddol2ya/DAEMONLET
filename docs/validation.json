@@ -70,7 +70,6 @@
     "reviewedOn": "2026-09-14 (Asia/Seoul)",
     "scope": "PR6 regression and candidate-specific native follow-up. Previous candidate outcomes are retained unchanged in previousCandidateReview; no result is transferred to a rebuilt or restapled artifact.",
     "identityFile": "validation-candidates.json",
-    "codeSourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492",
     "sourceChecks": {
       "status": "PASS",
       "ci": [
@@ -87,7 +86,8 @@
         "skipped": 4,
         "failed": 0
       },
-      "notes": "Both jobs execute source checks, typecheck, full npm test, both production builds and ASAR verification. Unix CI additionally executes Python and standalone creator checks. Windows platform skips are not Windows native PASS evidence."
+      "notes": "Both jobs execute source checks, typecheck, full npm test, both production builds and ASAR verification. Unix CI additionally executes Python and standalone creator checks. Windows platform skips are not Windows native PASS evidence.",
+      "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492"
     },
     "results": [
       {
@@ -148,6 +148,21 @@
           "realCodexIntegration": "NOT_RUN",
           "signing": "PASS",
           "notarization": "PASS"
+        }
+      },
+      {
+        "label": "macos-microphone-candidate",
+        "candidateId": "aae5cee7-e570-47dc-9354-db19bec427a9",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "NOT_RUN",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "PASS",
+          "notarization": "NOT_RUN"
         }
       }
     ],
@@ -223,6 +238,15 @@
         "speechDenialMessage": "PASS: user denial produced the expected inline guidance without an app crash",
         "cause": "After the user enabled Speech Recognition, macOS TCC refused the microphone prompt because the responsible main app lacked com.apple.security.device.audio-input. The native helper already had it.",
         "resolution": "Signing policy now requires JIT plus audio input on the main app, audio input on dictation only, JIT on other Electron helpers and no process entitlements on frameworks/libraries. New signed candidate and native acceptance required."
+      },
+      {
+        "candidateId": "aae5cee7-e570-47dc-9354-db19bec427a9",
+        "sourceCommit": "7fd4a735d263221ad06e2754689f3e147f6d540a",
+        "microphonePrompt": "PASS: user confirmed actual microphone prompt after the signing fix",
+        "microphoneDenialMessage": "PASS: user denial and CUA inline guidance observed",
+        "partialRecognition": "PASS: user observed text after enabling microphone access and restarting",
+        "dictationCompletion": "FAIL: user reported text disappears when stopping",
+        "resolution": "Retain the current recording\u2019s last nonempty partial through empty stop results; final corrections and new-session isolation are regression-tested. New native candidate still required."
       }
     ]
   },
