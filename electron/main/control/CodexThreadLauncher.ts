@@ -5,7 +5,12 @@ import { CodexAppLauncher } from "../activity/CodexAppLauncher"
 import { rolloutSessionId } from "../../../adapter/codex/lifecycle/CodexRolloutPath"
 
 export const isThreadUuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
-export const normalizeLocalCodexPath = (path: string) => process.platform === "darwin" && (path.startsWith("/var/") || path.startsWith("/tmp/")) ? `/private${path}` : path
+export function normalizeLocalCodexPath(path: string): string {
+  // Codex may store the same Windows drive path with an extended-length prefix.
+  // Normalize only drive paths; other device namespaces remain distinct.
+  if (process.platform === "win32" && path.startsWith("\\\\?\\") && /^[a-z]:\\/i.test(path.slice(4))) return path.slice(4)
+  return process.platform === "darwin" && (path.startsWith("/var/") || path.startsWith("/tmp/")) ? `/private${path}` : path
+}
 export function belongsToLocalCodexHome(path: string | null, threadId: string, home: string): boolean {
   if (!path || !isThreadUuid(threadId) || !isAbsolute(path) || path.includes("\0")) return false
   // The observer pins real paths; macOS's standard /var and /tmp aliases may occur in CODEX_HOME.
