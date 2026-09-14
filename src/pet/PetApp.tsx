@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useLanguage"
 import { useEffect, useRef, useState } from "react"
 import type { DesktopSettingsV1 } from "../../electron/shared/desktop-settings"
 import type { AdapterStatus } from "../../electron/shared/ipc-contract"
@@ -15,6 +16,7 @@ import type { CharacterSnapshot } from "../../electron/shared/character-pack-con
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
 
 export default function PetApp() {
+  const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sessionRef = useRef<CharacterSession | null>(null)
   const alphaRef = useRef<AlphaHitTestController | null>(null)
@@ -160,7 +162,7 @@ export default function PetApp() {
 
   return <main className={`pet-root${error ? " has-error" : ""}`}>
     <PetCanvas ref={canvasRef} />
-    {loading && !error && <div className="pet-loading" role="status"><span aria-hidden="true" />캐릭터 준비 중…</div>}
+    {loading && !error && <div className="pet-loading" role="status"><span aria-hidden="true" />{t("캐릭터 준비 중…")}</div>}
     {dialogue && sessionRef.current && <SpeechBubbleOverlay snapshot={dialogue} runtime={sessionRef.current.runtime} canvasRef={canvasRef} available={presentation.available} characterEpoch={presentation.epoch} controller={sessionRef.current.dialogue} />}
     {layout && settings && <LayoutOverlay settings={settings} onScale={setScale} onDone={done} />}
     {error && <div className="pet-error" role="alert"><b>Character unavailable</b><span>{error}</span><button onClick={() => void window.petDesktop?.reloadPet()}>Reload Pet</button></div>}

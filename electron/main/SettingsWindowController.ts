@@ -1,3 +1,4 @@
+import { appText, bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow } from "electron"
 import { randomUUID } from "node:crypto"
 import { expectedRendererUrl, secureWebContents } from "./SecurityPolicy"
@@ -32,11 +33,11 @@ export class SettingsWindowController {
     if (this.window && !this.window.isDestroyed()) { this.window.show(); this.window.focus(); return this.window }
     const win = new BrowserWindow({
       width: 1060, height: 820, minWidth: 800, minHeight: 650,
-      title: "Daemonlet Test 설정", show: false, frame: true, transparent: false,
+      title: appText("Daemonlet 설정"), show: false, frame: true, transparent: false,
       backgroundColor: "#f7f7f4", alwaysOnTop: false, skipTaskbar: false,
-      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.options.preloadPath, devTools: !process.env.ELECTRON_IS_PACKAGED },
+      webPreferences: { additionalArguments: languageArguments(), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.options.preloadPath, devTools: !process.env.ELECTRON_IS_PACKAGED },
     })
-    this.window = win
+    bindWindowLanguage(win, "Daemonlet 설정"); this.window = win
     this.token = randomUUID()
     secureWebContents(win.webContents, "settings", this.options.devServerUrl)
     win.webContents.on("did-start-loading", () => { if (this.owner) this.options.onClosed(this.owner); this.owner = null })

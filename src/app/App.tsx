@@ -1,3 +1,5 @@
+import { message, type AppMessage } from "../../electron/shared/translations"
+import { useT } from "../i18n/useLanguage"
 import type { TaskEventSource } from "../behavior/TaskEventSource"
 import type { CharacterDialogueController } from "../dialogue/CharacterDialogueController"
 import type { DialogueSnapshot } from "../dialogue/types"
@@ -62,6 +64,7 @@ const EMPTY: RigDiagnostics = {
 }
 
 export default function App() {
+  const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const selectionRef = useRef<LabSelection>({ kind: "character", id: "gpichan" })
   const loadedManifestRef = useRef<string | null>(null)
@@ -72,7 +75,7 @@ export default function App() {
   const [runtime, setRuntime] = useState<Anime25DRuntime | null>(null)
   const [diagnostics, setDiagnostics] = useState<RigDiagnostics>(EMPTY)
   const [overlayVisible, setOverlayVisible] = useState(false)
-  const [status, setStatus] = useState("See-through PSD를 열어 실제 자동 리깅을 시작하세요.")
+  const [status, setStatus] = useState<string | AppMessage>("See-through PSD를 열어 실제 자동 리깅을 시작하세요.")
   const [loading, setLoading] = useState(false)
   const [selection, setSelection] = useState<LabSelection>({ kind: "character", id: "gpichan" })
   const [models, setModels] = useState<LoadedCharacter[]>([])
@@ -161,9 +164,9 @@ export default function App() {
         if (lifetime.signal.aborted || request !== catalogEpoch) return
         loadedManifestRef.current = selected.manifestUrl
         const d = engine.getDiagnostics()
-        setStatus(`${selected.label} · ${d.rigLayerCount} rig layers · ${d.pose.availablePoses.length} poses`)
+        setStatus(message`${selected.label} · 리깅 레이어 ${d.rigLayerCount}개 · 포즈 ${d.pose.availablePoses.length}개`)
       } catch (error) {
-        if (!lifetime.signal.aborted && request === catalogEpoch) setStatus(error instanceof Error ? `로드 실패: ${error.message}` : "모델 로드에 실패했습니다.")
+        if (!lifetime.signal.aborted && request === catalogEpoch) setStatus(error instanceof Error ? message`로드 실패: ${error.message}` : "모델 로드에 실패했습니다.")
       }
     }
     const registry = window.motionLabDesktop?.characters
@@ -194,7 +197,7 @@ export default function App() {
     loadControllerRef.current?.abort()
     const loadEpoch = ++loadEpochRef.current
     setLoading(true)
-    setStatus(`${file.name} 분석 중…`)
+    setStatus(message`${file.name} 분석 중…`)
     dialogueController?.configure(createDefaultDialogueProfile(), null)
     behaviorController?.prepareForModelChange()
     try {
@@ -205,10 +208,10 @@ export default function App() {
       loadedManifestRef.current = null
       setSelection(selectionRef.current)
       setSelectedPoseId("")
-      setStatus(`${file.name} · ${result.model.rig.layers.length} rig layers · ${result.model.rig.layers.reduce((sum, layer) => sum + (layer.strands?.length ?? 0), 0)} hair strands`)
+      setStatus(message`${file.name} · 리깅 레이어 ${result.model.rig.layers.length}개 · 머리카락 ${result.model.rig.layers.reduce((sum, layer) => sum + (layer.strands?.length ?? 0), 0)}가닥`)
     } catch (error) {
       if (loadEpoch !== loadEpochRef.current) return
-      setStatus(error instanceof Error ? `로드 실패: ${error.message}` : "PSD 로드에 실패했습니다.")
+      setStatus(error instanceof Error ? message`로드 실패: ${error.message}` : "PSD 로드에 실패했습니다.")
     } finally {
       if (loadEpoch === loadEpochRef.current) setLoading(false)
     }
@@ -232,18 +235,18 @@ export default function App() {
     const model = models.find((candidate) => candidate.id === nextSelection.id)
     if (!model) return
     setLoading(true)
-    setStatus(`${model.label} 로드 중…`)
+    setStatus(message`${model.label} 로드 중…`)
     try {
       await characterSessionRef.current?.loadCharacter(model.id, loadController.signal)
       if (loadController.signal.aborted || loadEpoch !== loadEpochRef.current) return
       loadedManifestRef.current = model.manifestUrl
       const loadedDiagnostics = runtime.getDiagnostics()
       const pose = loadedDiagnostics.pose.availablePoses.length ? ` · ${loadedDiagnostics.pose.availablePoses.length} poses available` : " · no pose asset"
-      setStatus(`${model.label} · ${loadedDiagnostics.rigLayerCount} rig layers · ${loadedDiagnostics.qualityFindings.length} findings${pose}`)
+      setStatus(message`${model.label} · 리깅 레이어 ${loadedDiagnostics.rigLayerCount}개 · 검사 결과 ${loadedDiagnostics.qualityFindings.length}개${pose}`)
     } catch (error) {
       if (loadController.signal.aborted || loadEpoch !== loadEpochRef.current) return
       console.error(error)
-      setStatus(error instanceof Error ? `로드 실패: ${error.message}` : "모델 로드에 실패했습니다.")
+      setStatus(error instanceof Error ? message`로드 실패: ${error.message}` : "모델 로드에 실패했습니다.")
     } finally {
       if (loadEpoch === loadEpochRef.current) setLoading(false)
     }
@@ -281,7 +284,7 @@ export default function App() {
     const epoch = ++poseActionEpochRef.current, modelEpoch = loadEpochRef.current
     if (!selectedPoseId) {
       runtime.disposePose()
-      setStatus("Base pose active")
+      setStatus("기본 포즈 활성")
       return
     }
     try {
@@ -292,16 +295,16 @@ export default function App() {
       }
       if (action === "enter") await runtime.enterPose(selectedPoseId)
       if (action === "toggle") await runtime.togglePose(selectedPoseId)
-      if (epoch === poseActionEpochRef.current && modelEpoch === loadEpochRef.current) setStatus(`${summary?.label ?? selectedPoseId} · ${action === "load" ? "loaded" : action === "enter" ? "entering" : "toggled"}`)
+      if (epoch === poseActionEpochRef.current && modelEpoch === loadEpochRef.current) setStatus(message`${summary?.label ?? selectedPoseId} · ${action}`)
     } catch (error) {
-      if (epoch === poseActionEpochRef.current && modelEpoch === loadEpochRef.current) setStatus(error instanceof Error ? `Pose ${action} 실패: ${error.message}` : `Pose ${action} 실패`)
+      if (epoch === poseActionEpochRef.current && modelEpoch === loadEpochRef.current) setStatus(error instanceof Error ? message`Pose ${action} 실패: ${error.message}` : message`Pose ${action} 실패`)
     }
   }
 
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark">A2.5</span><div><h1>Motion Lab</h1><p>See-through PSD → Anime2.5DRig → WebGL1</p></div></div>
+        <div className="brand"><span className="brand-mark">A2.5</span><div><h1>{t("모션 실험실")}</h1><p>See-through PSD → Anime2.5DRig → WebGL1</p></div></div>
         <div className="engine-badge"><span className={diagnostics.rigLayerCount ? "status-dot live" : "status-dot"} />{diagnostics.rigLayerCount ? "RIG ONLINE" : "AWAITING PSD"}</div>
       </header>
 
@@ -309,20 +312,20 @@ export default function App() {
         <div className="stage-column">
           <div className="stage-toolbar">
             <FileDropZone onFile={load} disabled={!runtime || loading} />
-            <div className="stage-stats"><span>{diagnostics.rigLayerCount || 0} meshes</span><span>{diagnostics.hairStrandCount || 0} strands</span><span>{diagnostics.fps || 0} fps</span></div>
+            <div className="stage-stats"><span>{diagnostics.rigLayerCount || 0}  {t("메시")}</span><span>{diagnostics.hairStrandCount || 0}  {t("가닥")}</span><span>{diagnostics.fps || 0} fps</span></div>
           </div>
           <div className="stage" data-testid="rig-stage" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void load(event.dataTransfer.files[0]) }}>
             <div className="stage-grid" />
-            <canvas ref={canvasRef} aria-label="Anime2.5DRig WebGL canvas" />
+            <canvas ref={canvasRef} aria-label={t("Anime2.5DRig WebGL 캔버스")} />
             {runtime && <QualityComparison mode={diagnostics.qualityMode} image={diagnostics.qualityMode === "RAW_PSD_COMPOSITE" || diagnostics.qualityMode === "CLEANED_PSD_COMPOSITE" ? runtime.getComposite(diagnostics.qualityMode) : null} sourceUrl={diagnostics.sourceReferenceUrl} />}
             {runtime && dialogueSnapshot && <SpeechBubbleOverlay snapshot={dialogueSnapshot} runtime={runtime} canvasRef={canvasRef} />}
             {runtime && <HitAreaOverlay resolver={runtime.getHitAreaResolver()} width={size.width} height={size.height} visible={overlayVisible} />}
-            {!diagnostics.rigLayerCount && <div className="empty-stage"><span className="empty-icon">PSD</span><h2>Layered character required</h2><p>flat PNG와 CSS clip은 사용하지 않습니다.<br />ComfyUI-See-through가 만든 PSD를 드롭하세요.</p></div>}
-            <div className="stage-caption">{status}</div>
+            {!diagnostics.rigLayerCount && <div className="empty-stage"><span className="empty-icon">PSD</span><h2>{t("레이어가 있는 캐릭터가 필요합니다")}</h2><p>{t("flat PNG와 CSS clip은 사용하지 않습니다.")}<br />{t("ComfyUI-See-through가 만든 PSD를 드롭하세요.")}</p></div>}
+            <div className="stage-caption">{t(status)}</div>
           </div>
-          <div className="interaction-hints"><span>Move <b>gaze + head follow</b></span><span>Tap <b>recoil</b></span><span>Hold <b>face focus</b></span><span>Drag head <b>petting</b></span></div>
+          <div className="interaction-hints"><span>{t("움직이기")} <b>{t("시선·고개 따라가기")}</b></span><span>{t("누르기")} <b>{t("반응")}</b></span><span>{t("길게 누르기")} <b>{t("얼굴 집중")}</b></span><span>{t("머리 드래그")} <b>{t("쓰다듬기")}</b></span></div>
         </div>
-        {runtime && behaviorController && behaviorDiagnostics && taskSource ? <DebugPanel diagnostics={diagnostics} runtime={runtime} behavior={behaviorController} behaviorDiagnostics={behaviorDiagnostics} taskSource={taskSource} dialogue={dialogueController ?? undefined} onSourceChange={connectSource} onProtocolApiChange={setProtocolDebugApi} overlayVisible={overlayVisible} onToggleOverlay={() => setOverlayVisible((value) => !value)} models={[...models.map(({ id, label }) => ({ id: labSelectionKey({ kind: "character", id }), label })), { id: labSelectionKey({ kind: "loose-psd" }), label: "External PSD" }]} selectedModel={labSelectionKey(selection)} onSelectModel={(value) => void selectModel(value)} onCapture={capture} poses={diagnostics.pose.availablePoses as PoseSummary[]} selectedPoseId={selectedPoseId} onSelectPose={setSelectedPoseId} onLoadPose={() => void runPoseAction("load")} onEnterPose={() => void runPoseAction("enter")} onTogglePose={() => void runPoseAction("toggle")} /> : <aside className="debug-panel"><div className="warning">WebGL 초기화 실패</div></aside>}
+        {runtime && behaviorController && behaviorDiagnostics && taskSource ? <DebugPanel diagnostics={diagnostics} runtime={runtime} behavior={behaviorController} behaviorDiagnostics={behaviorDiagnostics} taskSource={taskSource} dialogue={dialogueController ?? undefined} onSourceChange={connectSource} onProtocolApiChange={setProtocolDebugApi} overlayVisible={overlayVisible} onToggleOverlay={() => setOverlayVisible((value) => !value)} models={[...models.map(({ id, label }) => ({ id: labSelectionKey({ kind: "character", id }), label })), { id: labSelectionKey({ kind: "loose-psd" }), label: "External PSD" }]} selectedModel={labSelectionKey(selection)} onSelectModel={(value) => void selectModel(value)} onCapture={capture} poses={diagnostics.pose.availablePoses as PoseSummary[]} selectedPoseId={selectedPoseId} onSelectPose={setSelectedPoseId} onLoadPose={() => void runPoseAction("load")} onEnterPose={() => void runPoseAction("enter")} onTogglePose={() => void runPoseAction("toggle")} /> : <aside className="debug-panel"><div className="warning">{t("WebGL 초기화 실패")}</div></aside>}
       </section>
     </main>
   )

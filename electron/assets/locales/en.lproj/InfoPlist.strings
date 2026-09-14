@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Microphone access is needed to dictate speech into the follow-up message field.";
+"NSSpeechRecognitionUsageDescription" = "Converts speech to text. If on-device recognition is unavailable, audio is sent to Apple’s speech recognition service.";

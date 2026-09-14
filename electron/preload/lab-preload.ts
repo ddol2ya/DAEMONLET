@@ -1,3 +1,5 @@
+import { exposeAppLanguage } from "./app-language"
+exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import type { ProtocolClientCommand } from "../../src/protocol/types"
 import { IPC, type MotionLabDesktopApi, type ProtocolBridgeStatus, type ProtocolConnectResult } from "../shared/ipc-contract"

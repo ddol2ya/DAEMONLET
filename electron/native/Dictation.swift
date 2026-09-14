@@ -7,10 +7,17 @@ func emit(_ value: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: value), let text = String(data: data, encoding: .utf8) else { return }
     FileHandle.standardOutput.write(Data((text + "\n").utf8))
 }
-let locale = Locale(identifier: "ko-KR")
+let arguments = CommandLine.arguments
+let localeIndex = arguments.firstIndex(of: "--locale")
+let localeId: String
+if let index = localeIndex {
+    guard index + 1 < arguments.count, ["ko-KR", "en-US"].contains(arguments[index + 1]) else { exit(2) }
+    localeId = arguments[index + 1]
+} else { localeId = "ko-KR" }
+let locale = Locale(identifier: localeId)
 let recognizer = SFSpeechRecognizer(locale: locale)
 if CommandLine.arguments.contains("--check") {
-    emit(["type": "capability", "supported": recognizer != nil, "onDevice": recognizer?.supportsOnDeviceRecognition ?? false, "available": recognizer?.isAvailable ?? false,
+    emit(["type": "capability", "locale": localeId, "supported": recognizer != nil, "onDevice": recognizer?.supportsOnDeviceRecognition ?? false, "available": recognizer?.isAvailable ?? false,
           "speechAuthorized": SFSpeechRecognizer.authorizationStatus() == .authorized,
           "microphoneAuthorized": AVCaptureDevice.authorizationStatus(for: .audio) == .authorized])
     exit(0)

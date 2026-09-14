@@ -14,6 +14,7 @@ class FakeWindow extends EventEmitter {
   minimized = false
   destroyed = false
   bounds = { x: 200, y: 200, width: 460, height: 460 }
+  setTitle = vi.fn()
   setAlwaysOnTop = vi.fn()
   setVisibleOnAllWorkspaces = vi.fn()
   setIgnoreMouseEvents = vi.fn()

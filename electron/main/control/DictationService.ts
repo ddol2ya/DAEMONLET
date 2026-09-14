@@ -1,6 +1,7 @@
 import { StringDecoder } from "node:string_decoder"
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process"
 import type { DictationSnapshot } from "../../shared/task-control-contract"
+import { languageLocale, type AppLanguage } from "../../shared/app-language"
 
 type NativeProcess = Pick<ChildProcessWithoutNullStreams, "stdout" | "stderr" | "stdin" | "once" | "kill">
 const allowedErrors = new Set(["UNAVAILABLE", "PERMISSION_DENIED", "ON_DEVICE_UNAVAILABLE", "AUDIO_UNAVAILABLE", "RECOGNITION_FAILED"])
@@ -10,7 +11,7 @@ export class DictationService {
   private timer: ReturnType<typeof setTimeout> | null = null
   private stopTimer: ReturnType<typeof setTimeout> | null = null
   private listeners = new Set<(snapshot: DictationSnapshot) => void>()
-  constructor(private readonly helperPath: string, private readonly launch: (path: string) => NativeProcess = path => spawn(path, ["--dictate"], { shell: false, stdio: ["pipe", "pipe", "pipe"] }), private readonly platform: NodeJS.Platform = process.platform) {}
+  constructor(private readonly helperPath: string, private readonly launch: (path: string, args: string[]) => NativeProcess = (path, args) => spawn(path, args, { shell: false, stdio: ["pipe", "pipe", "pipe"] }), private readonly platform: NodeJS.Platform = process.platform, private readonly language: () => AppLanguage = () => "ko") {}
   subscribe(listener: (snapshot: DictationSnapshot) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   private emit(): void { for (const listener of this.listeners) listener({ ...this.state }) }
   snapshot(): DictationSnapshot { return { ...this.state } }
@@ -19,7 +20,9 @@ export class DictationService {
     if (this.platform !== "darwin") throw new Error("UNAVAILABLE")
     this.state = { sessionId, state: "starting", text: "", error: null }; this.emit()
     let child: NativeProcess
-    try { child = this.launch(this.helperPath) } catch { this.state.state = "error"; this.state.error = "UNAVAILABLE"; this.emit(); return }
+    // Capture the setting once. A language change affects the next recording,
+    // without cancelling this session or replacing its editable transcript.
+    try { child = this.launch(this.helperPath, ["--dictate", "--locale", languageLocale(this.language())]) } catch { this.state.state = "error"; this.state.error = "UNAVAILABLE"; this.emit(); return }
     this.child = child
     let buffer = "", final = false
     const decoder = new StringDecoder("utf8")

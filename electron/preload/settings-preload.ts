@@ -1,3 +1,5 @@
+import { exposeAppLanguage } from "./app-language"
+exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import { SETUP_IPC, type SettingsDesktopApi, type SetupResponse } from "../shared/codex-integration-contract"
 import { characterManageApi } from "./character-api"

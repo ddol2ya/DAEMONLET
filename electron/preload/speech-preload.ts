@@ -1,3 +1,5 @@
+import { exposeAppLanguage } from "./app-language"
+exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import { BUBBLE_IPC, type SpeechBubbleFrame } from "../shared/bubble-presentation"
 

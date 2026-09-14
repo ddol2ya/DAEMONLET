@@ -1,3 +1,4 @@
+import { appText, readSavedAppLanguage, setAppLanguage } from "./AppLanguage"
 import { app, dialog } from "electron"
 import { join } from "node:path"
 import { mkdir, realpath } from "node:fs/promises"
@@ -35,6 +36,7 @@ if (!app.requestSingleInstanceLock()) {
     void active.quit()
   })
   void app.whenReady().then(async () => {
+    setAppLanguage(await readSavedAppLanguage(app.getPath("userData")))
     await startup.open()
     await prepareDesktopAdapterPorts()
     await mkdir(app.getPath("userData"), { recursive: true, mode: 0o700 })
@@ -53,7 +55,7 @@ if (!app.requestSingleInstanceLock()) {
   }).catch((error) => {
     console.error(error)
     startup.close()
-    dialog.showErrorBox("Daemonlet을 시작하지 못했습니다", "앱을 다시 실행해 주세요. 문제가 계속되면 진단을 확인해 주세요.")
+    dialog.showErrorBox(appText("Daemonlet을 시작하지 못했습니다"), appText("앱을 다시 실행해 주세요. 문제가 계속되면 진단을 확인해 주세요."))
     app.exit(1)
   })
 }

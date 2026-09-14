@@ -1,3 +1,4 @@
+import { bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow, screen, type Rectangle } from "electron"
 import { join } from "node:path"
 import type { DesktopSettingsV1 } from "../shared/desktop-settings"
@@ -46,7 +47,7 @@ export class PetWindowController {
       skipTaskbar: true,
       alwaysOnTop: settings.alwaysOnTop,
       focusable: true,
-      webPreferences: {
+      webPreferences: { additionalArguments: languageArguments(),
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
@@ -58,7 +59,7 @@ export class PetWindowController {
         preload: this.options.preloadPath,
       },
     })
-    this.window = win
+    bindWindowLanguage(win); this.window = win
     secureWebContents(win.webContents, "pet", this.options.devServerUrl)
     win.setAlwaysOnTop(settings.alwaysOnTop, "floating")
     if (process.platform === "darwin") win.setVisibleOnAllWorkspaces(settings.showOnAllWorkspaces, { visibleOnFullScreen: settings.showOverFullScreen })

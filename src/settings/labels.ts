@@ -68,5 +68,5 @@ const reasons: Record<string, string> = {
   ENOSPC: "저장 공간이 부족해 변경하지 못했습니다. 공간을 확보한 뒤 다시 시도해 주세요.",
 }
 export function reasonText(code: string): string { return PACK_ERRORS[code] ?? reasons[code.split(":")[0]] ?? "작업을 완료하지 못했습니다. 상태를 새로 확인하고 다시 시도해 주세요." }
-export const supportLabels = { supported: "지원 확인", unsupported: "미지원", unknown: "미확인" } as const
+export const supportLabels = { supported: "지원 확인", unsupported: "미지원", unknown: "지원 미확인" } as const
 import { PACK_ERRORS } from "../../electron/shared/character-pack-contract"

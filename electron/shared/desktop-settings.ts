@@ -1,3 +1,4 @@
+import { isAppLanguage, normalizeAppLanguage, type AppLanguage } from "./app-language"
 export const DESKTOP_SETTINGS_SCHEMA_VERSION = 1 as const
 export const CHARACTER_IDS = ["gpichan"] as const
 export const CHARACTER_NAMES = { gpichan: "지피쨩" } as const
@@ -19,6 +20,7 @@ export type DesktopBounds = {
 export type DesktopSettingsV1 = {
   schemaVersion: typeof DESKTOP_SETTINGS_SCHEMA_VERSION
   characterId: DesktopCharacterId
+  language: AppLanguage
   scale: number
   bounds: DesktopBounds
   visible: boolean
@@ -32,7 +34,7 @@ export type DesktopSettingsV1 = {
 }
 
 export type DesktopSettingsPatch = Partial<Pick<DesktopSettingsV1,
-  "characterId" | "scale" | "visible" | "alwaysOnTop" | "showOnAllWorkspaces" |
+  "characterId" | "language" | "scale" | "visible" | "alwaysOnTop" | "showOnAllWorkspaces" |
   "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "taskBubblesEnabled"
 >>
 
@@ -50,6 +52,7 @@ export function defaultDesktopSettings(): DesktopSettingsV1 {
   return {
     schemaVersion: DESKTOP_SETTINGS_SCHEMA_VERSION,
     characterId: "gpichan",
+    language: "ko",
     scale: 1,
     bounds: { x: 24, y: 24, width: DEFAULT_WINDOW_SIZE, height: DEFAULT_WINDOW_SIZE, displayId: null },
     visible: true,
@@ -94,6 +97,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
   const normalized: DesktopSettingsV1 = {
     schemaVersion: DESKTOP_SETTINGS_SCHEMA_VERSION,
     characterId,
+    language: normalizeAppLanguage(input.language),
     scale,
     bounds,
     visible: bool(input.visible, defaults.visible),
@@ -112,9 +116,13 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
 export function validateDesktopSettingsPatch(value: unknown, characterAllowed: (id: string) => boolean = builtinCharacter): DesktopSettingsPatch | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
   const input = value as Record<string, unknown>
-  const allowed = new Set(["characterId", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled"])
+  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled"])
   if (Object.keys(input).some((key) => !allowed.has(key))) return null
   const patch: DesktopSettingsPatch = {}
+  if ("language" in input) {
+    if (!isAppLanguage(input.language)) return null
+    patch.language = input.language
+  }
   if ("characterId" in input) {
     if (!isCharacterId(input.characterId) || !characterAllowed(input.characterId)) return null
     patch.characterId = input.characterId as DesktopCharacterId

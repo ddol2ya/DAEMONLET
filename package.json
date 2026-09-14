@@ -41,7 +41,8 @@
     "release:verify": "node scripts/release/verify.mjs",
     "creator:verify": "node scripts/release/verify-creator.mjs",
     "electron:install": "node node_modules/electron/install.js",
-    "release:validation": "node scripts/release/validation-cli.mjs"
+    "release:validation": "node scripts/release/validation-cli.mjs",
+    "language:smoke": "node scripts/language-smoke.mjs"
   },
   "dependencies": {
     "ag-psd": "29.0.0",

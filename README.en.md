@@ -34,7 +34,7 @@ To use the app, you do not need a separate Node.js or Python installation, Comfy
 
 For installation, recovery and removal details, see the [Mac guide](docs/install-macos.md) and [Windows guide](docs/install-windows.md).
 
-The app's settings UI and some linked guides are currently in Korean. Menu names below include the Korean labels so you can find them in the app.
+The published **v0.7.0** installers have a Korean interface and Korean Mac dictation. **Current source builds** add Korean/English selection under **Settings → 언어 / Language**, also available from the tray menu. The choice is saved and applies immediately to app windows; Mac dictation uses the selected language from the next recording. Existing drafts are preserved. Character names and authored dialogue stay in the pack’s original language. macOS permission dialogs follow the system’s language settings. Windows dictation is not supported. Some linked guides remain in Korean; labels below help you navigate the v0.7.0 installers.
 
 ## Features
 

@@ -1,3 +1,4 @@
+import { appText, bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow, screen } from "electron"
 import type { EventEmitter } from "node:events"
 import { ACTIVITY_IPC, type ActivitySnapshot } from "../shared/activity-contract"
@@ -99,12 +100,12 @@ export class ActivityBubbleWindowController {
 
   private create(): void {
     const win = new BrowserWindow({
-      width: 276, height: 100, title: "Daemonlet 작업 말풍선", show: false,
+      width: 276, height: 100, title: appText("Daemonlet 작업 말풍선"), show: false,
       transparent: true, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
       skipTaskbar: true, hasShadow: false, backgroundColor: "#00000000",
-      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, backgroundThrottling: false, preload: this.preloadPath },
+      webPreferences: { additionalArguments: languageArguments(), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, backgroundThrottling: false, preload: this.preloadPath },
     })
-    this.window = win; this.ready = false
+    bindWindowLanguage(win, "Daemonlet 작업 말풍선"); this.window = win; this.ready = false
     win.setIgnoreMouseEvents(true, { forward: true })
     const release = () => this.setInteractionLocked(false)
     // Lock before DOM dispatch, closing the cross-renderer race between a

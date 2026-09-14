@@ -1,3 +1,4 @@
+import { appText } from "./AppLanguage"
 import { dialog, ipcMain, type IpcMainInvokeEvent } from "electron"
 import { writeFile } from "node:fs/promises"
 import { CodexIntegrationController, publicSetupError } from "./CodexIntegrationController"
@@ -54,11 +55,11 @@ export class SettingsIpcController {
     this.bind(SETUP_IPC.refresh, 0, () => integration.refresh(true))
     this.bind(SETUP_IPC.prepare, 0, (owner) => integration.prepareConnection(owner))
     this.bind(SETUP_IPC.chooseExecutable, 0, (owner) => this.nativeDialog(async () => {
-      const choice = await dialog.showOpenDialog(window.window!, { title: "Codex 앱 또는 실행 파일 선택", properties: ["openFile", "showHiddenFiles"] })
+      const choice = await dialog.showOpenDialog(window.window!, { title: appText("Codex 앱 또는 실행 파일 선택"), properties: ["openFile", "showHiddenFiles"] })
       return choice.canceled || !choice.filePaths[0] ? integration.getStatus() : integration.selectExecutable(choice.filePaths[0], owner)
     }))
     this.bind(SETUP_IPC.chooseHome, 0, (owner) => this.nativeDialog(async () => {
-      const choice = await dialog.showOpenDialog(window.window!, { title: "사용자 Codex Home 선택", properties: ["openDirectory", "showHiddenFiles"] })
+      const choice = await dialog.showOpenDialog(window.window!, { title: appText("사용자 Codex Home 선택"), properties: ["openDirectory", "showHiddenFiles"] })
       return choice.canceled || !choice.filePaths[0] ? integration.getStatus() : integration.selectHome(choice.filePaths[0], owner)
     }))
     this.bind(SETUP_IPC.plan, 1, (owner, [action]) => {
@@ -93,7 +94,7 @@ export class SettingsIpcController {
     this.bind(SETUP_IPC.restartAdapter, 0, () => this.nativeDialog(this.options.restartAdapter))
     this.bind(SETUP_IPC.exportDiagnostics, 0, () => this.nativeDialog(async () => {
       const report = createSetupDiagnostics(integration.getStatus())
-      const choice = await dialog.showSaveDialog(window.window!, { title: "Daemonlet 진단 내보내기", defaultPath: "daemonlet-setup-diagnostics.json", filters: [{ name: "JSON", extensions: ["json"] }], properties: ["showOverwriteConfirmation", "createDirectory"] })
+      const choice = await dialog.showSaveDialog(window.window!, { title: appText("Daemonlet 진단 내보내기"), defaultPath: "daemonlet-setup-diagnostics.json", filters: [{ name: "JSON", extensions: ["json"] }], properties: ["showOverwriteConfirmation", "createDirectory"] })
       if (choice.canceled || !choice.filePath) return { saved: false }
       await writeFile(choice.filePath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 })
       return { saved: true }

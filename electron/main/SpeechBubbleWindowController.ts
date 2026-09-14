@@ -1,3 +1,4 @@
+import { appText, bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow, screen } from "electron"
 import { BUBBLE_IPC, type BubbleAnchor, type SpeechBubbleContent, type SpeechBubbleFrame } from "../shared/bubble-presentation"
 import type { BubbleRect } from "../shared/bubble-position"
@@ -60,13 +61,13 @@ export class SpeechBubbleWindowController {
 
   private create(): void {
     const win = new BrowserWindow({
-      width: 252, height: 100, title: "Daemonlet 대사", show: false,
+      width: 252, height: 100, title: appText("Daemonlet 대사"), show: false,
       transparent: true, frame: false, resizable: false, movable: false,
       minimizable: false, maximizable: false, fullscreenable: false, focusable: false,
       skipTaskbar: true, hasShadow: false, backgroundColor: "#00000000",
-      webPreferences: { preload: this.preloadPath, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, backgroundThrottling: false },
+      webPreferences: { additionalArguments: languageArguments(), preload: this.preloadPath, nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, backgroundThrottling: false },
     })
-    this.window = win; this.ready = false; this.appearanceKey = ""
+    bindWindowLanguage(win, "Daemonlet 대사"); this.window = win; this.ready = false; this.appearanceKey = ""
     win.setIgnoreMouseEvents(true, { forward: true })
     secureWebContents(win.webContents, "speech-bubble", this.devServerUrl)
     win.webContents.on("did-finish-load", () => {
