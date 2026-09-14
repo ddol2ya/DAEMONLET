@@ -30,7 +30,9 @@ async function fixture() {
   return { desktop, control, key, target, close: async () => { control.dispose(); await desktop.close() } }
 }
 
-describe("desktop task auto connection", () => {
+// A case can include two bounded 4s waits, connection setup and socket cleanup.
+// Its outer budget must exceed the combined waits without relaxing either one.
+describe("desktop task auto connection", { timeout: 15_000 }, () => {
   it("discovers only live owners without starting a daemon, resuming history, or exposing private metadata", async () => {
     const f = await fixture()
     try {
