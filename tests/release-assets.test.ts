@@ -3,7 +3,9 @@ import { mkdtemp, mkdir, readFile, rm, writeFile, access } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runtimeAssetPaths, pruneRuntimeAssets } from '../scripts/release/runtime-assets.mjs'
-import { seethroughProfile } from '../scripts/seethrough-profile.mjs'
+import { GROUP_OFFLOAD_MAX_VRAM_GIB, seethroughProfile, vramGiBFromStats } from '../scripts/seethrough-profile.mjs'
+import dependencies from '../skills/create-pet-character/external-dependencies.json'
+import template from '../skills/create-pet-character/workflows/seethrough-api.json'
 
 describe('distribution assets', () => {
   it('ships only the Gpichan manifest graph without modifying source assets', async () => {
@@ -28,10 +30,30 @@ describe('distribution assets', () => {
       await expect(access(join(temp, 'pet/authoring.json'))).rejects.toThrow()
     } finally { await rm(temp, { recursive: true, force: true }) }
   })
-  it('limits <=8 GiB while keeping group offload enabled on every hardware profile', () => {
+  it('keeps the <=8 GiB resolution limits', () => {
     expect(seethroughProfile(1280, 12)).toMatchObject({ resolution: 1280, groupOffload: true })
     expect(seethroughProfile(1536, 8)).toMatchObject({ resolution: 1024, depthResolution: 720, groupOffload: true })
     expect(seethroughProfile(768, 6).resolution).toBe(768)
-    expect(seethroughProfile(1280, null).warning).toBeTruthy()
+  })
+  it.each([4, 8, 10, 12])('enables offload at %s GiB', vram => {
+    expect(seethroughProfile(1280, vram).groupOffload).toBe(true)
+  })
+  it.each([12.0001, 16, 24, 48])('disables offload above 12 GiB (%s GiB)', vram => {
+    expect(seethroughProfile(1280, vram)).toMatchObject({groupOffload: false, resolution: 1280, depthResolution: -1})
+  })
+  it.each([null, NaN, Infinity, 0, -1])('rejects unknown or invalid VRAM (%s)', vram => {
+    expect(() => seethroughProfile(1280, vram)).toThrow(/VRAM/)
+  })
+  it('uses total server GPU memory, not free memory or the first CPU device', () => {
+    const vram = vramGiBFromStats({devices: [{type: 'cpu', vram_total: 8 * 1024 ** 3}, {type: 'cuda', vram_total: 24 * 1024 ** 3, vram_free: 2 * 1024 ** 3}]})
+    expect(vram).toBe(24)
+    expect(seethroughProfile(1280, vram).groupOffload).toBe(false)
+  })
+  it.each([{}, {devices: null}, {devices: [{type: 'cpu', vram_total: 16 * 1024 ** 3}]}, {devices: [{type: 'cuda', vram_total: 'invalid'}]}, {devices: [{type: 'cuda', vram_total: 0}]}, {devices: [{type: 'cuda', vram_total: Infinity}]}, {devices: [{type: 'cuda', vram_total: 8 * 1024 ** 3}, {type: 'cuda', vram_total: 24 * 1024 ** 3}]}])('does not guess missing or ambiguous GPU capacity', stats => {
+    expect(vramGiBFromStats(stats)).toBeNull()
+  })
+  it('keeps the skill policy consistent and the static example free of forced offload', () => {
+    expect(dependencies.profile.groupOffload).toEqual({maximumVramGiB: GROUP_OFFLOAD_MAX_VRAM_GIB, unknownVram: 'require-explicit-capacity'})
+    for (const id of ['2', '3'] as const) expect(template[id].inputs).toMatchObject({group_offload: false, auto_download: false})
   })
 })

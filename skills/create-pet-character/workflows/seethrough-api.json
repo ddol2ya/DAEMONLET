@@ -13,7 +13,7 @@
       "unet_ckpt": "",
       "quant_mode": "none",
       "cache_tag_embeds": true,
-      "group_offload": true,
+      "group_offload": false,
       "auto_download": false
     }
   },
@@ -23,7 +23,7 @@
       "model": "layerdifforg/seethroughv0.0.1_marigold",
       "quant_mode": "none",
       "cache_tag_embeds": true,
-      "group_offload": true,
+      "group_offload": false,
       "auto_download": false
     }
   },

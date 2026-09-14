@@ -16,7 +16,7 @@
 4. [외부 의존성 목록](../skills/create-pet-character/external-dependencies.json)의 모델 조건을 먼저 확인합니다. **2026-09-13 확인: LayerDiff3D는 지정 revision의 모델 카드에 Apache-2.0이 선언돼 있으나 별도 전문 파일은 없고, Marigold는 README·라이선스 파일·라이선스 메타데이터가 없어 조건 미확인(pending)입니다.** 플러그인 MIT 선언이나 다른 Marigold 저장소의 조건을 해당 가중치의 허락으로 대신하지 않습니다. 미확인 조건과 실제 설치 revision을 확인한 뒤 사용자가 직접 설치 여부를 판단합니다. 제작 요청은 `auto_download=false`이며 없는 모델을 몰래 내려받지 않습니다. 후처리는 추가 LaMA 가중치 로딩 없이 OpenCV를 사용하며, 숨은 면은 원화별 마감 단계에서 검수·보완합니다.
 5. 자체 제작 도구용 Node.js 22.13 이상, Python 3.10 이상과 `numpy`, `Pillow`를 준비합니다. 영상 검수에는 ffmpeg가 필요합니다. 이 Python은 ComfyUI Python과 다를 수 있습니다.
 
-RTX 3060 12GB + group offload가 최소 지원 목표입니다. 기본 1280px, 8GB 이하는 비권장/시도 시 1024px 이하입니다. 속도·메모리는 실행 환경에 따라 달라집니다. 현재 제작 GPU 기준은 NVIDIA CUDA이며 Mac 앱 지원과 별개입니다.
+RTX 3060 12GB + group offload가 최소 지원 목표입니다. **선택한 GPU의 전체 VRAM이 12GiB 이하일 때만** 두 로더의 group offload를 켜고, 12GiB를 초과하면 끕니다. 사용 가능한 여유 메모리와는 별개입니다. 제작 명령은 ComfyUI 서버에서 용량을 감지하며, 감지 실패나 복수 GPU로 불명확한 경우 작업 전에 실제 용량을 명시해야 합니다. 기본 1280px, 8GB 이하는 비권장/시도 시 1024px 이하입니다. 속도·메모리는 실행 환경에 따라 달라집니다. 현재 제작 GPU 기준은 NVIDIA CUDA이며 Mac 앱 지원과 별개입니다.
 
 ## See-through와 모델을 처음 준비할 때
 
@@ -24,7 +24,7 @@ Codex에 “캐릭터 생성에 See-through를 사용하고, 지정한 ComfyUI�
 
 새 설치와 기존 환경 변경은 구분합니다. Python 패키지 변경, 설정 수정, 캐시 복구, 재시작이 필요하면 승인 전에 범위를 설명하고 기존 상태를 기록합니다. 승인한 모델의 필수 메타데이터·문서도 준비 범위에 포함하여 파일마다 재승인을 요구하지 않습니다. 추가 모델이나 승인하지 않은 환경 변경이 필요하면 변경된 계획을 확인받습니다. Manager 설치 절차는 [공식 안내](https://docs.comfy.org/installation/install_custom_node)를 따르며, 실행 중인 GPU 작업을 취소하지 않습니다. 승인한 재시작은 서버가 유휴 상태일 때 진행합니다.
 
-준비 후 환경 검사, import 로그와 `/object_info`의 필수 노드, `auto_download=false` 모델 로딩을 확인합니다. 합의한 첫 포즈로 실제 분해를 실행해 두 로더의 group offload와 파츠·depth 출력을 검증한 뒤 제작을 이어갑니다. 설치 실패 시 부분 변경과 막힌 단계를 보고하며, 무차별 업데이트나 공유 캐시 삭제로 재시도하지 않습니다. 환경 검사 명령 자체는 계속 읽기 전용이며 설치를 수행하지 않습니다.
+준비 후 환경 검사, import 로그와 `/object_info`의 필수 노드, `auto_download=false` 모델 로딩을 확인합니다. 합의한 첫 포즈로 실제 분해를 실행해 두 로더의 VRAM별 offload 설정과 파츠·depth 출력을 검증한 뒤 제작을 이어갑니다. 설치 실패 시 부분 변경과 막힌 단계를 보고하며, 무차별 업데이트나 공유 캐시 삭제로 재시도하지 않습니다. 환경 검사 명령 자체는 계속 읽기 전용이며 설치를 수행하지 않습니다.
 
 노드팩 코드 설치와 모델 다운로드는 단계가 다릅니다. 공식 노드는 `auto_download=true`로 **처음 모델을 불러올 때** LayerDiff3D와 깊이 추정용 Marigold를 내려받을 수 있습니다. 따라서 See-through를 처음 설정하면서 Marigold도 함께 준비되는 것은 예상되는 동작입니다. 사용자가 모델 준비를 요청한 경우 이 공식 첫 다운로드 절차를 사용할 수 있습니다. 이미 있는 모델은 먼저 확인하여 재사용하고, 프로젝트 앱이나 제작 ZIP에 가중치를 넣지 않습니다. 준비 뒤 이 레포의 제작 요청은 `auto_download=false`로 실행하므로 제작 중 빠진 모델을 자동으로 받지 않습니다.
 
@@ -41,6 +41,8 @@ node <skill>/scripts/creator.mjs info
 node <skill>/scripts/creator.mjs check
 # GPU PC의 ComfyUI Python으로 실행
 <comfy-python> <skill>/scripts/check-environment.py --comfy-root <ComfyUI-folder>
+# 복수 GPU 등으로 자동 감지가 불명확하면 ComfyUI가 사용하는 GPU의 전체 용량을 명시
+<comfy-python> <skill>/scripts/check-environment.py --comfy-root <ComfyUI-folder> --vram-gib 24
 ```
 
 `$create-pet-character`와 레퍼런스 이미지를 전달하면 ComfyUI 절대 경로·Python·접속 URL·GPU, 출력 ID와 클릭 반응 수를 확인합니다. 기본 10포즈이며 머리/몸통 클릭을 각 3종으로 선택하면 14포즈입니다. 팩은 `.petchar`로 내보내 앱에서 가져옵니다.

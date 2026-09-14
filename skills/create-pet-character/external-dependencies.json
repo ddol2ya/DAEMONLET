@@ -78,7 +78,10 @@
   "profile": {
     "targetGpu": "RTX 3060 12GB",
     "measured3060Performance": false,
-    "groupOffload": true,
+    "groupOffload": {
+      "maximumVramGiB": 12,
+      "unknownVram": "require-explicit-capacity"
+    },
     "layerResolution": 1280,
     "steps": 30,
     "vram8GiBOrLess": {
