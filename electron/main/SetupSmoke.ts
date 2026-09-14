@@ -167,7 +167,7 @@ export async function createSetupSmokeContext(): Promise<SetupSmokeContext> {
         await evaluate("window.settingsDesktop.updateSettings({visible:true})")
         check("synthetic_command_is_not_reported_as_actual_codex", (await getStatus()).live.status === "not-tested")
         check("receipts_update_without_manual_observation", (await getStatus()).reception.status === "receiving" && !(await getStatus()).live.active)
-        await waitFor(() => evaluate<boolean>("document.querySelector('.connection-heading h2')?.textContent === '연결됨'"), "AUTOMATIC_RECEIPT_UI")
+        await waitFor(() => evaluate<boolean>("document.querySelector('[aria-label=\"CLI Hook 설정\"] .connection-heading h2')?.textContent === 'Hook 이벤트 수신 중'"), "AUTOMATIC_RECEIPT_UI")
         await snapshot("automatic-receipts")
         check("private_body_not_persisted", !(await readFile(join(dataDir, "adapter-state.json"), "utf8")).includes("PRIVATE_"))
         await writeFile(join(root, "installed-command.json"), JSON.stringify({ command: installedCommand }), { mode: 0o600 })
