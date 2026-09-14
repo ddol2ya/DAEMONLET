@@ -10,15 +10,15 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
 <img src="docs/images/gpichan.png" width="360" alt="Daemonlet for Codex에서 실행 중인 지피쨩">
 
-## 다운로드 — v0.7.0
+## 다운로드 — v0.7.1
 
 | 환경 | 다운로드 | 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/Daemonlet-for-Codex-0.7.0-macOS-arm64.zip) | Developer ID 서명·Apple 공증 완료 |
-| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe) | 미서명 |
-| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/Daemonlet-for-Codex-0.7.0-windows-x64.zip) | 설치 없이 압축 해제 후 실행 |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-macOS-arm64.zip) | Developer ID 서명·Apple 공증 완료 |
+| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64-Setup.exe) | 미서명 |
+| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64.zip) | 설치 없이 압축 해제 후 실행 |
 
-[릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.0) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/SHA256SUMS.txt)
+[릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.1) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/SHA256SUMS.txt)
 
 앱 사용에는 별도 Node.js, Python, ComfyUI, 모델 가중치 또는 제작용 GPU가 필요하지 않습니다.
 
@@ -41,9 +41,9 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 - **표시 설정:** 캐릭터의 크기·위치와 말풍선 표시를 조절할 수 있습니다.
 - **캐릭터 추가:** 외부 `.petchar` 팩을 가져와 사용할 수 있습니다.
 - **로딩 안내:** 캐릭터 가져오기와 앱 시작 시 준비 상태를 표시합니다.
-- **Mac 음성 입력:** 한국어 받아쓰기로 Codex에 보낼 문장을 입력할 수 있습니다.
+- **Mac 음성 입력:** 한국어·영어 받아쓰기로 Codex에 보낼 문장을 입력할 수 있습니다.
 
-현재 공개된 **v0.7.0 설치본**은 한국어 화면·Mac 한국어 받아쓰기를 사용합니다. **최신 소스 빌드**에서는 **설정 → 언어 / Language** 또는 트레이 메뉴에서 한국어·영어를 선택할 수 있습니다. 선택은 저장되며 모든 앱 창에 즉시 적용됩니다. Mac 받아쓰기는 다음 녹음부터 선택 언어를 사용하고, 작성 중인 문장은 보존합니다. 캐릭터 이름과 대사는 팩의 원문을 유지하며, macOS 권한 창은 시스템 언어 설정을 따릅니다. Windows 받아쓰기는 지원하지 않습니다.
+**v0.7.1부터** **설정 → 언어 / Language** 또는 트레이 메뉴에서 한국어·영어를 선택할 수 있습니다. 선택은 저장되며 모든 앱 창에 즉시 적용됩니다. Mac 받아쓰기는 다음 녹음부터 선택 언어를 사용하고, 작성 중인 문장은 보존합니다. 캐릭터 이름과 대사는 팩의 원문을 유지하며, macOS 권한 창은 시스템 언어 설정을 따릅니다. Windows 받아쓰기는 지원하지 않습니다.
 
 ## 캐릭터 추가하기
 
