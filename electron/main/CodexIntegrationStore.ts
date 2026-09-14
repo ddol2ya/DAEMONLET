@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto"
 import { constants } from "node:fs"
 import { isAbsolute, join } from "node:path"
 import { hashText } from "../../adapter/codex/hooks/HookLaunchSpec"
-import { isObject, parseUniqueJson } from "../../adapter/codex/hooks/HookJson"
-import { readSetupConfig } from "../../adapter/codex/hooks/HookInstallTransaction"
+import { isObject, parseUniqueJson, MAX_HOOK_FILE_BYTES } from "../../adapter/codex/hooks/HookJson"
+import { hasLocalFilePermissions } from "../../adapter/codex/lifecycle/LocalFilePolicy"
 import type { CodexSelection } from "../../adapter/codex/doctor/HookSetupDoctor"
 import type { PublicSetupStatus } from "../shared/codex-integration-contract"
 
@@ -26,9 +26,34 @@ export class CodexIntegrationStore {
 
   constructor(userData: string) { this.directory = userData; this.path = join(userData, "codex-integration.json") }
 
+  // App preferences are supported on Windows too; Hook installation's POSIX
+  // permission policy is deliberately kept separate and unchanged.
+  private async read(): Promise<string | null> {
+    let file: Awaited<ReturnType<typeof open>> | undefined
+    try {
+      const named = await lstat(this.path)
+      const directory = await lstat(this.directory)
+      if (!directory.isDirectory() || directory.isSymbolicLink() || await realpath(this.directory) !== this.directory
+        || !named.isFile() || named.isSymbolicLink() || named.nlink !== 1 || !hasLocalFilePermissions(named)) throw new Error("UNSAFE_INTEGRATION_STORE")
+      if (named.size > MAX_HOOK_FILE_BYTES) throw new Error("FILE_TOO_LARGE")
+      file = await open(this.path, constants.O_RDONLY | constants.O_NOFOLLOW)
+      const stat = await file.stat(), afterOpen = await lstat(this.path)
+      const same = (a: typeof stat, b: typeof stat) => a.dev === b.dev && a.ino === b.ino && a.uid === b.uid && a.mode === b.mode && a.nlink === b.nlink
+      if (!same(named, stat) || !same(afterOpen, stat) || afterOpen.isSymbolicLink()) throw new Error("INTEGRATION_STORE_CHANGED")
+      const buffer = Buffer.alloc(Math.min(MAX_HOOK_FILE_BYTES + 1, stat.size + 1))
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, 0)
+      const after = await file.stat(), pathAfter = await lstat(this.path)
+      if (!same(stat, pathAfter) || bytesRead !== stat.size || stat.size !== after.size || stat.mtimeMs !== after.mtimeMs) throw new Error("INTEGRATION_STORE_CHANGED")
+      return buffer.subarray(0, bytesRead).toString("utf8")
+    } catch (error) {
+      if (!file && (error as NodeJS.ErrnoException).code === "ENOENT") return null
+      throw error
+    } finally { await file?.close() }
+  }
+
   async load(): Promise<{ value: IntegrationSettingsV1; issue: string | null }> {
     try {
-      const text = await readSetupConfig(this.path)
+      const text = await this.read()
       this.currentHash = hashText(text ?? "missing")
       if (text === null) return { value: this.get(), issue: null }
       const parsed = parseUniqueJson(text)
@@ -51,7 +76,7 @@ export class CodexIntegrationStore {
   save(next: IntegrationSettingsV1): Promise<void> {
     const save = this.saving.catch(() => {}).then(async () => {
       if (!this.writable) throw new Error("INTEGRATION_STORE_UNREADABLE")
-      const before = await readSetupConfig(this.path)
+      const before = await this.read()
       if (hashText(before ?? "missing") !== this.currentHash) throw new Error("INTEGRATION_STORE_CHANGED")
       await mkdir(this.directory, { recursive: true, mode: 0o700 })
       const directory = await lstat(this.directory)

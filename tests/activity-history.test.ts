@@ -1,11 +1,16 @@
-import { afterEach, describe, expect, it } from "vitest"
-import { mkdtemp, readFile, writeFile, rm, stat, readdir, symlink, chmod, mkdir } from "node:fs/promises"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { mkdtemp, readFile, writeFile, rm, stat, readdir, symlink, chmod, mkdir, link, open, rename } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { ActivityHistoryStore, validateActivityHistory } from "../electron/main/activity/ActivityHistoryStore"
 import { ActivityStore } from "../electron/main/activity/ActivityStore"
 
 const directories: string[] = []
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>()
+  return { ...actual, open: vi.fn(actual.open) }
+})
+const actualFs = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises")
 afterEach(async () => { await Promise.all(directories.splice(0).map(d => rm(d, { recursive: true, force: true }))) })
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "activity-history-test-")); directories.push(directory)
@@ -67,9 +72,37 @@ describe("private atomic activity history", () => {
     await rm(history.directory, { recursive: true })
     const foreignDir = join(directory, "foreign-dir")
     await mkdir(foreignDir)
-    await symlink(foreignDir, history.directory)
+    await symlink(foreignDir, history.directory, process.platform === "win32" ? "junction" : "dir")
     await expect(history.save(data)).rejects.toThrow()
     expect(await readdir(foreignDir)).toEqual([])
+  })
+
+  it.each(["symlink", "hardlink"])("rejects a %s to valid foreign history without reading or quarantining it", async kind => {
+    const { directory, history, data } = await fixture()
+    const target = join(directory, "foreign-valid.json"), content = JSON.stringify(data)
+    await writeFile(target, content)
+    await mkdir(history.directory)
+    if (kind === "symlink") await symlink(target, history.path)
+    else await link(target, history.path)
+    const before = await stat(target)
+    expect(await history.load()).toEqual({ data: null, issue: "error" })
+    expect(await readFile(target, "utf8")).toBe(content)
+    expect((await stat(target)).mode).toBe(before.mode)
+    expect(await readdir(history.directory)).toEqual(["history.json"])
+  })
+
+  it("rejects a file replaced between name inspection and open", async () => {
+    const { directory, history, data } = await fixture()
+    await history.save(data)
+    const replacement = join(directory, "replacement.json")
+    await writeFile(replacement, JSON.stringify(data))
+    vi.mocked(open).mockImplementationOnce(async (...args: Parameters<typeof open>) => {
+      await rename(history.path, join(directory, "old-history.json"))
+      await rename(replacement, history.path)
+      return actualFs.open(...args)
+    })
+    expect(await history.load()).toEqual({ data: null, issue: "error" })
+    expect(await readdir(history.directory)).toEqual(["history.json"])
   })
 
   it("keeps the last committed file when replacement fails and removes temporary writes", async () => {

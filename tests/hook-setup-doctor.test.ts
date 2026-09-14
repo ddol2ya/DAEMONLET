@@ -38,7 +38,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(hookContractFor(f.contract.artifactSha256, "codex-cli 9.0.1", [f.contract])).toBeNull()
     expect(hookContractFor("other-artifact", f.contract.version, [f.contract])).toBeNull()
   })
-  it("uses selected Home before environment and default, and only probes fixed read-only commands", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] uses selected Home before environment and default, and only probes fixed read-only commands", async () => {
     const f = await fixture(), selected = join(f.root, "selected"), override = join(f.root, "override")
     await mkdir(selected); await mkdir(override)
     const doctor = f.make({ environment: { PATH: f.bin, CODEX_HOME: override } })
@@ -55,7 +55,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(value.warnings).toContain("CLI_NOT_FOUND_DESKTOP_MAY_STILL_WORK")
     expect(await missing(home)).toBe(true)
   })
-  it("does not execute an unrecognized PATH or CODEX_PATH candidate until explicitly selected", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] does not execute an unrecognized PATH or CODEX_PATH candidate until explicitly selected", async () => {
     const f = await fixture()
     const doctor = f.make({ contracts: [], environment: { CODEX_PATH: f.executable, PATH: f.bin } })
     expect((await doctor.inspect(f.selection)).executable.probeStatus).toBe("selection-required")
@@ -65,13 +65,13 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(selected.capability.contractId).toBeNull()
     expect((await readFile(f.calls, "utf8")).trim()).toBe("--version")
   })
-  it("finds a verified installation without the interactive shell PATH", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] finds a verified installation without the interactive shell PATH", async () => {
     const f = await fixture()
     const doctor = f.make({ environment: { PATH: '/usr/bin:/bin' }, additionalExecutables: async () => [f.executable] })
     expect((await doctor.inspect(f.selection)).executable).toMatchObject({ path: f.executable, source: 'installation', probeStatus: 'verified' })
     expect(new Set((await readFile(f.calls, 'utf8')).trim().split('\n'))).toEqual(new Set(['--version', 'features list']))
   })
-  it("does not let an unknown PATH shim hide another verified installation", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] does not let an unknown PATH shim hide another verified installation", async () => {
     const f = await fixture(), shimBin = join(f.root, 'shim-bin'), canary = join(f.root, 'unexpected-execution')
     await mkdir(shimBin)
     await writeFile(join(shimBin, 'codex'), `#!/bin/sh\ntouch ${quotePosix(canary)}\n`, { mode: 0o700 })
@@ -80,7 +80,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(await missing(canary)).toBe(true)
     expect((await doctor.inspect({ ...f.selection, executablePath: join(shimBin, 'codex') })).executable.probeStatus).toBe('failed')
   })
-  it("does not execute an unknown discovered installation or fall back from an explicit unavailable selection", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] does not execute an unknown discovered installation or fall back from an explicit unavailable selection", async () => {
     const f = await fixture()
     const doctor = f.make({ environment: { PATH: '' }, contracts: [], additionalExecutables: async () => [f.executable] })
     expect((await doctor.inspect(f.selection)).executable.probeStatus).toBe('selection-required')
@@ -88,7 +88,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect((await doctor.inspect({ ...f.selection, executablePath: join(f.root, 'missing') })).executable.path).toBeNull()
     expect(await missing(f.calls)).toBe(true)
   })
-  it("coalesces requests, caches read-only probes, and invalidates cache on config and artifact changes", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] coalesces requests, caches read-only probes, and invalidates cache on config and artifact changes", async () => {
     const f = await fixture(), doctor = f.make()
     await Promise.all([doctor.inspect(f.selection), doctor.inspect(f.selection), doctor.inspect(f.selection)])
     await doctor.inspect(f.selection)
@@ -99,7 +99,7 @@ describe("bounded read-only Hook setup discovery", () => {
     await writeFile(f.executable, "#!/bin/sh\nprintf 'codex-cli 10.0.0'\n", { mode: 0o700 })
     expect((await doctor.inspect(f.selection)).capability.contractId).toBeNull()
   })
-  it("reads quoted TOML inline hooks and managed policy without modifying either file", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] reads quoted TOML inline hooks and managed policy without modifying either file", async () => {
     const f = await fixture("hooks stable false")
     const config = `['hooks'.'Stop']\ndescription = '${HOOK_MARKER} PRIVATE_CONFIG_CANARY'\n`
     const policy = "allow_managed_hooks_only = true\n[features]\nhooks = true\n"
@@ -112,7 +112,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(await readFile(f.policy, "utf8")).toBe(policy)
     expect(value.uninspectedScope).toContain("hook-trust-store")
   })
-  it("keeps absent feature status unknown and treats an invalid configuration as a separate issue", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] keeps absent feature status unknown and treats an invalid configuration as a separate issue", async () => {
     const f = await fixture("another_feature stable true")
     expect((await f.make().inspect(f.selection)).feature).toBe("unknown")
     await writeFile(join(f.home, "config.toml"), "[bad\nPRIVATE_CANARY", { mode: 0o600 })
@@ -120,7 +120,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(value.warnings).toContain("CONFIG_UNREADABLE_OR_INVALID")
     expect(JSON.stringify(value)).not.toContain("PRIVATE_CANARY")
   })
-  it("does not use a user-file true flag as effective feature proof after the verified CLI rejects its config", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] does not use a user-file true flag as effective feature proof after the verified CLI rejects its config", async () => {
     const f = await fixture("", "codex-cli 9.0.0", 'if [ "$1" = "features" ]; then printf "PRIVATE_CONFIG_ERROR_CANARY" >&2; exit 1; fi')
     const config = "[features]\nhooks = true\n[features.context_management]\nexperimental_mode = true\n"
     await writeFile(join(f.home, "config.toml"), config, { mode: 0o600 })
@@ -133,7 +133,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(JSON.stringify(value)).not.toContain("PRIVATE_CONFIG_ERROR_CANARY")
     expect(await readFile(join(f.home, "config.toml"), "utf8")).toBe(config)
   })
-  it("preserves a supported structured context-management setting when the matched CLI reports hooks enabled", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] preserves a supported structured context-management setting when the matched CLI reports hooks enabled", async () => {
     const f = await fixture("hooks stable true")
     const config = "[features]\nhooks = true\n[features.context_management]\nexperimental_mode = true\n"
     await writeFile(join(f.home, "config.toml"), config, { mode: 0o600 })
@@ -141,7 +141,7 @@ describe("bounded read-only Hook setup discovery", () => {
     expect(value).toMatchObject({ feature: "enabled", executable: { probeStatus: "verified" }, manualFeatureInstruction: null, warnings: [] })
     expect(await readFile(join(f.home, "config.toml"), "utf8")).toBe(config)
   })
-  it("bounds timed-out and oversized probes, suppresses arbitrary output, and cancels pending work", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX CLI/config] bounds timed-out and oversized probes, suppresses arbitrary output, and cancels pending work", async () => {
     const slow = await fixture("hooks stable true", "codex-cli 9.0.0", "/bin/sleep 10")
     const started = Date.now()
     const value = await slow.make({ probeTimeoutMs: 60 }).inspect(slow.selection)

@@ -1,4 +1,4 @@
-import { isAbsolute } from "node:path"
+import { posix } from "node:path"
 import { createHookCommand, hashText, HOOK_MARKER, legacyHookCommands, PACKAGED_HOOK_TIMEOUT_SECONDS, type HookLaunchSpec } from "./HookLaunchSpec.ts"
 import { MAX_HOOK_FILE_BYTES, isObject, parseHooksFile, type HookGroup, type HooksFile, type JsonObject } from "./HookJson.ts"
 import { HOOK_EVENTS } from "./HookEvents.ts"
@@ -87,7 +87,7 @@ export function parseLegacyCommand(command: string): { executablePath: string; f
   const executablePath = literal()
   if (command[index++] !== " ") return null
   const forwarderPath = literal()
-  if (executablePath === null || forwarderPath === null || !isAbsolute(executablePath) || !isAbsolute(forwarderPath)
+  if (executablePath === null || forwarderPath === null || !posix.isAbsolute(executablePath) || !posix.isAbsolute(forwarderPath)
     || /[\0\r\n]/.test(executablePath + forwarderPath) || !forwarderPath.endsWith("/adapter/codex/hooks/hook-forwarder.mjs")) return null
   if (command.slice(index) !== ` # ${HOOK_MARKER}` || legacyHookCommands(executablePath, forwarderPath).command !== command) return null
   return { executablePath, forwarderPath }

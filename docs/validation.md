@@ -102,3 +102,34 @@ submission, external binary upload or release publication was performed.
 Character reference rights, external-model conditions, historical object cleanup
 and the publication decision remain separate unresolved gates in the
 [publication checklist](publication-checklist.md).
+
+## Windows regression follow-up — 2026-09-14
+
+A fresh run of merged main `30fbb7fbaaeedad70f109c735d508314dc66d09f` on
+Windows reproduced 60 failed tests, 1,212 passed and 2 skipped; four additional
+suites failed during import. The historical candidate results above are unchanged.
+
+The follow-up corrects app-preference persistence, activity-history link rejection,
+and local lifecycle-file inspection on Windows. Canonical ancestry, file/link type,
+opened-handle identity and bounded reads remain checked. Windows does not expose
+POSIX owner/group permission semantics through Node's mode bits; the Windows OS
+ACL still governs access. This is not a new ACL privacy attestation.
+The synthetic Desktop broker now uses a private profile-specific Windows pipe and
+requires explicit smoke isolation. It never connects tests to the ordinary broker.
+POSIX Hook command parsing uses POSIX path grammar on every test host.
+
+The corrected working-copy suite passed 1,276 tests on Windows with **70 skipped**,
+and 1,343 tests on macOS with **3 skipped**, across 140 files. The Windows skips
+explicitly identify POSIX Hook launch/install/configuration, Unix mode enforcement,
+and the existing platform-specific cases; those are not Windows PASS results.
+Hook installation remains a macOS feature; a separate regression verifies Windows
+Desktop connection and onboarding persistence without CLI discovery or Hook writes.
+The macOS run executes the POSIX cases. New settings tests preserve corrupt/future
+files and independent edits, and reject file links, hard links and directory links.
+Activity history additionally rejects a replacement between name lookup and open.
+Typecheck, source checks, four Python tests and creator runtime checks passed.
+
+The existing Unix CI job is retained, and a Windows job runs source/type/unit,
+both production builds and ASAR verification. Unit and build results do not certify
+native installation, real Codex use, `.petchar` dialogs, signatures or notarization.
+New native candidates require their own source/file identities and fresh evidence.

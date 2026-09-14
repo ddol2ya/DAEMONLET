@@ -45,7 +45,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-describe("abort receipt durability and uncertain commit boundaries", () => {
+describe.runIf(process.platform !== "win32")("[POSIX filesystem] abort receipt durability and uncertain commit boundaries", () => {
   it("keeps a terminal abort as audit history without granting its uninstalled afterOwned any authority", async () => {
     const f = await fixture()
     const tx = f.make(async (phase) => { if (phase === "before-temporary-write") throw new Error("ENOSPC") }, nextHandler)

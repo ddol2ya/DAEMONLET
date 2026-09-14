@@ -2,6 +2,7 @@ import { constants } from "node:fs"
 import { open, lstat, realpath, readdir, type FileHandle } from "node:fs/promises"
 import { join } from "node:path"
 import type { NormalizedCodexEvent } from "../types.ts"
+import { hasLocalFilePermissions } from "./LocalFilePolicy.ts"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_LINE = 64 * 1024, MAX_DELTA = 2 * 1024 * 1024, MAX_SESSIONS = 64
@@ -86,7 +87,7 @@ export class CodexLifecycleObserver {
   }
   private async directory(path: string): Promise<boolean> {
     const info = await lstat(path).catch(() => null)
-    return Boolean(info?.isDirectory() && !info.isSymbolicLink() && info.uid === process.getuid?.() && !(info.mode & 0o022))
+    return Boolean(info?.isDirectory() && !info.isSymbolicLink() && hasLocalFilePermissions(info))
   }
   private async ensureRoot(): Promise<string | null> {
     if (this.root) return this.root
@@ -138,10 +139,14 @@ export class CodexLifecycleObserver {
       if (names.length !== 1) continue
       const path = join(dir, names[0].name)
       if (await realpath(path) !== path) continue
+      const named = await lstat(path)
+      if (!named.isFile() || named.isSymbolicLink() || !hasLocalFilePermissions(named) || named.nlink !== 1) continue
       const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
       try {
         const info = await file.stat()
-        if (!info.isFile() || info.uid !== process.getuid?.() || info.mode & 0o022 || info.nlink !== 1) continue
+        const after = await lstat(path)
+        if (!info.isFile() || !hasLocalFilePermissions(info) || info.nlink !== 1 || after.isSymbolicLink()
+          || named.dev !== info.dev || named.ino !== info.ino || after.dev !== info.dev || after.ino !== info.ino) continue
         const first = Buffer.alloc(MAX_LINE)
         const { bytesRead } = await file.read(first, 0, first.length, 0)
         const end = first.subarray(0, bytesRead).indexOf(10)
@@ -172,7 +177,7 @@ export class CodexLifecycleObserver {
   private async read(target: Target, budget: number): Promise<number> {
     const file = target.file!, path = target.path!
     const named = await lstat(path)
-    if (!named.isFile() || named.uid !== process.getuid?.() || named.mode & 0o022 || named.nlink !== 1 || named.dev !== target.dev || named.ino !== target.ino || await realpath(path) !== path) throw new Error("changed lifecycle file")
+    if (!named.isFile() || named.isSymbolicLink() || !hasLocalFilePermissions(named) || named.nlink !== 1 || named.dev !== target.dev || named.ino !== target.ino || await realpath(path) !== path) throw new Error("changed lifecycle file")
     const info = await file.stat()
     if (info.size < target.offset) {
       // Truncation loses observation, not the task itself. A live owner can

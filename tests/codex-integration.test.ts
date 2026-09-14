@@ -19,7 +19,7 @@ import { ConnectionPage } from "../src/settings/ConnectionPage"
 const roots: string[] = [], controllers: CodexIntegrationController[] = []
 afterEach(async () => { await Promise.all(controllers.splice(0).map((controller) => controller.dispose())); await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
 
-async function fixture(temporaryLocation = false) {
+async function fixture(temporaryLocation = false, platform: NodeJS.Platform = "darwin") {
   const root = await realpath(await mkdtemp(join(tmpdir(), "pet-integration-")))
   roots.push(root)
   const home = join(root, "codex"), userData = join(root, "userData")
@@ -35,7 +35,7 @@ async function fixture(temporaryLocation = false) {
   const host = { available: true, reason: "ready" as const, fingerprint: "host-1", runAsNode: "enabled" as const, temporaryLocation }
   const make = () => {
     const controller = new CodexIntegrationController({
-      userData, packaged: true, platform: "darwin", appVersion: "0.2.0", doctor: doctor as unknown as HookSetupDoctor,
+      userData, packaged: true, platform, appVersion: "0.2.0", doctor: doctor as unknown as HookSetupDoctor,
       launchSpec: { mode: "packaged-electron-node", executablePath: join(root, "Pet.app/Contents/MacOS/Pet"), forwarderPath: join(root, "Pet.app/Contents/Resources/codex/hook-forwarder.mjs"), dataDir: join(root, "data"), hookEndpoint: adapter.hookEndpoint },
       getAdapterDiagnostics: () => structuredClone(adapter), getFreshAdapterDiagnostics: async () => structuredClone(adapter),
       inspectHost: async () => ({ ...host }),
@@ -52,7 +52,24 @@ async function fixture(temporaryLocation = false) {
   return { root, home, userData, original, discovery, doctor, adapter, host, controller, owner, make }
 }
 
-describe("connection state and first-run lifecycle", () => {
+it("uses Windows Desktop connection without CLI probes, Hook installation or a false host PASS", async () => {
+  const f = await fixture(false, "win32")
+  const status = await f.controller.prepareConnection(f.owner)
+  expect(status.app.platform).toBe("win32")
+  expect(status.adapter).toMatchObject({ state: "READY", ownership: "OWNED_UTILITY" })
+  expect(status.discovery).toBeNull()
+  expect(status.host.available).toBe(false)
+  expect(status.hostSelfTest.status).toBe("not-tested")
+  expect(f.doctor.inspect).not.toHaveBeenCalled()
+  await expect(f.controller.planHooks("install", f.owner)).rejects.toThrow("CONFIGURATION_UNAVAILABLE")
+  expect(await readFile(join(f.home, "hooks.json"), "utf8")).toBe(f.original)
+  await f.controller.dismissOnboarding("skipped", f.owner)
+  const reopened = f.make()
+  expect(await reopened.start()).toBe(false)
+  expect(reopened.getStatus().onboarding).toBe("skipped")
+})
+
+describe.runIf(process.platform !== "win32")("[macOS Hook setup] connection state and first-run lifecycle", () => {
   it("persists a one-time skip independently of actual installation or observation", async () => {
     const f = await fixture()
     expect(f.controller.getStatus()).toMatchObject({ onboarding: "shown", configurationStatus: "not-installed", hookReviewStatus: "unknown", live: { status: "not-tested" } })

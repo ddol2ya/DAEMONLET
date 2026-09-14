@@ -70,7 +70,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-describe("known pre-commit abort does not poison future installation plans", () => {
+describe.runIf(process.platform !== "win32")("[POSIX filesystem] known pre-commit abort does not poison future installation plans", () => {
   it("preserves a late external edit and allows a fresh approved plan after recreating the transaction", async () => {
     const f = await fixture()
     const tx = f.make(async (phase) => {

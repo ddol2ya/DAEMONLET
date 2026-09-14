@@ -58,7 +58,7 @@ describe("Hook command factory and runtime boundaries", () => {
     for (const path of ["/tmp/Pet.app", "/private/var/folders/user/AppTranslocation/Pet.app", "/Users/test/Downloads/Pet.app", "/Users/test/project/work/Pet.app", "/repo/out/Pet.app"]) expect(isTemporaryInstallPath(path)).toBe(true)
     for (const path of ["/Applications/Pet.app", "/Users/test/Applications/Pet.app", "/Users/test/My Apps/Pet.app"]) expect(isTemporaryInstallPath(path)).toBe(false)
   })
-  it("passes Unicode, quotes, substitution and backtick paths literally and strips inherited startup environment", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX host] passes Unicode, quotes, substitution and backtick paths literally and strips inherited startup environment", async () => {
     const f = await fixture()
     const report = join(f.spec.dataDir, "environment.json")
     await writeFile(f.spec.forwarderPath, 'import {writeFileSync} from "node:fs"; import {join} from "node:path"; writeFileSync(join(process.env.CODEX_PET_DATA_DIR,"environment.json"), JSON.stringify({env:process.env,args:process.argv.slice(1)})); process.stdout.write("{}\\n");\n')
@@ -73,7 +73,7 @@ describe("Hook command factory and runtime boundaries", () => {
     expect(environmentAfterLaunch).toEqual({ PATH: HOOK_SYSTEM_PATH, CODEX_PET_DATA_DIR: f.spec.dataDir, CODEX_PET_HOOK_URL: f.spec.hookEndpoint, CODEX_PET_HOOK_TIMEOUT_MS: "250" })
     expect(JSON.stringify(observed)).not.toContain("PRIVATE_INHERITED_CANARY")
   })
-  it("bounds never-ended stdin, excess body and malformed input without leaking output", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX host] bounds never-ended stdin, excess body and malformed input without leaking output", async () => {
     const f = await fixture()
     for (const [input, holdStdin] of [["{", false], ["x".repeat(65537), false], ["{}", true]] as const) {
       const result = await runHookCommand(f.spec, input, { holdStdin })
@@ -81,7 +81,7 @@ describe("Hook command factory and runtime boundaries", () => {
       expect(result.wallTimeMs).toBeLessThan(1000)
     }
   })
-  it("verifies actual sanitized receipt separately from stdout and handles cancellation", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX host] verifies actual sanitized receipt separately from stdout and handles cancellation", async () => {
     const f = await fixture()
     const result = await runHookHostSelfTest(f.spec)
     expect(result).toMatchObject({ status: "passed", source: "unit", receiverVerified: true, sanitized: true, cleanedUp: true })
@@ -92,14 +92,14 @@ describe("Hook command factory and runtime boundaries", () => {
     expect(await child).toMatchObject({ timedOut: true, cleanedUp: true })
     expect(JSON.stringify(result)).not.toMatch(/PRIVATE_|"sessionId":|"turnId":|"token":|"prompt":/)
   })
-  it("reports OS-level host unavailability separately from the forwarder's exit-zero contract", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX host] reports OS-level host unavailability separately from the forwarder's exit-zero contract", async () => {
     const f = await fixture()
     const missing = { ...f.spec, executablePath: join(f.root, "does-not-exist") }
     expect(await inspectHookHost(missing)).toMatchObject({ available: false, reason: "host-unavailable" })
     expect(await runHookCommand(missing, "{}")).toMatchObject({ hostStarted: false, outputContract: false })
     expect(await runHookHostSelfTest(missing)).toMatchObject({ status: "host-unavailable", receiverVerified: false })
   })
-  it("refuses group-writable runtime or resource files while accepting private test-owned copies", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX host] refuses group-writable runtime or resource files while accepting private test-owned copies", async () => {
     const f = await fixture(true)
     expect(await inspectHookHost(f.spec)).toMatchObject({ available: true })
     for (const [path, mode] of [[f.spec.executablePath, 0o700], [f.spec.forwarderPath, 0o600]] as const) {
@@ -109,7 +109,7 @@ describe("Hook command factory and runtime boundaries", () => {
     }
     expect(await inspectHookHost(f.spec)).toMatchObject({ available: true })
   })
-  it("never treats stdout alone as successful delivery", async () => {
+  it.runIf(process.platform !== "win32")("[POSIX host] never treats stdout alone as successful delivery", async () => {
     const f = await fixture()
     await writeFile(f.spec.forwarderPath, 'process.stdout.write("{}\\n");\n')
     const value = await runHookHostSelfTest(f.spec)

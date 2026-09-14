@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { configureDesktopIdentity } from "../electron/main/DesktopIdentity"
 import { createDesktopAdapterRuntimeConfig } from "../electron/main/DesktopAdapterConfig"
 
 const fakeApp = (isPackaged = true) => {
-  const paths = new Map<string, string>([["appData", "/profiles"], ["userData", "/profiles/Legacy Pet"]])
+  const paths = new Map<string, string>([["appData", resolve("/profiles")], ["userData", resolve("/profiles/Legacy Pet")]])
   return { isPackaged, paths, setName: vi.fn(), setAppUserModelId: vi.fn(),
     getPath: (key: string) => paths.get(key)!, setPath: (key: string, value: string) => { paths.set(key, value) } }
 }
@@ -13,7 +13,7 @@ describe("application identity", () => {
   it.each(["darwin", "win32"] as const)("isolates ordinary %s startup without a smoke override", platform => {
     const app = fakeApp(), environment = { CODEX_HOME: "/actual-codex" }
     configureDesktopIdentity(app, environment, platform)
-    const profile = join("/profiles", "Daemonlet for Codex")
+    const profile = join(resolve("/profiles"), "Daemonlet for Codex")
     expect(app.getPath("userData")).toBe(profile)
     expect(app.getPath("sessionData")).toBe(profile)
     expect(createDesktopAdapterRuntimeConfig(environment).dataDir).toBe(join(profile, "adapter"))
@@ -26,14 +26,14 @@ describe("application identity", () => {
   it("keeps developer runs out of both installed app profiles and Hook endpoints", () => {
     const app = fakeApp(false), env = {}
     configureDesktopIdentity(app, env, "darwin")
-    expect(app.getPath("userData")).toBe(join("/profiles", "Daemonlet for Codex Dev"))
+    expect(app.getPath("userData")).toBe(join(resolve("/profiles"), "Daemonlet for Codex Dev"))
     expect(createDesktopAdapterRuntimeConfig(env)).toMatchObject({ protocolPort: 4574, hookPort: 4575 })
   })
 
   it("retains explicit smoke paths and operator endpoint overrides", () => {
-    const app = fakeApp(), env = { ELECTRON_SMOKE_USER_DATA: "/qa/profile", CODEX_PET_DATA_DIR: "/qa/adapter", CODEX_PET_PROTOCOL_PORT: "50101", CODEX_PET_HOOK_PORT: "50102" }
+    const app = fakeApp(), env = { ELECTRON_SMOKE_USER_DATA: resolve("/qa/profile"), CODEX_PET_DATA_DIR: resolve("/qa/adapter"), CODEX_PET_PROTOCOL_PORT: "50101", CODEX_PET_HOOK_PORT: "50102" }
     configureDesktopIdentity(app, env, "darwin")
-    expect(app.getPath("userData")).toBe("/qa/profile")
-    expect(createDesktopAdapterRuntimeConfig(env)).toMatchObject({ dataDir: "/qa/adapter", protocolPort: 50101, hookPort: 50102 })
+    expect(app.getPath("userData")).toBe(resolve("/qa/profile"))
+    expect(createDesktopAdapterRuntimeConfig(env)).toMatchObject({ dataDir: resolve("/qa/adapter"), protocolPort: 50101, hookPort: 50102 })
   })
 })

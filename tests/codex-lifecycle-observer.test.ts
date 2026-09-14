@@ -100,11 +100,16 @@ describe("authenticated-session lifecycle fallback", () => {
     f.observer.observe("../../untrusted", a); await f.observer.poll()
     expect(f.targets).toHaveLength(1)
   })
-  it.each(["symlink", "wrong-owner-mode", "wrong-header"])("refuses %s targets without exposing them to navigation", async kind => {
+  it.each(["symlink", "wrong-header"])("refuses %s targets without exposing them to navigation", async kind => {
     const f = await fixture()
     if (kind === "symlink") { await rename(f.path, f.path + ".original"); await symlink(f.path + ".original", f.path) }
-    if (kind === "wrong-owner-mode") await chmod(f.path, 0o666)
     if (kind === "wrong-header") await writeFile(f.path, JSON.stringify({ type: "session_meta", payload: { id: b } }) + "\n")
+    await f.observe(); await f.append(record("task_started"))
+    expect(f.events).toEqual([]); expect(f.targets).toEqual([])
+  })
+  it.runIf(process.platform !== "win32")("refuses group/other-writable lifecycle files on POSIX", async () => {
+    const f = await fixture()
+    await chmod(f.path, 0o666)
     await f.observe(); await f.append(record("task_started"))
     expect(f.events).toEqual([]); expect(f.targets).toEqual([])
   })

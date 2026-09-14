@@ -1,7 +1,7 @@
 import { constants, createReadStream } from "node:fs"
 import { access, lstat, realpath } from "node:fs/promises"
 import { createHash } from "node:crypto"
-import { dirname, isAbsolute, join, resolve, sep } from "node:path"
+import { dirname, join, posix, sep } from "node:path"
 import { getCurrentFuseWire, FuseV1Options, FuseState } from "@electron/fuses"
 
 export const HOOK_MARKER = "daemonlet-codex-pet-adapter"
@@ -39,9 +39,11 @@ export function quotePosix(value: string): string {
 }
 
 export function validateLaunchSpec(spec: HookLaunchSpec): void {
+  // This factory emits a POSIX shell command, including when a Windows host
+  // inspects a saved macOS handler. Its grammar must not follow the test OS.
   if (!["development-node", "packaged-electron-node"].includes(spec.mode)) throw new Error("INVALID_LAUNCH_MODE")
   for (const value of [spec.executablePath, spec.forwarderPath, spec.dataDir]) {
-    if (!isAbsolute(value) || /[\0\r\n]/.test(value) || resolve(value) !== value) throw new Error("INVALID_LAUNCH_PATH")
+    if (!posix.isAbsolute(value) || /[\0\r\n]/.test(value) || posix.resolve(value) !== value) throw new Error("INVALID_LAUNCH_PATH")
   }
   // Main's runtime config emits this exact IPv4 form. Keep the command factory
   // narrower than the standalone forwarder's independent loopback validator;
@@ -49,9 +51,9 @@ export function validateLaunchSpec(spec: HookLaunchSpec): void {
   const endpoint = /^http:\/\/127\.0\.0\.1:([1-9]\d{0,4})\/hook$/.exec(spec.hookEndpoint)
   if (!endpoint || Number(endpoint[1]) > 65535) throw new Error("INVALID_HOOK_ENDPOINT")
   if (spec.mode === "packaged-electron-node") {
-    const contents = dirname(dirname(spec.executablePath))
-    if (!contents.endsWith(".app/Contents") || dirname(spec.executablePath) !== join(contents, "MacOS")
-      || spec.forwarderPath !== join(contents, "Resources", "codex", "hook-forwarder.mjs")) {
+    const contents = posix.dirname(posix.dirname(spec.executablePath))
+    if (!contents.endsWith(".app/Contents") || posix.dirname(spec.executablePath) !== posix.join(contents, "MacOS")
+      || spec.forwarderPath !== posix.join(contents, "Resources", "codex", "hook-forwarder.mjs")) {
       throw new Error("INVALID_PACKAGE_LAYOUT")
     }
   }

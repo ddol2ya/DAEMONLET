@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, beforeAll, afterAll, vi } from "vitest"
 import { randomUUID } from "node:crypto"
 import { appendFile, chmod, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -10,6 +10,11 @@ import { createDesktopControlFixture } from "../scripts/fixtures/desktop-control
 import { CodexRunRegistry } from "../adapter/codex/CodexRunRegistry"
 import { LiveActivityReconciler } from "../adapter/codex/lifecycle/LiveActivityReconciler"
 import type { LiveSession, LiveActivitySnapshot } from "../adapter/codex/lifecycle/LiveActivity"
+
+// Each Vitest worker uses only its test profile's private Windows pipe.
+beforeAll(() => { if (process.platform === "win32") vi.stubEnv("ELECTRON_SMOKE_TEST", "1") })
+afterAll(() => vi.unstubAllEnvs())
+
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })

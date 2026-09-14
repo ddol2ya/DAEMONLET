@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, beforeAll, afterAll, vi } from "vitest"
 import { randomUUID } from "node:crypto"
 import { DatabaseSync } from "node:sqlite"
 import { join } from "node:path"
@@ -8,6 +8,11 @@ import { DesktopControlConnection } from "../electron/main/control/DesktopContro
 import { readDesktopThreadCatalog } from "../electron/main/control/DesktopThreadCatalog"
 import { applyDesktopPatches, desktopLiveState, projectDesktopState } from "../electron/main/control/DesktopConversationState"
 import { TaskControlService } from "../electron/main/control/TaskControlService"
+
+// Each Vitest worker uses only its test profile's private Windows pipe.
+beforeAll(() => { if (process.platform === "win32") vi.stubEnv("ELECTRON_SMOKE_TEST", "1") })
+afterAll(() => vi.unstubAllEnvs())
+
 
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 async function until(check: () => boolean, timeout = 4000) {
