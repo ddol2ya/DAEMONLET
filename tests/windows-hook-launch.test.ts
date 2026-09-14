@@ -10,7 +10,7 @@ describe("packaged Windows Hook launch", () => {
     expect(command).not.toContain("powershell")
     expect(args[0]).toMatch(/^[a-f0-9]+$/)
     expect(args[0].match(/.{4}/g)?.map(value => String.fromCharCode(parseInt(value, 16))).join("")).toBe(spec.dataDir)
-    expect(hookHandler(spec).timeout).toBe(2)
+    expect(hookHandler(spec).timeout).toBe(3)
   })
   it.each(["%TEMP%", "bad!name", 'bad"name', "bad\nname"])("rejects shell expansions and controls: %s", name => {
     expect(() => validateLaunchSpec({ ...spec, dataDir: `C:\\${name}` })).toThrow("INVALID_LAUNCH_PATH")

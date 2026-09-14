@@ -11,6 +11,13 @@ export const HOOK_SYSTEM_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 // The pinned 0.147.0 contract allows 2 s for every selected event, including
 // SessionEnd/Interrupt (3 s maximum). Preview explicitly discloses this change.
 export const PACKAGED_HOOK_TIMEOUT_SECONDS = 2
+// The Windows native+cmd cold launch measured 2.6 s on an unsigned package.
+// 3 s is within the reviewed CLI's SessionEnd/Interrupt maximum; the native
+// host's own 1.7 s child watchdog and forwarder's 650 ms watchdog stay bounded.
+export const WINDOWS_HOOK_TIMEOUT_SECONDS = 3
+export function hookCommandTimeoutSeconds(spec: HookLaunchSpec): number {
+  return spec.mode === "packaged-windows-host" ? WINDOWS_HOOK_TIMEOUT_SECONDS : spec.mode === "packaged-electron-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS : 1
+}
 
 export type HookLaunchSpec = {
   mode: "development-node" | "packaged-electron-node" | "packaged-windows-host"

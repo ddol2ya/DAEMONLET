@@ -14,6 +14,7 @@ const reasons: Record<string, string> = {
   PACKAGED_APP_REQUIRED: "설치된 Daemonlet 앱에서 설정해 주세요.",
   PACKAGED_MAC_REQUIRED: "설치된 macOS 앱에서 연결을 설정해 주세요. 개발 실행은 패키지 설치 검증에 해당하지 않습니다.",
   PERMANENT_APP_LOCATION_REQUIRED: "현재 앱이 임시·빌드 위치에 있습니다. 사용할 영구 위치로 앱을 옮긴 뒤 다시 실행해 주세요.",
+  PACKAGED_TIMEOUT_3_SECONDS: "Windows 첫 실행 시간을 고려해 Hook 대기 제한을 3초로 설정합니다. 이벤트 처리 자체의 시간 제한은 유지됩니다.",
   PACKAGED_TIMEOUT_2_SECONDS: "패키지 첫 실행 측정에 따라 Hook timeout을 2초로 설정합니다. 동봉 forwarder의 처리 시간 제한은 유지됩니다.",
   HOOK_FEATURE_DISABLED: "선택한 Codex에서 Hook 기능이 꺼져 있습니다. 아래 안내에 따라 직접 활성화해 주세요.",
   HOOK_FEATURE_UNKNOWN: "선택한 Codex의 Hook 활성 상태를 확인하지 못했습니다.",

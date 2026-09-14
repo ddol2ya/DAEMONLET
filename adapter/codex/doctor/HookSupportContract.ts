@@ -40,7 +40,7 @@ export const VERIFIED_HOOK_CONTRACTS: readonly HookSupportContract[] = [{
   surface: "cli", source: "installed-artifact-and-fixtures",
   // All nine embedded input schemas match the reviewed macOS wire format.
   // Actual delivery/trust is separate from this parser compatibility evidence.
-  events: allEventSupport("supported"), featureKey: "hooks", eventTimeoutSeconds: 2,
+  events: allEventSupport("supported"), featureKey: "hooks", eventTimeoutSeconds: 3,
 }]
 
 export function hookContractFor(artifactSha256: string | null, version: string | null, contracts: readonly HookSupportContract[] = VERIFIED_HOOK_CONTRACTS): HookSupportContract | null {

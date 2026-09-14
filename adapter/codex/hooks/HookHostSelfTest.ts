@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http"
 import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createHookCommand, HOOK_SYSTEM_PATH, PACKAGED_HOOK_TIMEOUT_SECONDS, inspectHookHost, type HookLaunchSpec } from "./HookLaunchSpec.ts"
+import { createHookCommand, HOOK_SYSTEM_PATH, PACKAGED_HOOK_TIMEOUT_SECONDS, hookCommandTimeoutSeconds, inspectHookHost, type HookLaunchSpec } from "./HookLaunchSpec.ts"
 
 export type HookCommandResult = {
   hostStarted: boolean
@@ -34,7 +34,7 @@ export async function runHookCommand(spec: HookLaunchSpec, input: string, option
         try { process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGKILL") } catch { /* already reaped */ }
       }
     }
-    const timeout = setTimeout(() => { timedOut = true; terminate() }, spec.mode !== "development-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS * 1000 : 1000)
+    const timeout = setTimeout(() => { timedOut = true; terminate() }, hookCommandTimeoutSeconds(spec) * 1000)
     const abort = () => { timedOut = true; terminate() }
     options.signal?.addEventListener("abort", abort, { once: true })
     if (options.signal?.aborted) abort()
@@ -82,7 +82,7 @@ const fixture = JSON.stringify({
 const expectedPayload = { payloadVersion: 1, hookEventName: "UserPromptSubmit", sessionId: "synthetic-session", model: "synthetic-model", permissionMode: "default", turnId: "synthetic-turn" }
 
 export async function runHookHostSelfTest(spec: HookLaunchSpec, signal?: AbortSignal): Promise<PublicSelfTestResult> {
-  const result = { ...notTestedHost(), source: spec.mode !== "development-node" ? "synthetic-packaged" as const : "unit" as const, checkedAt: Date.now(), budgetMs: spec.mode !== "development-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS * 1000 : 1000 }
+  const result = { ...notTestedHost(), source: spec.mode !== "development-node" ? "synthetic-packaged" as const : "unit" as const, checkedAt: Date.now(), budgetMs: hookCommandTimeoutSeconds(spec) * 1000 }
   const inspection = await inspectHookHost(spec)
   result.hostFingerprint = inspection.fingerprint
   if (!inspection.available || signal?.aborted) return { ...result, status: "host-unavailable" }

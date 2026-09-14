@@ -37,7 +37,7 @@ export function ConnectionPage({ api, status, busy, run }: SettingsPageProps) {
     if (value) setApplied(value)
     setPlan(null)
   }
-  const warnings = status.configurationWarnings.filter(code => !["PACKAGED_TIMEOUT_2_SECONDS", "COMMITTED_RECEIPT_RECOVERED", "PREPARED_CHANGE_NOT_COMMITTED"].includes(code))
+  const warnings = status.configurationWarnings.filter(code => !["PACKAGED_TIMEOUT_2_SECONDS", "PACKAGED_TIMEOUT_3_SECONDS", "COMMITTED_RECEIPT_RECOVERED", "PREPARED_CHANGE_NOT_COMMITTED"].includes(code))
 
   const connected = status.desktop?.connected === true
 
