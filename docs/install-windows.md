@@ -17,6 +17,8 @@ ZIP판은 폴더 전체를 압축 해제하고 `Daemonlet for Codex/Daemonlet fo
 3. Codex CLI에서 `/hooks`를 열고 Daemonlet Hook의 실행을 허용합니다. 이후 새 작업으로 이벤트 수신을 확인합니다.
 
 Windows Hook의 대기 제한은 3초입니다. 첫 실행이 제한을 넘으면 실패로 표시하며, 고급 설정에서 다시 검사할 수 있습니다.
+CMD와 PowerShell에서 같은 Hook 명령을 사용합니다. 시스템 Windows PowerShell이 앱 실행 경로를 안전하게 전달하며, 별도 PowerShell 설치나 실행 정책 변경은 필요하지 않습니다.
+이전 설치에서 `hook exited with code 1`이 나왔다면 수정된 앱으로 업데이트하고 **고급 설정 → 수리 미리보기**를 적용한 뒤 Codex `/hooks`에서 변경된 Hook을 다시 검토합니다. 앱의 자체 검사는 두 셸에서 실제 테스트 이벤트가 수신되는지도 확인합니다.
 Hook 실행에는 별도 Node 설치가 필요하지 않습니다. 앱과 CLI는 같은 Windows 사용자 계정으로 실행하세요.
 CLI 버전이 아직 검증되지 않았으면 설정 화면에 확인이 필요하다고 표시합니다. 앱은 CLI를 자동 업데이트하거나 Hook 신뢰를 대신 승인하지 않습니다.
 앱 경로를 옮겼다면 고급 설정에서 수리 미리보기를 사용하세요. 앱이 꺼져 있을 때 Hook이 앱을 자동 실행하지는 않습니다.

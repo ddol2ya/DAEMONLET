@@ -11,8 +11,7 @@ export const HOOK_SYSTEM_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"
 // The pinned 0.147.0 contract allows 2 s for every selected event, including
 // SessionEnd/Interrupt (3 s maximum). Preview explicitly discloses this change.
 export const PACKAGED_HOOK_TIMEOUT_SECONDS = 2
-// The Windows native+cmd cold launch measured 2.6 s on an unsigned package.
-// 3 s is within the reviewed CLI's SessionEnd/Interrupt maximum; the native
+// 3 s is within the reviewed Windows CLI's SessionEnd/Interrupt maximum; the native
 // host's own 1.7 s child watchdog and forwarder's 650 ms watchdog stay bounded.
 export const WINDOWS_HOOK_TIMEOUT_SECONDS = 3
 export function hookCommandTimeoutSeconds(spec: HookLaunchSpec): number {
@@ -48,7 +47,7 @@ export function quotePosix(value: string): string {
 export function validateLaunchSpec(spec: HookLaunchSpec): void {
   if (spec.mode === "packaged-windows-host") {
     for (const value of [spec.executablePath, spec.forwarderPath, spec.dataDir]) {
-      if (!/^[a-z]:\\/i.test(value) || win32.resolve(value) !== value || /[\x00-\x1f"%!]/.test(value) || value.length > 2048) throw new Error("INVALID_LAUNCH_PATH")
+      if (!/^[a-z]:\\/i.test(value) || win32.resolve(value) !== value || /[\x00-\x1f"%!\u2018\u2019\u201c\u201d]/.test(value) || value.length > 2048) throw new Error("INVALID_LAUNCH_PATH")
     }
     if (win32.basename(spec.executablePath) !== "hook-host.exe" || spec.forwarderPath !== win32.join(win32.dirname(spec.executablePath), "hook-forwarder.mjs") || !win32.dirname(spec.executablePath).endsWith("\\resources\\codex")) throw new Error("INVALID_PACKAGE_LAYOUT")
     if (spec.hookEndpoint !== "discover" && !/^http:\/\/127\.0\.0\.1:([1-9]\d{0,4})\/hook$/.test(spec.hookEndpoint)) throw new Error("INVALID_HOOK_ENDPOINT")
@@ -77,7 +76,16 @@ export function validateLaunchSpec(spec: HookLaunchSpec): void {
 
 export function createHookCommand(spec: HookLaunchSpec): string {
   validateLaunchSpec(spec)
-  if (spec.mode === "packaged-windows-host") return `"${spec.executablePath}" ${windowsHookArguments(spec).join(" ")}`
+  if (spec.mode === "packaged-windows-host") {
+    // A quoted executable path is an invocation in CMD but only a string in
+    // PowerShell. An unquoted, absolute system executable plus ASCII arguments
+    // works in both. Encode only our generated invocation, never user code.
+    const invocation = `& '${spec.executablePath.replaceAll("'", "''")}' ${windowsHookArguments(spec).map(value => `'${value}'`).join(" ")}`
+    const command = `${windowsHookShellPath()} -NoLogo -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(invocation, "utf16le").toString("base64")}`
+    // CMD has the smaller command-line limit (8191), including its /c wrapper.
+    if (command.length > 8000) throw new Error("INVALID_LAUNCH_PATH")
+    return command
+  }
   const environment = [
     `PATH=${HOOK_SYSTEM_PATH}`,
     ...(spec.mode === "packaged-electron-node" ? ["ELECTRON_RUN_AS_NODE=1"] : []),
@@ -86,6 +94,33 @@ export function createHookCommand(spec: HookLaunchSpec): string {
     "CODEX_PET_HOOK_TIMEOUT_MS=250",
   ]
   return `/usr/bin/env -i ${[...environment, spec.executablePath, spec.forwarderPath, HOOK_ARGUMENT].map(quotePosix).join(" ")}`
+}
+
+export function windowsHookShellPath(): string {
+  const root = process.env.SystemRoot ?? "C:\\Windows"
+  // This token must be literal without quoting in both shells. Do not fall
+  // back to PATH lookup or interpolate an unsupported system directory.
+  if (!/^[a-z]:\\[a-z0-9_\\.-]+$/i.test(root) || win32.resolve(root) !== root) throw new Error("INVALID_SYSTEM_SHELL_PATH")
+  return win32.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+}
+
+export function resemblesEncodedWindowsHook(command: string): boolean {
+  // Recognition is only for refusing an unowned/altered definition. Decoding
+  // does not confer ownership and this function never evaluates the payload.
+  const encoded = /(?:^|\s)-EncodedCommand ([A-Za-z0-9+/=]{1,8000})(?:\s|$)/i.exec(command)?.[1]
+  if (!encoded) return false
+  const invocation = Buffer.from(encoded, "base64").toString("utf16le")
+  return invocation.includes("hook-host.exe") && invocation.includes(HOOK_ARGUMENT)
+}
+
+export function containsHookMarker(value: unknown): boolean {
+  const pending = [value]
+  while (pending.length) {
+    const item = pending.pop()
+    if (typeof item === "string" && (item.includes(HOOK_MARKER) || resemblesEncodedWindowsHook(item))) return true
+    if (item && typeof item === "object") pending.push(...Object.values(item))
+  }
+  return false
 }
 
 export function windowsHookArguments(spec: HookLaunchSpec): string[] {

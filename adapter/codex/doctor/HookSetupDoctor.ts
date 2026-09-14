@@ -4,7 +4,7 @@ import { access, lstat, realpath, open } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
 import { parse as parseToml } from "smol-toml"
-import { HOOK_MARKER, HOOK_SYSTEM_PATH, hashFile, hashText } from "../hooks/HookLaunchSpec.ts"
+import { containsHookMarker, HOOK_SYSTEM_PATH, hashFile, hashText } from "../hooks/HookLaunchSpec.ts"
 import { allEventSupport, type EventSupport } from "../hooks/HookInstallPlan.ts"
 import { isObject } from "../hooks/HookJson.ts"
 import { canonicalCodexHome, readSetupConfig } from "../hooks/HookInstallTransaction.ts"
@@ -43,7 +43,7 @@ function inspectConfig(config: string | null, policy: string | null): { feature:
     // Conservatively report suspected inline ownership, never migrate or
     // reinterpret inline TOML. Unknown metadata containing the marker is a
     // reason for review, not authority to delete anything.
-    inlineOwnedConflict: isObject(parsed.hooks) && JSON.stringify(parsed.hooks).includes(HOOK_MARKER),
+    inlineOwnedConflict: isObject(parsed.hooks) && containsHookMarker(parsed.hooks),
     policyBlocked: requirements.allow_managed_hooks_only === true || requiredFeatures.hooks === false || requiredFeatures.codex_hooks === false,
   }
 }

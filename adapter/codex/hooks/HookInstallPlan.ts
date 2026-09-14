@@ -1,5 +1,5 @@
 import { posix } from "node:path"
-import { createHookCommand, hashText, HOOK_MARKER, legacyHookCommands, PACKAGED_HOOK_TIMEOUT_SECONDS, WINDOWS_HOOK_TIMEOUT_SECONDS, hookCommandTimeoutSeconds, type HookLaunchSpec } from "./HookLaunchSpec.ts"
+import { createHookCommand, hashText, HOOK_MARKER, legacyHookCommands, PACKAGED_HOOK_TIMEOUT_SECONDS, WINDOWS_HOOK_TIMEOUT_SECONDS, hookCommandTimeoutSeconds, resemblesEncodedWindowsHook, type HookLaunchSpec } from "./HookLaunchSpec.ts"
 import { MAX_HOOK_FILE_BYTES, isObject, parseHooksFile, type HookGroup, type HooksFile, type JsonObject } from "./HookJson.ts"
 import { HOOK_EVENTS } from "./HookEvents.ts"
 
@@ -66,7 +66,7 @@ export function classifyHandler(handler: JsonObject, group: HookGroup, context: 
     return legacy && !exact && !recorded ? "legacy-recognized" : "managed-exact"
   }
   const command = typeof handler.command === "string" ? handler.command : ""
-  const resemblesOwnedCommand = command.includes(HOOK_MARKER) && (command.includes("hook-forwarder.mjs") || command.includes("hook-host.exe") || command.startsWith("/usr/bin/env -i "))
+  const resemblesOwnedCommand = resemblesEncodedWindowsHook(command) || command.includes(HOOK_MARKER) && (command.includes("hook-forwarder.mjs") || command.includes("hook-host.exe") || command.startsWith("/usr/bin/env -i "))
   return resemblesOwnedCommand ? "ambiguous" : "foreign"
 }
 
