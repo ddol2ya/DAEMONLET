@@ -288,6 +288,58 @@
           "kind": "macosZip"
         }
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "candidateId": "7bfbfcab-299c-4bc7-886b-4829a4581610",
+      "sourceCommit": "c6e7a4df7d3c38912b12397e84504b94362d0453",
+      "sourceTreeSha256": "1aab34cd62f6ca2e6159b5782f191079c0e82ddb87689ef6b92fcc96133adf21",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T06:20:55.660Z",
+      "timeZone": "Asia/Seoul",
+      "label": "macos-dictation-submission",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "submission.zip",
+          "bytes": 153426349,
+          "sha256": "c13950f1523b86757c0a0bf0fc637766225334ada402789434fdbb5246208e39",
+          "kind": "macosZip"
+        }
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "candidateId": "de5be784-c813-4ff6-893b-2c0dc9c7b949",
+      "sourceCommit": "c6e7a4df7d3c38912b12397e84504b94362d0453",
+      "sourceTreeSha256": "1aab34cd62f6ca2e6159b5782f191079c0e82ddb87689ef6b92fcc96133adf21",
+      "workingTreeHasChanges": false,
+      "appVersion": "0.7.0",
+      "checkedAt": "2026-09-14T06:33:41.455Z",
+      "timeZone": "Asia/Seoul",
+      "label": "macos-dictation-notarized-final",
+      "environment": {
+        "platform": "darwin",
+        "arch": "arm64",
+        "osVersion": "25.6.0 (Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050)",
+        "nodeVersion": "v24.18.0",
+        "codexVersion": "NOT_RUN: real Codex integration not exercised"
+      },
+      "artifacts": [
+        {
+          "file": "Daemonlet for Codex-0.7.0-c6e7a4df7d3c-darwin-arm64.zip",
+          "bytes": 153428329,
+          "sha256": "8c7e2c7cb06670d9675663752fd2f4c7f0d001b39981dc63edb0f1d76ca035c4",
+          "kind": "macosFinalZip"
+        }
+      ]
     }
   ]
 }

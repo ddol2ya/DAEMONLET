@@ -229,3 +229,55 @@ One Windows CI run also exceeded the default five-second outer timeout in the
 source-change regression, which creates a Git repository and launches several
 Node/Git processes. The affected suite now has a bounded fifteen-second budget;
 its assertions and child-process limits are unchanged. The failed run is retained.
+
+### Completed dictation and Desktop acceptance — `c6e7a4d`
+
+The new signed submission ZIP, candidate
+`7bfbfcab-299c-4bc7-886b-4829a4581610`, was built from clean source
+`c6e7a4df7d3c38912b12397e84504b94362d0453`. Its SHA-256 is
+`c13950f1523b86757c0a0bf0fc637766225334ada402789434fdbb5246208e39`
+(153,426,349 bytes). The user spoke, stopped dictation, waited, and confirmed
+that the recognized text remained editable. CUA independently observed the edited
+nonempty draft with recording inactive. The earlier permission and text-loss
+failures remain attached to their original candidates.
+
+Using the actual Daemonlet controls and a separately created test task, selection,
+send/reply, interruption of the exact active turn, and resend/reply passed.
+The interrupted turn had already started a terminal `sleep` command, which
+continued and completed later. This verifies Codex turn interruption; it does
+not establish termination of external processes. No approval dialog occurred,
+and CLI Hook installation/trust acceptance remains unrun. Other tasks were not
+sent messages or interrupted.
+
+All four push/PR CI jobs for this source passed. Windows passed 1,280 tests with
+70 explicit platform skips; Linux passed 1,346 with 4 skips. The local Mac suite
+passed 1,347 with 3 skips. Source checks, typecheck, signing/dictation and validation
+source-binding regressions, production builds and ASAR checks passed. Unix CI also
+ran Python and standalone creator checks. Skipped platform cases are not native
+PASS results.
+
+### Final notarized `c6e7a4d` ZIP
+
+After the user approved the exact submission ZIP above, Apple accepted it. Ticket
+attachment and final archive verification produced a separate candidate,
+`de5be784-c813-4ff6-893b-2c0dc9c7b949`, with SHA-256
+`8c7e2c7cb06670d9675663752fd2f4c7f0d001b39981dc63edb0f1d76ca035c4`
+(153,428,329 bytes). Developer ID, ticket, Gatekeeper, extracted bundle and ASAR
+verification passed. The built code remains `c6e7a4d`; subsequent documentation
+commits do not relabel this artifact as a new source build.
+
+Fresh checks on this final ZIP passed the full Mac unit command with source
+identity checked before and after execution, packaged runtime smoke, and the
+native file-dialog pack workflow: import/apply 1.0.0, update 1.1.0, restart with
+that version still selected, and restore 1.0.0 with both revisions retained.
+The rendered character was visually checked. An independent Applications test
+installation also passed normal first-run “Later” selection, quit/relaunch
+persistence and removal with its isolated settings retained. Test apps were
+stopped and original user data and packs were preserved.
+
+Voice and real Desktop controls were exercised on the signed submission ZIP,
+before ticket attachment; those results are not copied into this final ZIP's
+record. Approval/CLI Hook trust, an actual distinct-version app upgrade/rollback,
+Windows distribution signing and the separate publication-history decision remain
+outstanding. No repository visibility change, Release, tag, binary distribution,
+PR6 merge, history rewrite or branch deletion was performed.

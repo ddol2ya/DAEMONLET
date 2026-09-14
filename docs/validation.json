@@ -73,21 +73,27 @@
     "sourceChecks": {
       "status": "PASS",
       "ci": [
-        "https://github.com/ddol2ya/DAEMONLET/actions/runs/34805868776",
-        "https://github.com/ddol2ya/DAEMONLET/actions/runs/34805865085"
+        "https://github.com/ddol2ya/DAEMONLET/actions/runs/34812905178",
+        "https://github.com/ddol2ya/DAEMONLET/actions/runs/34812903996"
       ],
       "windows": {
-        "passed": 1276,
+        "passed": 1280,
         "skipped": 70,
         "failed": 0
       },
       "linux": {
-        "passed": 1342,
+        "passed": 1346,
         "skipped": 4,
         "failed": 0
       },
       "notes": "Both jobs execute source checks, typecheck, full npm test, both production builds and ASAR verification. Unix CI additionally executes Python and standalone creator checks. Windows platform skips are not Windows native PASS evidence.",
-      "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492"
+      "sourceCommit": "c6e7a4df7d3c38912b12397e84504b94362d0453",
+      "macosLocal": {
+        "files": 140,
+        "passed": 1347,
+        "skipped": 3,
+        "failed": 0
+      }
     },
     "results": [
       {
@@ -164,6 +170,36 @@
           "signing": "PASS",
           "notarization": "NOT_RUN"
         }
+      },
+      {
+        "label": "macos-dictation-submission",
+        "candidateId": "7bfbfcab-299c-4bc7-886b-4829a4581610",
+        "checks": {
+          "unit": "NOT_RUN",
+          "build": "NOT_RUN",
+          "asar": "NOT_RUN",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "NOT_RUN",
+          "realCodexIntegration": "PASS",
+          "signing": "PASS",
+          "notarization": "NOT_RUN"
+        }
+      },
+      {
+        "label": "macos-dictation-notarized-final",
+        "candidateId": "de5be784-c813-4ff6-893b-2c0dc9c7b949",
+        "checks": {
+          "unit": "PASS",
+          "build": "NOT_RUN",
+          "asar": "PASS",
+          "creatorExtraction": "NOT_RUN",
+          "nativePackageSmoke": "PASS",
+          "nativeInstall": "PASS",
+          "realCodexIntegration": "NOT_RUN",
+          "signing": "PASS",
+          "notarization": "PASS"
+        }
       }
     ],
     "nativeObservations": [
@@ -209,26 +245,51 @@
           "Test settings and extra-pack sentinels retained"
         ],
         "limits": "Both actual candidates version0.7.0; not version-number upgrade acceptance. EXE remains NotSigned."
+      },
+      {
+        "candidateId": "7bfbfcab-299c-4bc7-886b-4829a4581610",
+        "scope": "Exact c6e7a4d signed submission ZIP (before ticket attachment)",
+        "status": "PASS within stated scope",
+        "steps": [
+          "Fresh strict role-based signing verification and packaged runtime smoke",
+          "User spoke, stopped dictation, waited and confirmed retained editable text; CUA independently observed nonempty edited text with recording inactive",
+          "Actual Daemonlet Desktop controls on a separately created test task: selection, send/reply, interruption of the exact active turn, and successful resend/reply"
+        ],
+        "limits": "The interrupted turn had already started a terminal sleep command, which continued and completed later. This proves turn interruption, not termination of external processes. No approval dialog or CLI Hook installation/trust was exercised. These results are not copied to the final ZIP."
+      },
+      {
+        "candidateId": "de5be784-c813-4ff6-893b-2c0dc9c7b949",
+        "scope": "Exact c6e7a4d final notarized ZIP",
+        "status": "PASS within stated scope",
+        "steps": [
+          "Apple Accepted; attached ticket, strict Developer ID signature, Gatekeeper and extracted ASAR/bundle verification",
+          "Fresh full npm test bound to the actual source before and after execution: 1347 passed, 3 skipped",
+          "Fresh packaged runtime smoke including Gpichan, WebGL, three reloads and cleanup",
+          "Fresh native file-dialog pack import/apply1.0.0, update1.1.0, restart persistence and rollback1.0.0 with both revisions retained",
+          "Fresh Applications installation, normal first-run Later selection, quit/relaunch persistence and removal with isolated settings retained"
+        ],
+        "limits": "Voice and real Desktop controls were exercised on the separately identified signed submission ZIP; they were not rerun on this final ZIP. No distinct app-version upgrade acceptance or production Hook trust is implied."
       }
     ],
     "deferredUserChecks": [
-      "Microphone/speech permission prompt denial and recovery",
-      "Full real Codex Desktop send/stop/trust acceptance in the user environment"
+      "Actual Codex approval-dialog handling and CLI Hook installation/trust acceptance; no such prompt occurred in the Desktop test"
     ],
     "remainingPrerequisites": [
+      "Any additional release acceptance must name the actual final artifact; real voice and Desktop controls currently have evidence for the signed submission ZIP only",
       "A distinct-version prior Daemonlet artifact is required for real version-upgrade/rollback acceptance; no artificial version-labelled candidate is substituted",
       "Windows distribution signing identity is not available in the tested environment",
       "Publication history treatment requires a separate maintainer decision; no history rewriting or branch deletion performed"
     ],
     "decisions": {
       "technicalSource": "PASS for the named code source and CI runs",
-      "macosNotarization": "PASS for the named final ZIP only",
+      "macosNotarization": "PASS for both named notarized final ZIPs; newest c6e7a4d final SHA-256 8c7e2c7cb06670d9675663752fd2f4c7f0d001b39981dc63edb0f1d76ca035c4",
       "windowsSigning": "FAIL: actual EXE NotSigned",
       "characterRights": "User states the base character is open; existing attribution and the exact contribution-grant scope are preserved. This is not an independent legal attestation.",
       "externalModelTerms": "External user downloads only; missing model license remains disclosed in the external workflow. No model bundled or newly installed.",
       "gitHistory": "Read-only review completed; existing retained historical objects remain pending publication review",
-      "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or merge performed in this follow-up",
-      "microphoneAcceptance": "FAIL on the named old final ZIP; correction requires a new candidate and fresh permission-recovery test"
+      "publication": "NOT_AUTHORIZED: no public visibility change, Release, tag, binary distribution or PR6 merge. Apple submissions were separately approved for exact ZIP hashes.",
+      "microphoneAcceptance": "7fd4a73: actual microphone prompt and denial guidance PASS, completed dictation FAIL. c6e7a4d signed submission: permission-enabled speech, stop-to-draft retention and editing PASS. Earlier failures unchanged.",
+      "desktopControls": "PASS for c6e7a4d signed submission only: send, turn interruption and resend. External process termination is not established; approval/CLI Hook trust remains unrun."
     },
     "acceptanceFindings": [
       {
@@ -247,6 +308,35 @@
         "partialRecognition": "PASS: user observed text after enabling microphone access and restarting",
         "dictationCompletion": "FAIL: user reported text disappears when stopping",
         "resolution": "Retain the current recording\u2019s last nonempty partial through empty stop results; final corrections and new-session isolation are regression-tested. New native candidate still required."
+      },
+      {
+        "candidateId": "7bfbfcab-299c-4bc7-886b-4829a4581610",
+        "sourceCommit": "c6e7a4df7d3c38912b12397e84504b94362d0453",
+        "dictationCompletion": "PASS: user confirmed text remains after stop and a wait, and is editable; CUA observed the edited draft with recording inactive",
+        "desktopControls": "PASS within scope: actual selection, send/reply, exact turn interruption, resend/reply",
+        "externalCommandTermination": "NOT_ESTABLISHED: already-running sleep completed after the turn was interrupted",
+        "earlierFindings": "The 7857cf7 microphone failure and 7fd4a73 stop-to-draft failure remain attached to their original candidate identities."
+      }
+    ],
+    "sourceCheckHistory": [
+      {
+        "status": "PASS",
+        "ci": [
+          "https://github.com/ddol2ya/DAEMONLET/actions/runs/34805868776",
+          "https://github.com/ddol2ya/DAEMONLET/actions/runs/34805865085"
+        ],
+        "windows": {
+          "passed": 1276,
+          "skipped": 70,
+          "failed": 0
+        },
+        "linux": {
+          "passed": 1342,
+          "skipped": 4,
+          "failed": 0
+        },
+        "notes": "Both jobs execute source checks, typecheck, full npm test, both production builds and ASAR verification. Unix CI additionally executes Python and standalone creator checks. Windows platform skips are not Windows native PASS evidence.",
+        "sourceCommit": "7857cf7768b31777e2cd36fa4adaf88a5ece5492"
       }
     ]
   },
