@@ -6,7 +6,15 @@ does not authorize changing visibility, publishing a release, uploading binaries
 or merging the PR. On 2026-09-13 the user separately approved history cleanup of
 this public-preparation repository, including its affected branch updates.
 
-## Current read-only review — 2026-09-14
+## Before the next visibility decision
+
+Use [GitHub publication settings](github-public-settings.md) for the private-state settings and the rulesets prepared for public repositories. Review current files, all advertised branches/tags and PR refs, retrievable historical objects, PR/issue/discussion text, Actions logs/artifacts, Release assets and commit identities. Keep raw records and matched private values outside Git.
+
+A clean current-tree scan does not clear older objects. Classify real credentials separately from personal environment literals and synthetic test data; revoke/rotate actual credentials before attempting history cleanup. Preserve original evidence and source-to-artifact identities. Prepare and review the exact ref/tag and release impact before any history rewrite or deletion.
+
+The snapshots below record earlier observations; their PR states, counts and blocker labels are historical, not a claim about the current repository. Do not copy their outcomes to a new candidate or infer public-conversion authorization from them.
+
+## Historical read-only review — 2026-09-14
 
 Remote main was `37ec67b619eb259245ca97efb9ae9779fa320876`. PRs #1, #2 and #3
 were merged; PR #4 remained OPEN at `47c2326e71f2fe511f3ffd7fce2ccac865e64f91`.
