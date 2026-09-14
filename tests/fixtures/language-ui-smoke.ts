@@ -54,7 +54,7 @@ const capture = async (w: BrowserWindow, name: string) => { await pause(); await
 const open = async (page: string, preload: string, width: number, height: number) => {
  const win = new BrowserWindow({ width, height, show: false, webPreferences: { preload: join(root, 'dist-electron/'+preload+'-preload.cjs'), additionalArguments: languageArguments(), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
  windows.push(win); bindWindowLanguage(win, page==='settings'?'Daemonlet 설정':page==='activity'?'Daemonlet 작업 목록':'Daemonlet 작업 말풍선')
- win.webContents.on('console-message', (_e, level, message) => { if(level >= 3) errors.push(message) })
+ win.webContents.on('console-message', details => { if(details.level === 'error') errors.push(details.message) })
  await win.loadURL('pet://app/'+page+'.html'); return win
 }
 try {
