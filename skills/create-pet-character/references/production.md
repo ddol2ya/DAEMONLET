@@ -38,11 +38,15 @@
 
 ```sh
 node scripts/run-seethrough.mjs "<pose.png>" "<새-output>" 42013 "<ComfyUI-URL>" waiting 1280 30
-# VRAM 자동 감지가 불가능한 8GB 환경에서는 마지막 인자로 명시:
+# VRAM 자동 감지가 불가능하면 실제 선택한 GPU의 전체 용량을 마지막 인자로 명시:
 node scripts/run-seethrough.mjs "<pose.png>" "<새-output>" 42013 "<ComfyUI-URL>" waiting 1024 30 8
 ```
 
-ComfyUI 큐가 비어 있을 때 포즈 하나씩 실행한다. 다른 작업을 취소하지 않는다. 두 로더의 group offload 실제 활성화를 로그로 확인하고, 모델은 미리 설치하며 auto_download=false를 유지한다. 실제 모델 snapshot/해시를 기록한다. RTX 3060 12GB + group offload/1280이 프로젝트의 최소 지원 목표다. 8GB 이하는 비권장이며 1024 이하로 낮춰도 OOM이 날 수 있다.
+선택한 ComfyUI GPU의 **전체 VRAM이 12GiB 이하일 때만** 두 로더의 group offload를 켜고, 12GiB를 초과하면 둘 다 끈다. `/system_stats`의 `vram_total`을 사용하며 남은 메모리(`vram_free`)로 판단하지 않는다. 감지 실패·잘못된 응답·복수 CUDA 장치로 용량이 불명확하면 이미지 업로드나 작업 제출 전에 중단하므로 마지막 인자에 실제 용량을 지정한다. 예를 들어 24GiB GPU에서는 마지막 인자 `24`를 사용하면 offload가 꺼진다. 실행 시작 로그와 `run-summary.json`에 적용한 용량과 모드를 기록한다.
+
+`workflows/seethrough-api.json`은 두 로더의 offload가 꺼진 정적 예제다. 자동 용량 선택에는 위 제작 명령을 사용한다. 예제를 직접 제출할 때는 선택한 GPU가 12GiB 이하인 경우에만 두 `group_offload`를 `true`로 바꾼다.
+
+ComfyUI 큐가 비어 있을 때 포즈 하나씩 실행한다. 다른 작업을 취소하지 않는다. 두 로더가 선택한 offload 모드로 실행되는지 로그로 확인하고, 모델은 미리 설치하며 auto_download=false를 유지한다. 실제 모델 snapshot/해시를 기록한다. RTX 3060 12GB + group offload/1280이 프로젝트의 최소 지원 목표다. 8GB 이하는 비권장이며 1024 이하로 낮춰도 OOM이 날 수 있다.
 
 ## 모델 조립과 마감
 

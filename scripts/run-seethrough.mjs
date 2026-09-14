@@ -3,7 +3,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { basename, join } from "node:path"
 import { makeSeeThroughPrompt } from "./seethrough-workflow.mjs"
-import { seethroughProfile } from "./seethrough-profile.mjs"
+import { seethroughProfile, selectedComfyGpu, vramGiBFromStats } from "./seethrough-profile.mjs"
 
 const [
   inputPath,
@@ -32,13 +32,14 @@ let vramGiB = vramArgument === undefined ? null : Number(vramArgument)
 if (vramGiB !== null && (!Number.isFinite(vramGiB) || vramGiB <= 0)) throw new Error("VRAM must be a positive GiB number")
 if (vramGiB === null) {
   try {
-    const stats = await (await checked(await fetch(`${comfy}/system_stats`), "ComfyUI system stats")).json()
-    const device = stats.devices?.find(candidate => candidate.type === "cuda")
-    if (device?.vram_total > 0) vramGiB = device.vram_total / 1024 ** 3
-  } catch { /* Unknown hardware remains visible in the summary. */ }
+    const stats = await (await checked(await fetch(`${comfy}/system_stats`, {signal: AbortSignal.timeout(10000)}), "ComfyUI system stats")).json()
+    vramGiB = vramGiBFromStats(stats)
+  } catch { /* The profile rejects unknown capacity before any upload or GPU job. */ }
 }
 const profile = seethroughProfile(requestedResolution, vramGiB)
 const { resolution } = profile
+const vramSource = vramArgument === undefined ? "ComfyUI system_stats" : "explicit capacity"
+console.log(`GPU total VRAM: ${vramGiB} GiB (${vramSource}); group offload ${profile.groupOffload ? "enabled" : "disabled"} on both loaders`)
 if (profile.warning) console.warn(profile.warning)
 const objectInfo = await (await checked(await fetch(`${comfy}/object_info`), "ComfyUI node definitions")).json()
 const required = ['SeeThrough_LoadLayerDiffModel','SeeThrough_LoadDepthModel','SeeThrough_GenerateLayers','SeeThrough_GenerateDepth','SeeThrough_PostProcess','SeeThrough_SavePSD']
@@ -91,7 +92,7 @@ async function waitForHistory(promptId) {
     try {
       const statsResponse = await checked(await fetch(`${comfy}/system_stats`), "ComfyUI system stats")
       const stats = await statsResponse.json()
-      const device = stats.devices?.find((candidate) => candidate.type === "cuda")
+      const device = selectedComfyGpu(stats)
       if (device && Number.isFinite(device.vram_total) && Number.isFinite(device.vram_free)) {
         peakVramBytes = Math.max(peakVramBytes, device.vram_total - device.vram_free)
         vramSamples++
@@ -160,4 +161,4 @@ for (const seed of seeds) {
   summaries.push({ seed, depthSeed: (seed + 1) >>> 0, resolution, steps, promptId, elapsedMs, peakVramBytes, peakVramMiB: Math.round(peakVramBytes / 1024 / 1024), vramSamples, ...result })
   console.log(`Completed seed ${seed} at ${resolution}px in ${(elapsedMs / 1000).toFixed(1)}s`)
 }
-await writeFile(join(outputDirectory, "run-summary.json"), `${JSON.stringify({ input: basename(inputPath), filenamePrefix, requestedResolution, vramGiB, requestedProfile: profile, offloadActivation: "verify in ComfyUI logs; a requested flag alone is not proof", runs: summaries }, null, 2)}\n`)
+await writeFile(join(outputDirectory, "run-summary.json"), `${JSON.stringify({ input: basename(inputPath), filenamePrefix, requestedResolution, vramGiB, vramSource, requestedProfile: profile, offloadActivation: "verify the requested enabled/disabled mode in ComfyUI logs; a requested flag alone is not proof", runs: summaries }, null, 2)}\n`)
