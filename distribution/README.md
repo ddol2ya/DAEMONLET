@@ -1,7 +1,9 @@
 # Daemonlet for Codex
 
 Windows 압축판은 폴더 전체를 풀고 `Daemonlet for Codex/Daemonlet for Codex.exe`를 실행합니다. 같은 계정의 Codex Desktop과 Hook 없이 자동 연결됩니다. 설치형은 Setup.exe로 설치한 뒤 시작 메뉴에서 실행합니다.
-Mac은 `.app`을 응용 프로그램 폴더로 옮긴 뒤 설정 → Codex 연결 → 연결 준비에서 Hook을 설정하고 Codex에서 실행을 허용합니다.
+Mac은 `.app`을 응용 프로그램 폴더로 옮긴 뒤 같은 계정의 Codex 데스크톱 앱과 함께 실행합니다. 데스크톱 연결에는 Hook이 필요하지 않습니다.
+
+CLI Hook은 두 운영체제에서 선택 사항입니다. 설정 → Codex 연결 → CLI Hook 설정에서 등록한 뒤 Codex CLI의 `/hooks`에서 신뢰합니다. CLI 단독 사용 시 상태·포즈 표시가 정상 동작하지 않을 수 있으므로 Codex 데스크톱 앱을 함께 실행하세요. 한국어·영어는 설정 또는 트레이 메뉴의 언어 / Language에서 선택합니다. 받아쓰기는 Mac에서만 지원합니다.
 
 기본 캐릭터는 지피쨩 하나입니다. 추가 `.petchar`는 앱 설정에서 가져옵니다. 이 앱에는 제작 스킬·ComfyUI·모델 가중치가 포함되지 않으며, 사용에 제작용 GPU가 필요하지 않습니다.
 

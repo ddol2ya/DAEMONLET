@@ -10,15 +10,15 @@ This is not an official OpenAI product and is not affiliated with OpenAI.
 
 <img src="docs/images/gpichan.png" width="360" alt="Gpichan running in Daemonlet for Codex">
 
-## Downloads — v0.7.0
+## Downloads — v0.7.1
 
 | Platform | Download | Notes |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/Daemonlet-for-Codex-0.7.0-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
-| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe) | Unsigned |
-| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/Daemonlet-for-Codex-0.7.0-windows-x64.zip) | Extract and run without installation |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
+| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64-Setup.exe) | Unsigned |
+| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64.zip) | Extract and run without installation |
 
-[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.0) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.0/SHA256SUMS.txt)
+[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.1) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/SHA256SUMS.txt)
 
 To use the app, you do not need a separate Node.js or Python installation, ComfyUI, model weights, or a GPU for character creation.
 
@@ -34,7 +34,7 @@ To use the app, you do not need a separate Node.js or Python installation, Comfy
 
 For installation, recovery and removal details, see the [Mac guide](docs/install-macos.md) and [Windows guide](docs/install-windows.md).
 
-The published **v0.7.0** installers have a Korean interface and Korean Mac dictation. **Current source builds** add Korean/English selection under **Settings → 언어 / Language**, also available from the tray menu. The choice is saved and applies immediately to app windows; Mac dictation uses the selected language from the next recording. Existing drafts are preserved. Character names and authored dialogue stay in the pack’s original language. macOS permission dialogs follow the system’s language settings. Windows dictation is not supported. Some linked guides remain in Korean; labels below help you navigate the v0.7.0 installers.
+**v0.7.1** adds Korean/English selection under **Settings → 언어 / Language**, also available from the tray menu. The choice is saved and applies immediately to app windows; Mac dictation uses the selected language from the next recording. Existing drafts are preserved. Character names and authored dialogue stay in the pack’s original language. macOS permission dialogs follow the system’s language settings. Windows dictation is not supported. Some linked guides remain in Korean; both language labels are included below.
 
 ## Features
 
@@ -43,7 +43,7 @@ The published **v0.7.0** installers have a Korean interface and Korean Mac dicta
 - **Display settings:** Adjust the character's size, position and bubble visibility.
 - **Additional characters:** Import external `.petchar` packs.
 - **Loading feedback:** See progress while importing characters and preparing the app at startup.
-- **Mac voice input:** Use Korean dictation to compose a message to send to Codex.
+- **Mac voice input:** Use Korean or English dictation to compose a message to send to Codex.
 
 ## Add a character
 

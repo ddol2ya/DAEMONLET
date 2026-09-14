@@ -1,6 +1,6 @@
 # App language
 
-Source builds support Korean (`ko`) and English (`en`). The published v0.7.0 installers predate this feature.
+Version 0.7.1 supports Korean (`ko`) and English (`en`) on macOS and Windows. Version 0.7.0 predates this feature.
 
 Choose **Settings → 언어 / Language** or the same submenu in the tray/character menu. The choice is saved in `desktop-settings.json`. Existing settings default to Korean and retain the selected character and display preferences. All open app windows update without reloading the character. Imported names, conversation titles, authored character dialogue and technical diagnostic values remain unchanged.
 
