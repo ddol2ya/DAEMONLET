@@ -20,6 +20,7 @@ export default function PetApp() {
   const alphaRef = useRef<AlphaHitTestController | null>(null)
   const [settings, setSettings] = useState<DesktopSettingsV1 | null>(null)
   const [layout, setLayout] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [presentation, setPresentation] = useState({ available: false, epoch: 0 })
   const [dialogue, setDialogue] = useState<DialogueSnapshot | null>(null)
@@ -77,6 +78,7 @@ export default function PetApp() {
       const epoch = ++loadEpoch
       loadKey = key
       loadingCharacter = true
+      setLoading(true)
       loadFailed = false
       updateAvailability()
       setError(null)
@@ -89,6 +91,7 @@ export default function PetApp() {
         if (disposed || epoch !== loadEpoch) return
         successfulKey = key
         loadingCharacter = false
+        setLoading(false)
         updateAvailability()
         alpha.reset()
         desktop.reportReady({ webgl: true, characterId: entry.id, revision: entry.revision, firstFrameAt: performance.now() })
@@ -96,6 +99,7 @@ export default function PetApp() {
         if (disposed || epoch !== loadEpoch || reason instanceof DOMException && reason.name === "AbortError") return
         const message = reason instanceof Error ? reason.message : String(reason)
         loadingCharacter = false
+        setLoading(false)
         loadFailed = !successfulKey
         loadKey = null
         updateAvailability()
@@ -156,6 +160,7 @@ export default function PetApp() {
 
   return <main className={`pet-root${error ? " has-error" : ""}`}>
     <PetCanvas ref={canvasRef} />
+    {loading && !error && <div className="pet-loading" role="status"><span aria-hidden="true" />캐릭터 준비 중…</div>}
     {dialogue && sessionRef.current && <SpeechBubbleOverlay snapshot={dialogue} runtime={sessionRef.current.runtime} canvasRef={canvasRef} available={presentation.available} characterEpoch={presentation.epoch} controller={sessionRef.current.dialogue} />}
     {layout && settings && <LayoutOverlay settings={settings} onScale={setScale} onDone={done} />}
     {error && <div className="pet-error" role="alert"><b>Character unavailable</b><span>{error}</span><button onClick={() => void window.petDesktop?.reloadPet()}>Reload Pet</button></div>}

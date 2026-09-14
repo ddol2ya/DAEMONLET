@@ -1,10 +1,10 @@
 import { constants } from "node:fs"
 import { spawn } from "node:child_process"
-import { access, lstat, realpath } from "node:fs/promises"
+import { access, lstat, realpath, open } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
 import { parse as parseToml } from "smol-toml"
-import { HOOK_MARKER, HOOK_SYSTEM_PATH, hashFile, hashText } from "../hooks/HookLaunchSpec.ts"
+import { containsHookMarker, HOOK_SYSTEM_PATH, hashFile, hashText } from "../hooks/HookLaunchSpec.ts"
 import { allEventSupport, type EventSupport } from "../hooks/HookInstallPlan.ts"
 import { isObject } from "../hooks/HookJson.ts"
 import { canonicalCodexHome, readSetupConfig } from "../hooks/HookInstallTransaction.ts"
@@ -43,7 +43,7 @@ function inspectConfig(config: string | null, policy: string | null): { feature:
     // Conservatively report suspected inline ownership, never migrate or
     // reinterpret inline TOML. Unknown metadata containing the marker is a
     // reason for review, not authority to delete anything.
-    inlineOwnedConflict: isObject(parsed.hooks) && JSON.stringify(parsed.hooks).includes(HOOK_MARKER),
+    inlineOwnedConflict: isObject(parsed.hooks) && containsHookMarker(parsed.hooks),
     policyBlocked: requirements.allow_managed_hooks_only === true || requiredFeatures.hooks === false || requiredFeatures.codex_hooks === false,
   }
 }
@@ -53,7 +53,12 @@ async function checkedExecutable(path: string): Promise<string | null> {
     if (!isAbsolute(path) || /[\0\r\n]/.test(path)) return null
     const canonical = await realpath(path)
     const stat = await lstat(canonical)
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 350 * 1024 * 1024 || ![0, process.getuid?.() ?? 0].includes(stat.uid) || (stat.mode & 0o022) !== 0) return null
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 350 * 1024 * 1024 || (process.platform !== "win32" && (![0, process.getuid?.() ?? 0].includes(stat.uid) || (stat.mode & 0o022) !== 0))) return null
+    if (process.platform === "win32") {
+      const file = await open(canonical, "r")
+      try { const header = Buffer.alloc(2); if ((await file.read(header, 0, 2, 0)).bytesRead !== 2 || header.toString("ascii") !== "MZ") return null }
+      finally { await file.close() }
+    }
     await access(canonical, constants.X_OK)
     return canonical
   } catch { return null }
@@ -87,7 +92,7 @@ export type HookSetupDoctorOptions = {
 /** Finder-launched apps do not inherit the user's shell PATH. No shell or
  * recursive filesystem search is needed for these standard installation paths. */
 export function standardCodexExecutables(userHome = homedir(), platform = process.platform): string[] {
-  if (platform === "win32") return []
+  if (platform === "win32") return [join(userHome, "AppData/Roaming/npm/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe")]
   return [
     ...(platform === "darwin" ? ["/opt/homebrew/bin/codex"] : []),
     "/usr/local/bin/codex", join(userHome, ".local/bin/codex"), join(userHome, ".npm-global/bin/codex"), join(userHome, "bin/codex"),
@@ -157,7 +162,8 @@ export class HookSetupDoctor {
       let output = "", bytes = 0, rejected = false, settled = false
       const child = spawn(path, args, {
         cwd: tmpdir(), shell: false, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"],
-        env: { PATH: this.environment.PATH ?? HOOK_SYSTEM_PATH, CODEX_HOME: codexHome },
+        windowsHide: true,
+        env: { ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR } : {}), PATH: this.environment.PATH ?? HOOK_SYSTEM_PATH, CODEX_HOME: codexHome },
       })
       const timeout = setTimeout(() => { rejected = true; this.kill(child) }, this.options.probeTimeoutMs ?? 2000)
       const finish = (code: number | null) => {

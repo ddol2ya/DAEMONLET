@@ -61,7 +61,7 @@ export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatu
     {
       label: "Character",
       submenu: [
-        ...(actions.characters?.() ?? CHARACTER_IDS.map(id => ({ id, name: CHARACTER_NAMES[id], status: "ready" }))).map(entry => ({ label: entry.name, enabled: entry.status === "ready", type: "radio" as const, checked: settings.characterId === entry.id, click: () => actions.updateSettings({ characterId: entry.id }) })),
+        ...(actions.characters?.() ?? CHARACTER_IDS.map(id => ({ id, name: CHARACTER_NAMES[id], status: "ready" }))).map(entry => ({ label: entry.name, enabled: entry.status !== "disabled", type: "radio" as const, checked: settings.characterId === entry.id, click: () => actions.updateSettings({ characterId: entry.id }) })),
       ],
     },
     {

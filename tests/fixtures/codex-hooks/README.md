@@ -23,3 +23,12 @@ node scripts/verify-codex-hook-contract.mjs /absolute/path/to/reviewed/native/co
 ```
 
 This does not execute the CLI, read a user Home, install hooks or request a model. It refuses a different binary hash and existing output file. It also checks the forwarder's empty response against the eight embedded output schemas. SessionEnd has no embedded output schema and is advisory per the [official event reference](https://learn.chatgpt.com/docs/hooks#sessionend). `codex-hook-contract-01534.test.ts` exercises every fixture through the raw validator, source sanitizer and sanitized ingress boundary.
+
+## Windows CLI 0.151.0
+
+`contract-v0.151.0-win32.json` binds all nine synthetic inputs to the exact
+Windows x64 npm native artifact `cf68265897197ac5f3bff6a10c168eec159842b353129726da5e3ed6b91ef0f4`.
+Its nine embedded input schemas are structurally identical to the macOS 0.153.4
+fixtures above; the eight embedded output schemas accept `{}`. Extraction
+accepts both LF and Windows CRLF boundaries. These are parser compatibility
+checks, not evidence that a user trusted or delivered real CLI events.

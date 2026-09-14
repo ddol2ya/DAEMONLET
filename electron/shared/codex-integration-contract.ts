@@ -34,6 +34,7 @@ export type PublicSetupStatus = {
   host: HookHostInspection & { mode: HookLaunchSpec["mode"]; executableDisplayPath: string; resourceDisplayPath: string; dataDisplayPath: string; endpoint: string }
   hostSelfTest: PublicSelfTestResult
   adapter: { state: AdapterStatus["state"]; ownership: AdapterOwnership; activeRunCount: number; activeTaskCount: number; codexAvailable?: boolean }
+  desktop?: { connected: boolean; activeRunCount: number }
   hookReviewStatus: HookReviewStatus
   live: LiveObservation
   reception: HookReception

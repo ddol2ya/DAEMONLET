@@ -12,7 +12,7 @@ describe("Settings preload", () => {
     expect(name).toBe("settingsDesktop")
     expect(Object.isFrozen(api)).toBe(true)
     expect(Object.isFrozen(api.characters)).toBe(true)
-    expect(Object.keys(api.characters).sort()).toEqual(["list", "select", "onChanged", "chooseImport", "commitImport", "cancelImport", "remove", "rollback"].sort())
+    expect(Object.keys(api.characters).sort()).toEqual(["list", "select", "onChanged", "onProgress", "chooseImport", "commitImport", "cancelImport", "remove", "rollback"].sort())
     expect(Object.keys(api).sort()).toEqual(["characters", "getStatus", "refreshStatus", "prepareConnection", "chooseCodexExecutable", "chooseCodexHome", "planHooks", "applyHookPlan", "discardHookPlan", "runHostSelfTest", "reportHookReview", "startLiveObservation", "stopLiveObservation", "reportDesktopStopAttempt", "dismissOnboarding", "getSettings", "updateSettings", "resetPetPosition", "restartAdapter", "exportDiagnostics", "onStatusChanged", "onSettingsChanged"].sort())
     for (const forbidden of ["invoke", "ipcRenderer", "shell", "readFile", "writeFile", "protocol", "reportReady", "setMousePassthrough"]) expect(api).not.toHaveProperty(forbidden)
     await api.prepareConnection()

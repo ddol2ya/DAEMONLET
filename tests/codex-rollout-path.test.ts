@@ -14,6 +14,26 @@ describe("continued Codex rollout paths", () => {
     expect(belongsToLocalCodexHome(continued.replace("C:", "D:"), id, home)).toBe(false)
     expect(belongsToLocalCodexHome(continued.replace("\\sessions\\", "\\sessions\\..\\outside\\"), id, home)).toBe(false)
   })
+  it.runIf(process.platform === "win32")("matches extended-length drive paths without accepting other homes or device namespaces", () => {
+    const home = "C:\\Users\\example-user\\.codex"
+    const first = `${home}\\sessions\\2026\\09\\11\\rollout-2026-09-11T00-00-00-${id}.jsonl`
+    const continued = `${home}\\sessions\\2026\\09\\12\\rollout-2026-09-12T00-00-00-${id}_${segment}.jsonl`
+    const extended = (path: string) => `\\\\?\\${path}`
+    for (const root of [home, extended(home)]) {
+      for (const path of [continued, extended(continued)]) expect(belongsToLocalCodexHome(path, id, root)).toBe(true)
+    }
+    expect(sameLocalCodexConversationPath(first, extended(first), id)).toBe(true)
+    expect(sameLocalCodexConversationPath(extended(first), continued, id)).toBe(true)
+    expect(sameLocalCodexConversationPath(first, extended(continued), id)).toBe(true)
+    for (const path of [
+      extended(continued.replace("C:", "D:")),
+      extended(continued.replace("example-user", "other-user")),
+      extended(continued.replace("\\.codex\\", "\\.codex-other\\")),
+      extended(continued.replace("\\sessions\\", "\\sessions\\..\\outside\\")),
+      `\\\\.\\${continued}`,
+      `\\\\?\\GLOBALROOT\\Device\\HarddiskVolume1\\${continued.slice(3)}`,
+    ]) expect(belongsToLocalCodexHome(path, id, home)).toBe(false)
+  })
   it("retains conversation identity across continuation files and days", () => {
     expect(rolloutSessionId(next)).toBe(id)
     expect(belongsToLocalCodexHome(next, id, "/tmp/codex")).toBe(true)

@@ -5,7 +5,8 @@ import { createConnection } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
-import { HOOK_MARKER, INSTALLED_HOOK_EVENTS } from "../hooks/HookInstaller.ts"
+import { INSTALLED_HOOK_EVENTS } from "../hooks/HookInstaller.ts"
+import { containsHookMarker } from "../hooks/HookLaunchSpec.ts"
 import { inspectAttachFeasibility } from "../app-server/AppServerAttachProbe.ts"
 
 const execFileAsync = promisify(execFile)
@@ -83,7 +84,7 @@ export async function runDoctor(options: { codexPath?: string; codexHome: string
   let installed = false
   try {
     const hooks = JSON.parse(await readFile(hooksPath, "utf8")) as { hooks?: Record<string, unknown[]> }
-    installed = INSTALLED_HOOK_EVENTS.every((event) => Array.isArray(hooks.hooks?.[event]) && JSON.stringify(hooks.hooks?.[event]).includes(HOOK_MARKER))
+    installed = INSTALLED_HOOK_EVENTS.every((event) => Array.isArray(hooks.hooks?.[event]) && containsHookMarker(hooks.hooks?.[event]))
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") hooksFileValid = true
     else { hooksFileValid = false; warnings.push("hooks.json is invalid or unreadable") }

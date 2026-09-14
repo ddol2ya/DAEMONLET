@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http"
 import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { createHookCommand, HOOK_SYSTEM_PATH, PACKAGED_HOOK_TIMEOUT_SECONDS, inspectHookHost, type HookLaunchSpec } from "./HookLaunchSpec.ts"
+import { createHookCommand, HOOK_SYSTEM_PATH, PACKAGED_HOOK_TIMEOUT_SECONDS, hookCommandTimeoutSeconds, inspectHookHost, windowsHookShellPath, type HookLaunchSpec } from "./HookLaunchSpec.ts"
 
 export type HookCommandResult = {
   hostStarted: boolean
@@ -20,13 +20,18 @@ export async function runHookCommand(spec: HookLaunchSpec, input: string, option
   signal?: AbortSignal
   holdStdin?: boolean
   environment?: NodeJS.ProcessEnv
+  windowsShell?: "powershell" | "cmd"
 } = {}): Promise<HookCommandResult> {
   const command = createHookCommand(spec)
   const startedAt = performance.now()
   return new Promise((resolveResult) => {
     let stdout = "", stderr = "", timedOut = false, settled = false
-    const child = spawn("/bin/sh", ["-c", command], {
-      cwd: "/", env: options.environment ?? { PATH: HOOK_SYSTEM_PATH },
+    // Match the reviewed Windows CLI's derive_exec_args(..., false), including
+    // PowerShell's parsing and normal Windows argument quoting. CMD-only probes
+    // can pass commands that fail before the native host starts in the CLI.
+    const windows = spec.mode === "packaged-windows-host", cmd = windows && options.windowsShell === "cmd"
+    const child = spawn(windows ? cmd ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "cmd.exe") : windowsHookShellPath() : "/bin/sh", windows ? cmd ? ["/d", "/c", `"${command}"`] : ["-NoProfile", "-Command", command] : ["-c", command], {
+      cwd: windows ? tmpdir() : "/", windowsHide: true, windowsVerbatimArguments: cmd, env: options.environment ?? { PATH: HOOK_SYSTEM_PATH },
       detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"],
     })
     const terminate = () => {
@@ -34,7 +39,7 @@ export async function runHookCommand(spec: HookLaunchSpec, input: string, option
         try { process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGKILL") } catch { /* already reaped */ }
       }
     }
-    const timeout = setTimeout(() => { timedOut = true; terminate() }, spec.mode === "packaged-electron-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS * 1000 : 1000)
+    const timeout = setTimeout(() => { timedOut = true; terminate() }, hookCommandTimeoutSeconds(spec) * 1000)
     const abort = () => { timedOut = true; terminate() }
     options.signal?.addEventListener("abort", abort, { once: true })
     if (options.signal?.aborted) abort()
@@ -82,7 +87,7 @@ const fixture = JSON.stringify({
 const expectedPayload = { payloadVersion: 1, hookEventName: "UserPromptSubmit", sessionId: "synthetic-session", model: "synthetic-model", permissionMode: "default", turnId: "synthetic-turn" }
 
 export async function runHookHostSelfTest(spec: HookLaunchSpec, signal?: AbortSignal): Promise<PublicSelfTestResult> {
-  const result = { ...notTestedHost(), source: spec.mode === "packaged-electron-node" ? "synthetic-packaged" as const : "unit" as const, checkedAt: Date.now(), budgetMs: spec.mode === "packaged-electron-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS * 1000 : 1000 }
+  const result = { ...notTestedHost(), source: spec.mode !== "development-node" ? "synthetic-packaged" as const : "unit" as const, checkedAt: Date.now(), budgetMs: hookCommandTimeoutSeconds(spec) * 1000 }
   const inspection = await inspectHookHost(spec)
   result.hostFingerprint = inspection.fingerprint
   if (!inspection.available || signal?.aborted) return { ...result, status: "host-unavailable" }
@@ -121,19 +126,26 @@ export async function runHookHostSelfTest(spec: HookLaunchSpec, signal?: AbortSi
     })
     const port = await listen(receiver)
     const testSpec = { ...spec, dataDir: directory, hookEndpoint: `http://127.0.0.1:${port}/hook` }
-    const check = async (name: string, input: string, expectedReceipts: number, holdStdin = false) => {
+    const check = async (name: string, input: string, expectedReceipts: number, holdStdin = false, windowsShell: "powershell" | "cmd" = "powershell") => {
       if (signal?.aborted) throw new Error("SELFTEST_CANCELLED")
       const before = received
       const outcome = await runHookCommand(testSpec, input, {
-        signal, holdStdin,
-        environment: { PATH: HOOK_SYSTEM_PATH, NODE_OPTIONS: "--require /missing/private-preload.cjs", NODE_PATH: "/missing/modules", ELECTRON_ENABLE_LOGGING: "1", ELECTRON_RUN_AS_NODE: "0", CODEX_PET_DATA_DIR: "/missing/wrong-data", CODEX_PET_HOOK_URL: "https://example.invalid/never" },
+        signal, holdStdin, windowsShell,
+        // PowerShell requires PATHEXT even for an absolute .exe path. Keep
+        // only that OS dispatch prerequisite; the native host still clears
+        // it along with all runtime-affecting values before Electron starts.
+        environment: { PATH: HOOK_SYSTEM_PATH, ...(spec.mode === "packaged-windows-host" ? { PATHEXT: ".EXE" } : {}), NODE_OPTIONS: "--require /missing/private-preload.cjs", NODE_PATH: "/missing/modules", ELECTRON_ENABLE_LOGGING: "1", ELECTRON_RUN_AS_NODE: "0", CODEX_PET_DATA_DIR: "/missing/wrong-data", CODEX_PET_HOOK_URL: "https://example.invalid/never" },
       })
       result.cases.push({ name, passed: outcome.outputContract && !outcome.timedOut && outcome.wallTimeMs < result.budgetMs && received - before === expectedReceipts, wallTimeMs: outcome.wallTimeMs })
       return outcome.wallTimeMs
     }
     result.coldStartMs = await check("cold-start-sanitized-delivery", fixture, 1)
     for (let index = 0; index < 3; index++) result.repeatMs.push(await check(`repeat-${index + 1}`, fixture, 1))
-    result.receiverVerified = received === 4
+    if (spec.mode === "packaged-windows-host") {
+      await check("cmd-cold-start-sanitized-delivery", fixture, 1, false, "cmd")
+      for (let index = 0; index < 3; index++) await check(`cmd-repeat-${index + 1}`, fixture, 1, false, "cmd")
+    }
+    result.receiverVerified = received === (spec.mode === "packaged-windows-host" ? 8 : 4)
     await check("malformed-json", "{", 0)
     await check("oversized-body", "x".repeat(65537), 0)
     await check("stdin-watchdog", fixture, 0, true)

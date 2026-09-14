@@ -5,12 +5,13 @@ import { Transform } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { openPromise } from "yauzl"
 import { crc32 } from "node:zlib"
-import { PACK_LIMITS } from "../shared/character-pack-contract"
+import { PACK_LIMITS, type PackProgress } from "../shared/character-pack-contract"
 import { validatePackPath } from "../shared/character-pack-path"
 import { isPayloadPath, validatePackDirectory } from "./CharacterPackAssets"
 
 /** One entry/stream at a time; neither archive nor inflated payload is buffered in Main. */
-export async function extractCharacterPack(source: string, transactionRoot: string) {
+export async function extractCharacterPack(source: string, transactionRoot: string, progress?: (value: PackProgress) => void) {
+  progress?.({ phase: "extract", completed: 0, total: 0 })
   const size = (await stat(source)).size
   if (size > PACK_LIMITS.archiveBytes || size < 22) throw new Error("PACK_LIMIT")
   const frozen = join(transactionRoot, "archive.zip"), payload = join(transactionRoot, "payload")
@@ -60,5 +61,5 @@ export async function extractCharacterPack(source: string, transactionRoot: stri
       if (actual !== entry.uncompressedSize || crc !== entry.crc32) throw new Error("PACK_INTEGRITY")
     }
   } finally { zip.close() }
-  return validatePackDirectory(payload)
+  return validatePackDirectory(payload, { progress })
 }

@@ -10,3 +10,7 @@ color for the current menu-bar appearance.
 
 `manifest.json` records the selected source and generated asset hashes. The
 application icon is bound through the macOS Forge `icon` option.
+
+Windows uses `appIcon.ico`, exported from the same A2 original with
+`node scripts/build-windows-icon.mjs` on macOS. It contains 16–256px PNG images
+and is used for the packaged EXE and the installer/uninstaller.

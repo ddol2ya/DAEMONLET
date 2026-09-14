@@ -19,6 +19,7 @@ type Options = {
   appVersion: string
   packaged: boolean
   platform?: NodeJS.Platform
+  getDesktopConnection?: () => { connected: boolean; activeRunCount: number }
   getAdapterDiagnostics: () => SanitizedAdapterDiagnostics
   getFreshAdapterDiagnostics: () => Promise<SanitizedAdapterDiagnostics | null>
   doctor?: HookSetupDoctor
@@ -114,6 +115,7 @@ export class CodexIntegrationController {
       host: { ...this.host, mode: this.options.launchSpec.mode, executableDisplayPath: this.options.launchSpec.executablePath, resourceDisplayPath: this.options.launchSpec.forwarderPath, dataDisplayPath: this.options.launchSpec.dataDir, endpoint: this.options.launchSpec.hookEndpoint },
       hostSelfTest: structuredClone(this.hostTest),
       adapter: { state: adapter.state, ownership: adapter.adapterOwnership, activeRunCount: adapter.activeRunCount, activeTaskCount: adapter.activeTaskCount, codexAvailable: adapter.codexAvailable },
+      desktop: this.options.getDesktopConnection?.() ?? { connected: false, activeRunCount: 0 },
       hookReviewStatus: stored.reviewedFingerprint !== null && stored.reviewedFingerprint === this.validationFingerprint ? "user-reported-reviewed" : this.reviewRequired || stored.reviewedFingerprint !== null ? "review-required" : "unknown",
       live: this.observation.get(), reception: currentHookReception(adapter), hasRevert: this.hasRevert, checkedAt: this.checkedAt, issue: this.issue,
     }
@@ -145,12 +147,6 @@ export class CodexIntegrationController {
   }
 
   private async refreshInternal(force: boolean): Promise<PublicSetupStatus> {
-    if ((this.options.platform ?? process.platform) === "win32") {
-      // Direct Desktop IPC needs neither CLI discovery nor the macOS Hook host.
-      await this.options.getFreshAdapterDiagnostics()
-      this.checkedAt = Date.now()
-      return this.emit()
-    }
     try {
       const discovery = await this.doctor.inspect(this.store.get().selection, force)
       const revision = await hookHostRevision(this.options.launchSpec)
@@ -199,7 +195,7 @@ export class CodexIntegrationController {
     const installing = action === "install" || action === "repair"
     if (installing) {
     if (!host.available || !host.fingerprint) blockers.push("HOST_UNAVAILABLE")
-    if (!this.options.packaged || (this.options.platform ?? process.platform) !== "darwin") blockers.push("PACKAGED_MAC_REQUIRED")
+    if (!this.options.packaged || !["darwin", "win32"].includes(this.options.platform ?? process.platform)) blockers.push("PACKAGED_APP_REQUIRED")
     if (host.temporaryLocation && !this.options.testLocationPolicy?.(this.options.launchSpec)) blockers.push("PERMANENT_APP_LOCATION_REQUIRED")
     if (this.hostTest.status !== "passed" || this.hostTest.hostFingerprint !== host.fingerprint) blockers.push("HOST_SELF_TEST_REQUIRED")
     if (!discovery.capability.contractId) blockers.push("CAPABILITY_CONTRACT_UNKNOWN")

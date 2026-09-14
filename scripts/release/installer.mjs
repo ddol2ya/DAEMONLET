@@ -17,6 +17,7 @@ const root = resolve(import.meta.dirname, '../..'), app = resolve(values.app), o
 const checks = await checkCandidate(join(app, 'resources/app.asar'))
 await checkExternalNotices(join(app, 'resources/licenses'))
 await mkdir(output) // Existing build projects are never overwritten.
+await cp(join(root, 'electron/assets/appIcon.ico'), join(output, 'appIcon.ico'))
 const staged = join(output, 'runtime')
 await cp(app, staged, { recursive: true })
 // The packaged application must already use the test identity. Renaming only
@@ -47,8 +48,9 @@ await writeFile(join(output, 'electron-builder.json'), JSON.stringify({
   appId: BUNDLE_ID, productName: APP_NAME,
   executableName: APP_NAME, electronVersion: appPackage.devDependencies.electron,
   publish: null, npmRebuild: false, directories: { output: 'artifacts', buildResources: '.' },
-  win: { target: [{ target: 'nsis', arch: ['x64'] }], signAndEditExecutable: false },
+  win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: "appIcon.ico", signAndEditExecutable: false },
   nsis: { artifactName: `Daemonlet-for-Codex-${identity.appVersion}-windows-x64-Setup.exe`,
+    installerIcon: "appIcon.ico", uninstallerIcon: "appIcon.ico",
     oneClick: false, perMachine: false, allowElevation: false, allowToChangeInstallationDirectory: true,
     include: 'installer.nsh', createDesktopShortcut: false, createStartMenuShortcut: true,
     shortcutName: APP_NAME, uninstallDisplayName: APP_NAME,

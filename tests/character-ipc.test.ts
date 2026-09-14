@@ -16,7 +16,7 @@ function fixture() {
   const entry = { id: "fresh", name: "Fresh", source: "external", status: "ready", version: "2.0.0", previousVersion: "1.0.0", revision: "a".repeat(64) }
   const registry = { snapshot: vi.fn(() => ({ generation: 1, entries: [entry] })), get: vi.fn(() => entry), prepareImport: vi.fn(async () => ({})), commitImport: vi.fn(async () => entry), cancelImport: vi.fn(async () => {}), rollback: vi.fn(async () => {}), remove: vi.fn(async () => {}) }
   const select = vi.fn(async () => {})
-  const window = { window: settings, currentOwner: () => "owner-1" } as unknown as SettingsWindowController
+  const window = { window: settings, currentOwner: () => "owner-1", send: vi.fn() } as unknown as SettingsWindowController
   const controller = new CharacterIpcController({ registry: registry as unknown as CharacterRegistry, settings: window, pet: () => pet, lab: () => lab, select, selected: () => "fresh" })
   controllers.push(controller); controller.register()
   const event = (w = settings) => ({ sender: w.webContents, senderFrame: w.webContents.mainFrame }) as IpcMainInvokeEvent
@@ -47,7 +47,18 @@ describe("character IPC authority", () => {
     expect(await f.invoke(CHARACTER_IPC.choose)).toEqual({ ok: true, value: null })
     mocks.picker.mockResolvedValueOnce({ canceled: false, filePaths: ["/native/selected.petchar"] })
     await f.invoke(CHARACTER_IPC.choose)
-    expect(f.registry.prepareImport).toHaveBeenCalledExactlyOnceWith("/native/selected.petchar", "owner-1")
+    expect(f.registry.prepareImport).toHaveBeenCalledExactlyOnceWith("/native/selected.petchar", "owner-1", expect.any(Function))
+  })
+  it("sends progress only to the window that owns the import", async () => {
+    const f = fixture()
+    mocks.picker.mockResolvedValueOnce({ canceled: false, filePaths: ["/native/selected.petchar"] })
+    await f.invoke(CHARACTER_IPC.choose)
+    const progress = (f.registry.prepareImport.mock.calls[0] as unknown as [string, string, (value: unknown) => void])[2]
+    progress({ phase: "rig", completed: 1, total: 3 })
+    expect(f.window.send).toHaveBeenCalledExactlyOnceWith(CHARACTER_IPC.progress, { phase: "rig", completed: 1, total: 3 })
+    f.window.currentOwner = () => "different-window"
+    progress({ phase: "rig", completed: 2, total: 3 })
+    expect(f.window.send).toHaveBeenCalledTimes(1)
   })
   it("waits for the fallback to be ready before removing the selected pack", async () => {
     const f = fixture(); let ready!: () => void

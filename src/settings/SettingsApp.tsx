@@ -55,7 +55,7 @@ export function SettingsApp() {
       <div className="sidebar-bottom"><span className="status-dot positive" />Pet 실행 중<small>{status?.app.version ? `버전 ${status.app.version}` : "설정 불러오는 중"}</small></div>
     </aside>
     <main className="settings-content" id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0}>
-      {status?.onboarding === "shown" && api && <div className="onboarding-banner"><strong>연결 준비를 눌러 시작하세요.</strong><div className="banner-actions"><button className="text-button" disabled={Boolean(busy)} onClick={() => void run("안내 닫기", () => api.dismissOnboarding("acknowledged"))}>닫기</button><button className="text-button" disabled={Boolean(busy)} onClick={() => void run("나중에 설정", () => api.dismissOnboarding("skipped"))}>나중에</button></div></div>}
+      {status?.onboarding === "shown" && api && <div className="onboarding-banner"><strong>데스크톱은 자동 연결됩니다. CLI 사용자는 아래에서 Hook을 설정해 주세요.</strong><div className="banner-actions"><button className="text-button" disabled={Boolean(busy)} onClick={() => void run("안내 닫기", () => api.dismissOnboarding("acknowledged"))}>닫기</button><button className="text-button" disabled={Boolean(busy)} onClick={() => void run("나중에 설정", () => api.dismissOnboarding("skipped"))}>나중에</button></div></div>}
       {error && <div className="notice error" role="alert"><span>{error}</span><button className="text-button" aria-label="오류 닫기" onClick={() => setError(null)}>닫기</button></div>}
       {!api ? <div className="empty-state"><h1>Daemonlet 앱에서 열어 주세요</h1><p>설정은 앱의 메뉴 막대 → Settings에서 사용할 수 있습니다.</p></div>
         : !status || !settings ? <div className="empty-state" role="status">설정 불러오는 중…</div>

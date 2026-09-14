@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { lstat, readdir, readFile, realpath } from "node:fs/promises"
 import { join, relative, sep } from "node:path"
 import { initializeCanvas, readPsd, type Layer } from "ag-psd"
-import { PACK_LIMITS, type CharacterPackManifest } from "../shared/character-pack-contract"
+import { PACK_LIMITS, type CharacterPackManifest, type PackProgress } from "../shared/character-pack-contract"
 import { parseBoundedJson, parsePackManifest, validateRigOverrides } from "../shared/character-pack-validation"
 import { resolvePackReference, validatePackPath } from "../shared/character-pack-path"
 import { parseCharacterManifest, parsePoseManifest } from "../../src/pose/PoseManifest"
@@ -119,7 +119,7 @@ function checkRig(rig: RigDefinition): void {
   if (pixels > PACK_LIMITS.rigPixels || vertices > 300_000) throw new Error("PACK_LIMIT")
 }
 
-export async function validatePackDirectory(root: string, options: { rig?: boolean } = {}): Promise<ValidatedPack> {
+export async function validatePackDirectory(root: string, options: { rig?: boolean; progress?: (value: PackProgress) => void } = {}): Promise<ValidatedPack> {
   const manifestBytes = await boundedFile(root, "pack.json", PACK_LIMITS.jsonBytes)
   const manifest = parsePackManifest(manifestBytes), inventory = new Set(manifest.files.map(f => f.path))
   const json = new Map<string, unknown>()
@@ -135,7 +135,10 @@ export async function validatePackDirectory(root: string, options: { rig?: boole
   }
   await walk(root)
   let bytes = manifestBytes.length
+  let checkedFiles = 0
+  options.progress?.({ phase: "files", completed: 0, total: manifest.files.length })
   for (const f of manifest.files) {
+    options.progress?.({ phase: "files", completed: checkedFiles++, total: manifest.files.length })
     if (!isPayloadPath(f.path)) throw new Error("PACK_SCHEMA")
     const b = await boundedFile(root, f.path)
     if (b.length !== f.bytes || sha256(b) !== f.sha256) throw new Error("PACK_INTEGRITY")
@@ -201,6 +204,7 @@ export async function validatePackDirectory(root: string, options: { rig?: boole
     const loader = new PsdRigLoader()
     let base: RigDefinition | undefined
     for (let index = 0; index < models.length; index++) {
+      options.progress?.({ phase: "rig", completed: index, total: models.length })
       const m = models[index], b = await boundedFile(root, m.psd)
       const result = loader.loadArrayBuffer(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer, m.psd, m.overrides)
       if (result.model.missingRequiredLayers.length) throw new Error("PACK_SCHEMA")
@@ -216,5 +220,6 @@ export async function validatePackDirectory(root: string, options: { rig?: boole
       }
     }
   }
+  options.progress?.({ phase: options.rig === false ? "files" : "rig", completed: options.rig === false ? manifest.files.length : models.length, total: options.rig === false ? manifest.files.length : models.length })
   return { manifest, revision: packRevision(manifestBytes, manifest), bytes, poseCount: poses.length }
 }

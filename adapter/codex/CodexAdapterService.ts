@@ -1,3 +1,4 @@
+import { publishHookEndpoint } from "./hooks/HookEndpoint.ts"
 import { randomUUID } from "node:crypto"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
@@ -92,6 +93,7 @@ export class CodexAdapterService {
           return this.apply(mapHookEvent(event))
         } })
         await this.ingress.start()
+        if (process.platform === "win32") await publishHookEndpoint(this.config.dataDir, Number(new URL(this.ingress.getDiagnostics().endpoint).port))
       } else {
         this.appServer = new AppServerProcess(this.config.codexPath)
         const client = await this.appServer.start()

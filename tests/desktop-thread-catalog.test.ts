@@ -1,6 +1,6 @@
 import { chmod, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, toNamespacedPath } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { afterEach, describe, expect, it } from "vitest"
 import { readDesktopThreadCatalog } from "../electron/main/control/DesktopThreadCatalog"
@@ -55,5 +55,13 @@ describe("desktop session display titles", () => {
     expect((await readDesktopThreadCatalog(f.home))[0].title).toBe("SQLite fallback")
     await writeFile(f.index, line("Windows 대화", "2026-09-12T01:00:00Z"))
     expect((await readDesktopThreadCatalog(f.home))[0].title).toBe("Windows 대화")
+  })
+  it.runIf(process.platform === "win32")("discovers Desktop tasks stored with extended-length rollout paths", async () => {
+    const f = await fixture(), db = new DatabaseSync(join(f.home, "state_5.sqlite"))
+    const path = toNamespacedPath(join(f.home, "sessions", "2026", "09", "12", `rollout-2026-09-12T00-00-00-${id}.jsonl`))
+    db.prepare("UPDATE threads SET rollout_path=?, source=? WHERE id=?").run(path, "vscode", id); db.close()
+    await writeFile(f.index, line("Windows sleep test", "2026-09-12T01:00:00Z"))
+    expect(await readDesktopThreadCatalog(f.home)).toMatchObject([{ id, path, title: "Windows sleep test" }])
+    expect(await readDesktopThreadCatalog(toNamespacedPath(f.home))).toMatchObject([{ id, path }])
   })
 })

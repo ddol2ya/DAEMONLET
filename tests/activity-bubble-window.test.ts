@@ -28,7 +28,7 @@ class FakeWindow extends EventEmitter {
   destroy() { this.destroyed = true; this.emit("closed") }
 }
 vi.mock("electron", () => ({ BrowserWindow: FakeWindow, screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 24, width: 1440, height: 900 } }) } }))
-async function fixture() {
+async function fixture(paintReady = true) {
   const { ActivityBubbleWindowController } = await import("../electron/main/ActivityBubbleWindowController")
   const hidden = vi.fn(), c = new ActivityBubbleWindowController("/preload.cjs", undefined, hidden)
   const pet = new FakeWindow(); pet.visible = true
@@ -40,10 +40,28 @@ async function fixture() {
   const epoch = c.presentation.begin(); let sequence = 0
   const report = (phase: "hidden" | "preparing" | "shown" | "exiting", available = true) => c.presentation.report({ epoch, sequence: ++sequence, phase, available, anchor: { x0: .3, x1: .7, y0: .02, y1: .32 } })
   await report("hidden")
-  const win = c.window as unknown as FakeWindow; win.emit("ready-to-show")
+  const win = c.window as unknown as FakeWindow; if (paintReady) win.emit("ready-to-show")
   return { c, pet, win, report, settings, hidden, store }
 }
 describe("native activity window arbitration", () => {
+  it("shows loaded activity even when a hidden window never emits ready-to-show", async () => {
+    const f = await fixture(false)
+    expect(f.win.visible).toBe(false)
+    f.win.webContents.emit("did-finish-load")
+    expect(f.win.visible).toBe(true)
+    expect(f.win.webContents.send).toHaveBeenCalledWith("activity:changed", expect.objectContaining({ entries: expect.any(Array) }))
+    f.c.destroy()
+  })
+  it("keeps loaded activity hidden during speech and restores it when speech ends", async () => {
+    const f = await fixture(false)
+    await f.report("shown")
+    f.win.webContents.emit("did-finish-load")
+    expect(f.win.visible).toBe(false)
+    await f.report("hidden")
+    await new Promise(done => setTimeout(done, 50))
+    expect(f.win.visible).toBe(true)
+    f.c.destroy()
+  })
   it("hides before the permit while explicit controls stay visible in their own slot", async () => {
     const f = await fixture()
     expect(f.win.visible).toBe(true)

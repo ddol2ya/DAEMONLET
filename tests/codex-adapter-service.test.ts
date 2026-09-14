@@ -1,17 +1,19 @@
-import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { CodexAdapterService } from "../adapter/codex/CodexAdapterService.ts"
 import { createCodexAdapterConfig } from "../adapter/codex/CodexAdapterConfig.ts"
 
+// CI Windows TEMP can use an 8.3 alias. Supply the canonical private root,
+// matching the packaged app and preserving the endpoint publisher's path guard.
 const dirs: string[] = []
 const isolatedConfig = (dataDir: string, overrides: Parameters<typeof createCodexAdapterConfig>[0] = {}) => createCodexAdapterConfig({ ...overrides, dataDir, codexHome: join(dataDir, "codex-home"), protocolPort: 0, hookPort: 0 })
 afterEach(async () => { await Promise.all(dirs.splice(0).map((path) => rm(path, { recursive: true, force: true }))) })
 
 describe("CodexAdapterService", () => {
   it("starts Hook Observer without executing a configured CLI candidate", async () => {
-    const dataDir = await mkdtemp(join(tmpdir(), "codex-no-cli-probe-"))
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-no-cli-probe-")))
     dirs.push(dataDir)
     const codexPath = join(dataDir, "fake-codex")
     await writeFile(codexPath, '#!/bin/sh\nprintf executed > "${0}.executed"\n', { mode: 0o700 })
@@ -38,7 +40,7 @@ describe("CodexAdapterService", () => {
   })
 
   it("connects authenticated hook ingress to registry, persistence, diagnostics, and protocol state", async () => {
-    const dataDir = await mkdtemp(join(tmpdir(), "codex-service-"))
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-service-")))
     dirs.push(dataDir)
     const service = new CodexAdapterService(isolatedConfig(dataDir, { codexPath: process.execPath }))
     await service.start()
@@ -78,7 +80,7 @@ describe("CodexAdapterService", () => {
   })
 
   it("persists an empty active state after an authenticated Interrupt", async () => {
-    const dataDir = await mkdtemp(join(tmpdir(), "codex-interrupt-"))
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-interrupt-")))
     dirs.push(dataDir)
     const service = new CodexAdapterService(isolatedConfig(dataDir, { codexPath: process.execPath }))
     await service.start()
@@ -104,7 +106,7 @@ describe("CodexAdapterService", () => {
   })
 
   it("recovers an active run after adapter restart", async () => {
-    const dataDir = await mkdtemp(join(tmpdir(), "codex-restart-"))
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-restart-")))
     dirs.push(dataDir)
     const config = isolatedConfig(dataDir, { codexPath: process.execPath })
     const first = new CodexAdapterService(config)
@@ -127,7 +129,7 @@ describe("CodexAdapterService", () => {
   })
 
   it("starts idle instead of restoring an old persisted run", async () => {
-    const dataDir = await mkdtemp(join(tmpdir(), "codex-stale-restart-"))
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-stale-restart-")))
     dirs.push(dataDir)
     const service = new CodexAdapterService(isolatedConfig(dataDir, { codexPath: process.execPath }))
     await service.store.ensureDirectory()
@@ -151,7 +153,7 @@ describe("CodexAdapterService", () => {
   })
 
   it("expires and persists an unconfirmed recovered run through service maintenance", async () => {
-    const dataDir = await mkdtemp(join(tmpdir(), "codex-recovery-deadline-"))
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-recovery-deadline-")))
     dirs.push(dataDir)
     const recoveryTtlMs = 120_000
     let now = 1_000_000

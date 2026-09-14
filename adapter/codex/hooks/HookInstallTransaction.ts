@@ -78,7 +78,7 @@ export async function canonicalCodexHome(path: string): Promise<string> {
 
 async function directoryIdentity(path: string, privateDirectory = false): Promise<Identity> {
   const stat = await lstat(path)
-  if (!stat.isDirectory() || stat.isSymbolicLink() || (privateDirectory && (stat.uid !== uid() || (stat.mode & 0o077) !== 0))) throw new Error("UNSAFE_DIRECTORY")
+  if (!stat.isDirectory() || stat.isSymbolicLink() || (process.platform !== "win32" && privateDirectory && (stat.uid !== uid() || (stat.mode & 0o077) !== 0))) throw new Error("UNSAFE_DIRECTORY")
   if (await realpath(path) !== path) throw new Error("NON_CANONICAL_ROOT")
   return identityOf(stat)
 }
@@ -87,7 +87,7 @@ async function safeReadFile(path: string, limit = MAX_HOOK_FILE_BYTES, privateFi
   let handle: FileHandle | undefined
   try {
     const before = await lstat(path)
-    if (!before.isFile() || before.isSymbolicLink() || ![uid(), ...(allowRootOwner ? [0] : [])].includes(before.uid) || (before.mode & 0o022) !== 0 || (privateFile && (before.mode & 0o077) !== 0)) throw new Error("UNSAFE_FILE")
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || (process.platform !== "win32" && (![uid(), ...(allowRootOwner ? [0] : [])].includes(before.uid) || (before.mode & 0o022) !== 0 || (privateFile && (before.mode & 0o077) !== 0)))) throw new Error("UNSAFE_FILE")
     if (before.size > limit) throw new Error("FILE_TOO_LARGE")
     handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
     const stat = await handle.stat()
@@ -113,7 +113,7 @@ export async function readHookTarget(codexHome: string): Promise<TargetSnapshot>
   let rootIdentity: Identity | null = null
   try {
     rootIdentity = await directoryIdentity(codexHome)
-    if (rootIdentity.uid !== uid() || (rootIdentity.mode & 0o022) !== 0) throw new Error("UNSAFE_CODEX_HOME")
+    if (process.platform !== "win32" && (rootIdentity.uid !== uid() || (rootIdentity.mode & 0o022) !== 0)) throw new Error("UNSAFE_CODEX_HOME")
   } catch (error) { if (!isMissing(error)) throw error }
   const file = rootIdentity ? await safeReadFile(join(codexHome, "hooks.json")) : null
   return { root: codexHome, rootIdentity, parentIdentity, before: file?.contents ?? null, hash: snapshotHash(file?.contents ?? null), identity: file?.identity ?? null }

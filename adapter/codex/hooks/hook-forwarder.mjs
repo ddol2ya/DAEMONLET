@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises"
+import { open, lstat, realpath } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -74,6 +74,20 @@ async function readStdin() {
   return Buffer.concat(chunks)
 }
 
+async function checkedText(path, limit) {
+  const before = await lstat(path)
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || before.size > limit || await realpath(path) !== path) throw new Error("unsafe hook data")
+  const handle = await open(path, "r")
+  try {
+    const info = await handle.stat()
+    if (info.dev !== before.dev || info.ino !== before.ino || info.size !== before.size) throw new Error("changed hook data")
+    const buffer = Buffer.alloc(limit + 1)
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+    const after = await handle.stat(), current = await lstat(path)
+    if (bytesRead !== info.size || bytesRead > limit || info.mtimeMs !== after.mtimeMs || current.ino !== info.ino || current.dev !== info.dev) throw new Error("changed hook data")
+    return buffer.subarray(0, bytesRead).toString("utf8").trim()
+  } finally { await handle.close() }
+}
 async function forward() {
   try {
     const body = await readStdin()
@@ -81,10 +95,13 @@ async function forward() {
       const parsed = JSON.parse(body.toString("utf8"))
       const sanitized = sanitizeHookPayload(parsed)
       if (!sanitized.hookEventName) throw new Error("invalid hook input")
-      const endpoint = parseLoopbackHookUrl(process.env.CODEX_PET_HOOK_URL || DEFAULT_ENDPOINT)
+      const dataDir = await realpath(process.env.CODEX_PET_DATA_DIR || join(homedir(), ".codex-pet"))
+      const configured = process.env.CODEX_PET_HOOK_URL || DEFAULT_ENDPOINT
+      const address = configured === "discover" ? await checkedText(join(dataDir, "hook-endpoint"), 128) : configured
+      if (configured === "discover" && !/^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}\/hook$/.test(address)) return
+      const endpoint = parseLoopbackHookUrl(address)
       if (!endpoint) return
-      const dataDir = process.env.CODEX_PET_DATA_DIR || join(homedir(), ".codex-pet")
-      const token = (await readFile(join(dataDir, "adapter-token"), "utf8")).trim()
+      const token = await checkedText(join(dataDir, "adapter-token"), 512)
       if (token) {
         await fetch(endpoint, {
           method: "POST",

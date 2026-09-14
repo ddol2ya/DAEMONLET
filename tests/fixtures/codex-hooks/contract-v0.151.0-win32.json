@@ -1,0 +1,704 @@
+{
+  "schemaVersion": 1,
+  "codexVersion": "codex-cli 0.151.0",
+  "platform": "win32",
+  "architecture": "x64",
+  "artifactSha256": "cf68265897197ac5f3bff6a10c168eec159842b353129726da5e3ed6b91ef0f4",
+  "source": "Command-input JSON schemas extracted from the exact official npm native CLI artifact; generated placeholder fixtures, no actual session content",
+  "events": [
+    {
+      "event": "SessionStart",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "SessionStart",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "startup",
+              "resume",
+              "clear",
+              "compact"
+            ],
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "model",
+          "permission_mode",
+          "session_id",
+          "source",
+          "transcript_path"
+        ],
+        "title": "session-start.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "SessionStart",
+        "source": "startup"
+      }
+    },
+    {
+      "event": "SessionEnd",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "SessionEnd",
+            "type": "string"
+          },
+          "reason": {
+            "const": "other",
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "reason",
+          "session_id",
+          "transcript_path"
+        ],
+        "title": "session-end.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "hook_event_name": "SessionEnd",
+        "reason": "other"
+      }
+    },
+    {
+      "event": "UserPromptSubmit",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "UserPromptSubmit",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "model",
+          "permission_mode",
+          "prompt",
+          "session_id",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "user-prompt-submit.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "UserPromptSubmit",
+        "turn_id": "fixture-turn",
+        "prompt": "fixture content to discard"
+      }
+    },
+    {
+      "event": "PreToolUse",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "PreToolUse",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tool_input": true,
+          "tool_name": {
+            "type": "string"
+          },
+          "tool_use_id": {
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "model",
+          "permission_mode",
+          "session_id",
+          "tool_input",
+          "tool_name",
+          "tool_use_id",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "pre-tool-use.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "PreToolUse",
+        "turn_id": "fixture-turn",
+        "tool_name": "Bash",
+        "tool_use_id": "fixture-tool",
+        "tool_input": {
+          "command": "fixture content to discard"
+        }
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "PostToolUse",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "tool_input": true,
+          "tool_name": {
+            "type": "string"
+          },
+          "tool_response": true,
+          "tool_use_id": {
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "model",
+          "permission_mode",
+          "session_id",
+          "tool_input",
+          "tool_name",
+          "tool_response",
+          "tool_use_id",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "post-tool-use.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "PostToolUse",
+        "turn_id": "fixture-turn",
+        "tool_name": "Bash",
+        "tool_use_id": "fixture-tool",
+        "tool_input": {
+          "command": "fixture content to discard"
+        },
+        "tool_response": {
+          "output": "fixture content to discard"
+        }
+      }
+    },
+    {
+      "event": "SubagentStart",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "SubagentStart",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_type",
+          "cwd",
+          "hook_event_name",
+          "model",
+          "permission_mode",
+          "session_id",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "subagent-start.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "SubagentStart",
+        "turn_id": "fixture-turn",
+        "agent_id": "fixture-agent",
+        "agent_type": "worker"
+      }
+    },
+    {
+      "event": "SubagentStop",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "agent_transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "SubagentStop",
+            "type": "string"
+          },
+          "last_assistant_message": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "stop_hook_active": {
+            "type": "boolean"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_transcript_path",
+          "agent_type",
+          "cwd",
+          "hook_event_name",
+          "last_assistant_message",
+          "model",
+          "permission_mode",
+          "session_id",
+          "stop_hook_active",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "subagent-stop.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "SubagentStop",
+        "turn_id": "fixture-turn",
+        "agent_id": "fixture-agent",
+        "agent_type": "worker",
+        "agent_transcript_path": null,
+        "stop_hook_active": false,
+        "last_assistant_message": "fixture content to discard"
+      }
+    },
+    {
+      "event": "Stop",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "Stop",
+            "type": "string"
+          },
+          "last_assistant_message": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "stop_hook_active": {
+            "type": "boolean"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "last_assistant_message",
+          "model",
+          "permission_mode",
+          "session_id",
+          "stop_hook_active",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "stop.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "Stop",
+        "turn_id": "fixture-turn",
+        "stop_hook_active": false,
+        "last_assistant_message": null
+      }
+    },
+    {
+      "event": "Interrupt",
+      "schema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+          "NullableString": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "properties": {
+          "cwd": {
+            "type": "string"
+          },
+          "hook_event_name": {
+            "const": "Interrupt",
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "permission_mode": {
+            "enum": [
+              "default",
+              "acceptEdits",
+              "plan",
+              "dontAsk",
+              "bypassPermissions"
+            ],
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "transcript_path": {
+            "$ref": "#/definitions/NullableString"
+          },
+          "turn_id": {
+            "description": "Codex extension: expose the active turn id to internal turn-scoped hooks.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd",
+          "hook_event_name",
+          "model",
+          "permission_mode",
+          "session_id",
+          "transcript_path",
+          "turn_id"
+        ],
+        "title": "interrupt.command.input",
+        "type": "object"
+      },
+      "input": {
+        "cwd": "/fixture/0.153.4",
+        "session_id": "fixture-session",
+        "transcript_path": null,
+        "model": "fixture-model",
+        "permission_mode": "default",
+        "hook_event_name": "Interrupt",
+        "turn_id": "fixture-turn"
+      }
+    }
+  ]
+}

@@ -3,8 +3,9 @@
  * Place in tests/macos-candidate-retry.test.ts.
  *
  * Uses real temporary files, state IO and candidate locks. macOS verification,
- * compression and Hook subprocesses are fixture doubles; no Apple upload,
- * signing, real ZIP creation, or user configuration changes occur.
+ * compression and Hook subprocesses are fixture doubles in retry cases. Two
+ * macOS cases use real ZIPs and file metadata; no Apple upload, signing, or
+ * user configuration changes occur.
  *
  * These expectations intentionally fail on review HEAD 19cb8993.
  * If recovery becomes an explicit API, adapt the retry invocation to that API,
@@ -13,6 +14,8 @@
 import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), verify: vi.fn(), failStateWrite: null as string | null }))
@@ -114,6 +117,27 @@ async function attempts(root: string) {
   const entries = (await readdir(parent)).filter(name => /^(prepare|archive)-/.test(name))
   return Promise.all(entries.map(async id => ({ id, directory: join(parent, id), record: await readJSON(join(parent, id, "attempt.json")) })))
 }
+
+it.runIf(process.platform === "darwin").each(["prepare", "archive"] as const)(
+  "%s keeps AppleDouble metadata outside the app in a real ZIP",
+  async operation => {
+    const f = await fixture(operation === "prepare" ? "signed" : "notarized")
+    const execute = promisify(execFile)
+    await execute("/usr/bin/xattr", ["-w", "com.daemonlet.archive-fixture", "metadata", f.payloadPath])
+    mocks.run.mockImplementation(async (file: string, args: string[]) => {
+      if (file === "/usr/bin/ditto") return { code: 0, ...await execute(file, args) }
+      if (args.some(arg => arg.endsWith("hook-host-proof.ts"))) return { code: 0, stdout: "", stderr: "" }
+      throw new Error("Unexpected fixture subprocess")
+    })
+    const result = operation === "prepare" ? await prepareSubmission(f.root, "fixture-profile") : await createFinalArchive(f.root)
+    const archive = operation === "prepare" ? result.state.submission.path : result.state.final.path
+    const entries = (await execute("/usr/bin/unzip", ["-Z", "-1", archive])).stdout.trim().split("\n")
+    expect(entries).toContain(`${appName}/Contents/fixture-payload`)
+    expect(entries.some(path => path.startsWith("__MACOSX/") && path.endsWith("/._fixture-payload"))).toBe(true)
+    expect(entries.filter(path => path.startsWith(`${appName}/`) && path.split("/").some(part => part.startsWith("._")))).toEqual([])
+    expect(await readFile(f.payloadPath, "utf8")).toBe("unchanged-signed-payload-fixture")
+  },
+)
 
 it.each(["host", "compression"] as const)(
   "can recover a local %s failure without changing the accepted candidate or re-uploading",

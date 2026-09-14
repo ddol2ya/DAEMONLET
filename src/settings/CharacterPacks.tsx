@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { PACK_ERRORS, type CharacterEntry, type CharacterSnapshot, type ImportPreview } from "../../electron/shared/character-pack-contract"
+import { PACK_ERRORS, type CharacterEntry, type CharacterSnapshot, type ImportPreview, type PackProgress } from "../../electron/shared/character-pack-contract"
 import type { SettingsPageProps } from "./SettingsApp"
 
 const size = (bytes: number) => bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`
@@ -8,26 +8,34 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [installed, setInstalled] = useState<CharacterEntry | null>(null)
   const [choosing, setChoosing] = useState(false)
+  const [progress, setProgress] = useState<PackProgress | null>(null)
+  const loadingDialog = useRef<HTMLDialogElement>(null)
+  const loading = choosing && progress !== null || busy === "캐릭터 적용" || busy === "이전 버전 복원"
   const dialog = useRef<HTMLDialogElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     let active = true
     const receive = (s: CharacterSnapshot) => { if (active) setSnapshot(previous => !previous || s.generation >= previous.generation ? s : previous) }
     const unsubscribe = api.characters.onChanged(receive)
+    const unsubscribeProgress = api.characters.onProgress(value => { if (active) setProgress(value) })
     void run("캐릭터 목록 확인", () => api.characters.list().then(receive))
-    return () => { active = false; unsubscribe(); void api.characters.cancelImport().catch(() => {}) }
+    return () => { active = false; unsubscribe(); unsubscribeProgress(); void api.characters.cancelImport().catch(() => {}) }
   }, [api])
   useEffect(() => {
     if (preview && !dialog.current?.open) dialog.current?.showModal()
     if (!preview && dialog.current?.open) { dialog.current.close(); trigger.current?.focus() }
   }, [preview])
+  useEffect(() => {
+    if (loading && !loadingDialog.current?.open) loadingDialog.current?.showModal()
+    if (!loading && loadingDialog.current?.open) { loadingDialog.current.close(); trigger.current?.focus() }
+  }, [loading])
   const choose = async () => {
-    setChoosing(true); setInstalled(null)
+    setProgress(null); setChoosing(true); setInstalled(null)
     try { const result = await run("캐릭터 팩 검증", () => api.characters.chooseImport()); if (result) setPreview(result) }
     finally { setChoosing(false) }
   }
   const cancel = async () => { await api.characters.cancelImport(); setPreview(null) }
-  const apply = (entry: CharacterEntry) => void run("캐릭터 적용", () => api.characters.select({ id: entry.id, revision: entry.revision }))
+  const apply = (entry: CharacterEntry) => { setProgress(null); return void run("캐릭터 적용", () => api.characters.select({ id: entry.id, revision: entry.revision })) }
   const commit = async () => {
     if (!preview) return
     const result = await run("캐릭터 팩 설치", () => api.characters.commitImport(preview.token))
@@ -36,10 +44,9 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
   return <div className="character-packs">
     <div className="pack-toolbar"><h2>캐릭터</h2><button ref={trigger} className="button secondary small" disabled={Boolean(busy)} onClick={() => void choose()}>＋ 캐릭터 추가</button></div>
     {snapshot?.warning && <div className="notice warning" role="status">{snapshot.warning}</div>}
-    {choosing && <div className="notice neutral pack-progress" role="status"><span>파일과 캐릭터 동작을 확인하고 있어요.</span><button className="text-button" onClick={() => void cancel()}>취소</button></div>}
     {installed && <div className="notice success pack-progress" role="status"><span><strong>{installed.name}</strong> {installed.version} 버전이 준비됐어요.</span><button className="button primary small" disabled={Boolean(busy)} onClick={() => apply(installed)}>지금 적용</button></div>}
     <div className="pack-list" role="radiogroup" aria-label="캐릭터 선택">{snapshot?.entries.map(entry => <article className={`pack-card${selected === entry.id ? " selected" : ""}`} key={entry.id}>
-      <label className="pack-choice"><input type="radio" name="character" value={entry.id} checked={selected === entry.id} disabled={Boolean(busy) || entry.status !== "ready"} onChange={() => apply(entry)} aria-label={entry.name} />
+      <label className="pack-choice"><input type="radio" name="character" value={entry.id} checked={selected === entry.id} disabled={Boolean(busy) || entry.status === "disabled"} onChange={() => apply(entry)} aria-label={entry.name} />
         {entry.thumbnailUrl ? <img className="pack-thumbnail" src={entry.thumbnailUrl} alt="" width="48" height="56" /> : <span className={`pack-thumbnail pack-initial character-${entry.id}`} aria-hidden="true">{Array.from(entry.name)[0]}</span>}
         <span className="pack-title"><strong>{entry.name}</strong><small>{entry.source === "builtin" ? "기본 제공" : `v${entry.version} · ${entry.poseCount}포즈`}</small></span><span className="selection-mark" aria-hidden="true">{selected === entry.id ? "✓" : "○"}</span>
       </label>
@@ -51,6 +58,14 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
     </article>)}</div>
     {!snapshot && <p role="status">캐릭터 목록 불러오는 중…</p>}
     {snapshot && <p className="pack-storage">외부 캐릭터 저장량 <strong>{size(snapshot.storageBytes)}</strong> / {size(snapshot.storageLimitBytes)}</p>}
+    <dialog ref={loadingDialog} className="plan-dialog loading-dialog" aria-labelledby="pack-loading-title" aria-busy={loading} onCancel={event => { event.preventDefault(); if (choosing) void cancel() }}>
+      <span className="loading-spinner" aria-hidden="true" />
+      <h2 id="pack-loading-title">{choosing ? "캐릭터 가져오는 중" : "캐릭터 준비 중"}</h2>
+      <p role="status" aria-live="polite">{!progress ? choosing ? "파일을 선택하면 검사를 시작합니다." : "캐릭터를 화면에 준비하고 있어요." : progress.phase === "extract" ? "압축을 풀고 있어요." : progress.phase === "files" ? "캐릭터 파일을 확인하고 있어요." : `캐릭터 동작 확인 중 · ${progress.completed} / ${progress.total}`}</p>
+      {progress && progress.total > 0 && <progress max={progress.total} value={progress.completed} aria-label={progress.phase === "rig" ? "동작 검사 진행" : "파일 검사 진행"} />}
+      <p className="fine-print">포즈가 많은 캐릭터는 시간이 더 걸릴 수 있어요.</p>
+      {choosing && <button className="button secondary" onClick={() => void cancel()}>가져오기 취소</button>}
+    </dialog>
     <dialog ref={dialog} className="plan-dialog pack-dialog" aria-labelledby="pack-preview-title" onCancel={event => { event.preventDefault(); if (!busy) void cancel() }}>
       {preview && <><div className="dialog-heading"><div><span className="eyebrow">CHARACTER PACK</span><h2 id="pack-preview-title">{preview.kind === "installed" ? "이미 설치된 캐릭터" : preview.kind === "update" ? "캐릭터 업데이트" : "새 캐릭터 추가"}</h2></div></div>
         <div className="dialog-body"><h3>{preview.entry.name}</h3><dl className="diagnostic-list">

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, statfs } from "node:fs/promises"
 import { join, dirname, resolve, sep } from "node:path"
-import { PACK_LIMITS, isCharacterId, isRevision, comparePackVersions, type CharacterEntry, type CharacterSnapshot, type ImportPreview, type CharacterSelection } from "../shared/character-pack-contract"
+import { PACK_LIMITS, isCharacterId, isRevision, comparePackVersions, type CharacterEntry, type CharacterSnapshot, type ImportPreview, type CharacterSelection, type PackProgress } from "../shared/character-pack-contract"
 import { parsePackManifest } from "../shared/character-pack-validation"
 import { packAssetUrl } from "../shared/character-pack-path"
 import { containedFile, sha256, type ValidatedPack } from "./CharacterPackAssets"
@@ -34,6 +34,7 @@ export class CharacterRegistry {
   private pending: Pending | null = null
   private busy = false
   private usedBytes = 0
+  private viewGeneration = 0
   private warning: string | undefined
   private writable = true
 
@@ -47,7 +48,7 @@ export class CharacterRegistry {
     try { return await work() } finally { this.busy = false }
   }
 
-  async initialize(): Promise<void> {
+  async initialize(options: { deferRig?: boolean } = {}): Promise<void> {
     const catalog = JSON.parse(await readFile(join(this.builtinRoot, "catalog.json"), "utf8")) as { characters: string[] }
     for (const path of catalog.characters) {
       const c = JSON.parse(await readFile(join(this.builtinRoot, path), "utf8")) as { id: string; label: string; poses: unknown[] }
@@ -81,10 +82,10 @@ export class CharacterRegistry {
           try {
             const directory = this.revisionRoot(entry.id, revision)
             await this.requireDirectory(directory)
-            const pack = await this.validate({ kind: "directory", path: directory, rig: revision === entry.current })
+            const pack = await this.validate({ kind: "directory", path: directory, rig: !options.deferRig && revision === entry.current })
             if (pack.revision !== revision || pack.manifest.id !== entry.id) throw new Error("PACK_INTEGRITY")
             this.inventories.set(this.key(entry.id, revision), pack)
-            if (revision === entry.current) this.verified.set(this.key(entry.id, revision), pack)
+            if (!options.deferRig && revision === entry.current) this.verified.set(this.key(entry.id, revision), pack)
           } catch { if (revision === entry.current) this.failures.set(entry.id, "PACK_INTEGRITY") }
         }
       }
@@ -106,9 +107,10 @@ export class CharacterRegistry {
   snapshot(): CharacterSnapshot {
     const external = this.index.entries.filter(e => !this.builtin.has(e.id)).map(e => {
       const pack = this.verified.get(this.key(e.id, e.current)), previous = e.previous ? this.inventories.get(this.key(e.id, e.previous)) : undefined
-      return pack ? this.entryFor(pack, previous) : { id: e.id, name: e.id, source: "external" as const, version: "—", revision: e.current, manifestUrl: "", status: "disabled" as const, error: this.failures.get(e.id) ?? "PACK_UNAVAILABLE", bytes: 0, poseCount: 0 }
+      const inventory = this.inventories.get(this.key(e.id, e.current))
+      return pack ? this.entryFor(pack, previous) : inventory && !this.failures.has(e.id) ? { ...this.entryFor(inventory, previous), status: "pending" as const, manifestUrl: "", thumbnailUrl: undefined } : { id: e.id, name: e.id, source: "external" as const, version: "—", revision: e.current, manifestUrl: "", status: "disabled" as const, error: this.failures.get(e.id) ?? "PACK_UNAVAILABLE", bytes: 0, poseCount: 0 }
     })
-    return structuredClone({ generation: this.index.generation, entries: [...this.builtin.values(), ...external], storageBytes: this.usedBytes, storageLimitBytes: PACK_LIMITS.storageBytes, ...(this.warning ? { warning: this.warning } : {}) })
+    return structuredClone({ generation: this.index.generation + this.viewGeneration, entries: [...this.builtin.values(), ...external], storageBytes: this.usedBytes, storageLimitBytes: PACK_LIMITS.storageBytes, ...(this.warning ? { warning: this.warning } : {}) })
   }
   get(id: string): CharacterEntry | undefined { return this.snapshot().entries.find(e => e.id === id) }
   isAvailable = (id: string): boolean => this.get(id)?.status === "ready"
@@ -118,11 +120,29 @@ export class CharacterRegistry {
     if (!entry || entry.status !== "ready" || entry.revision !== selection.revision) throw new Error("PACK_UNAVAILABLE")
     return entry
   }
-  catalog() { return { schemaVersion: 1, generation: this.index.generation, characters: this.snapshot().entries.filter(e => e.status === "ready").map(e => e.manifestUrl) } }
+  /** Defer expensive rig decoding, never the asset authorization gate. */
+  async ensureReady(selection: CharacterSelection, progress?: (value: PackProgress) => void): Promise<CharacterEntry> {
+    const entry = this.get(selection.id)
+    if (!entry || entry.revision !== selection.revision || entry.status === "disabled") throw new Error("PACK_UNAVAILABLE")
+    if (entry.status === "ready") return entry
+    return this.exclusive(async () => {
+      const directory = this.revisionRoot(entry.id, entry.revision)
+      try {
+        await this.requireDirectory(directory)
+        const pack = await this.validate({ kind: "directory", path: directory }, undefined, progress)
+        if (pack.revision !== entry.revision || pack.manifest.id !== entry.id) throw new Error("PACK_INTEGRITY")
+        this.verified.set(this.key(entry.id, entry.revision), pack)
+        this.viewGeneration++
+        this.changed()
+        return this.requireSelection(selection)
+      } catch (error) { this.failures.set(entry.id, "PACK_INTEGRITY"); this.viewGeneration++; this.changed(); throw error }
+    })
+  }
+  catalog() { return { schemaVersion: 1, generation: this.index.generation + this.viewGeneration, characters: this.snapshot().entries.filter(e => e.status === "ready").map(e => e.manifestUrl) } }
   subscribe(listener: (snapshot: CharacterSnapshot) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   private changed() { const value = this.snapshot(); for (const listener of this.listeners) listener(value) }
 
-  async prepareImport(source: string, owner: string): Promise<ImportPreview> {
+  async prepareImport(source: string, owner: string, progress?: (value: PackProgress) => void): Promise<ImportPreview> {
     return this.exclusive(async () => {
       await this.cancelImport(owner)
       if (this.pending) throw new Error("PACK_BUSY")
@@ -135,7 +155,7 @@ export class CharacterRegistry {
         timer: setTimeout(() => { void this.cancelImport(owner) }, PACK_LIMITS.transactionMs) }
       this.pending = pending
       try {
-        const pack = await this.validate({ kind: "archive", path: source, transactionRoot: root }, controller.signal)
+        const pack = await this.validate({ kind: "archive", path: source, transactionRoot: root }, controller.signal, progress)
         if (controller.signal.aborted || this.pending !== pending) throw new Error("PACK_CANCELLED")
         if (this.builtin.has(pack.manifest.id)) throw new Error("PACK_BUILTIN")
         const stored = this.index.entries.find(e => e.id === pack.manifest.id), current = this.get(pack.manifest.id)
@@ -146,7 +166,7 @@ export class CharacterRegistry {
             if (old?.manifest.version === pack.manifest.version && old.revision !== pack.revision) throw new Error("PACK_CONFLICT")
           }
           if (stored.current === pack.revision) kind = "installed"
-          else if (current?.status === "ready") {
+          else if (current && current.status !== "disabled") {
             const compare = comparePackVersions(pack.manifest.version, current.version)
             if (compare < 0) throw new Error("PACK_DOWNGRADE")
             if (compare === 0) throw new Error("PACK_CONFLICT")
@@ -209,7 +229,8 @@ export class CharacterRegistry {
   }
   async rollback(selection: CharacterSelection): Promise<void> {
     return this.exclusive(async () => {
-      this.requireSelection(selection)
+      const currentEntry = this.get(selection.id)
+      if (!currentEntry || currentEntry.status === "disabled" || currentEntry.revision !== selection.revision) throw new Error("PACK_UNAVAILABLE")
       const next = structuredClone(this.index), entry = next.entries.find(e => e.id === selection.id)
       if (!entry || !entry.previous || !this.inventories.has(this.key(entry.id, entry.previous))) throw new Error("PACK_UNAVAILABLE")
       // Archived revisions keep integrity-checked metadata at startup. Decode

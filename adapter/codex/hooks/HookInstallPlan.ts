@@ -1,5 +1,5 @@
 import { posix } from "node:path"
-import { createHookCommand, hashText, HOOK_MARKER, legacyHookCommands, PACKAGED_HOOK_TIMEOUT_SECONDS, type HookLaunchSpec } from "./HookLaunchSpec.ts"
+import { createHookCommand, hashText, HOOK_MARKER, legacyHookCommands, PACKAGED_HOOK_TIMEOUT_SECONDS, WINDOWS_HOOK_TIMEOUT_SECONDS, hookCommandTimeoutSeconds, resemblesEncodedWindowsHook, type HookLaunchSpec } from "./HookLaunchSpec.ts"
 import { MAX_HOOK_FILE_BYTES, isObject, parseHooksFile, type HookGroup, type HooksFile, type JsonObject } from "./HookJson.ts"
 import { HOOK_EVENTS } from "./HookEvents.ts"
 
@@ -53,7 +53,7 @@ const publicEvent = (event: string): string => (INSTALLED_HOOK_EVENTS as readonl
 
 export function hookHandler(spec: HookLaunchSpec, legacyDevelopment = false): JsonObject {
   if (legacyDevelopment) return { type: "command", ...legacyHookCommands(spec.executablePath, spec.forwarderPath), timeout: 1 }
-  return { type: "command", command: createHookCommand(spec), timeout: spec.mode === "packaged-electron-node" ? PACKAGED_HOOK_TIMEOUT_SECONDS : 1 }
+  return { type: "command", command: createHookCommand(spec), timeout: hookCommandTimeoutSeconds(spec) }
 }
 
 export function classifyHandler(handler: JsonObject, group: HookGroup, context: OwnershipContext): Ownership {
@@ -66,7 +66,7 @@ export function classifyHandler(handler: JsonObject, group: HookGroup, context: 
     return legacy && !exact && !recorded ? "legacy-recognized" : "managed-exact"
   }
   const command = typeof handler.command === "string" ? handler.command : ""
-  const resemblesOwnedCommand = command.includes(HOOK_MARKER) && (command.includes("hook-forwarder.mjs") || command.startsWith("/usr/bin/env -i "))
+  const resemblesOwnedCommand = resemblesEncodedWindowsHook(command) || command.includes(HOOK_MARKER) && (command.includes("hook-forwarder.mjs") || command.includes("hook-host.exe") || command.startsWith("/usr/bin/env -i "))
   return resemblesOwnedCommand ? "ambiguous" : "foreign"
 }
 
@@ -198,6 +198,7 @@ export function planHookEdit(options: {
       changes.push({ event, operation: "add", reasonCode: "CURRENT_APP_COMMAND" })
     }
     if (Number(options.context.desiredHandler.timeout) === PACKAGED_HOOK_TIMEOUT_SECONDS) warnings.push("PACKAGED_TIMEOUT_2_SECONDS")
+    if (Number(options.context.desiredHandler.timeout) === WINDOWS_HOOK_TIMEOUT_SECONDS) warnings.push("PACKAGED_TIMEOUT_3_SECONDS")
   } else if (options.action === "uninstall") {
     removeOwned(next, options.context, () => true, changes, "REMOVE_OWNED_HANDLER")
   } else {
