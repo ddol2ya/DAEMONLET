@@ -1,14 +1,16 @@
 import { createServer, type Socket } from "node:net"
 import { randomUUID } from "node:crypto"
 import { DatabaseSync } from "node:sqlite"
-import { access, chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { access, chmod, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { windowsDesktopPipe } from "../../electron/shared/desktop-ipc-endpoint.mjs"
 
 /** Synthetic desktop owner for protocol/UI verification; refuses non-fixture homes. */
 export async function createDesktopControlFixture(options: { home?: string; fragmented?: boolean } = {}) {
-  const home = options.home ?? await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-fixture-"))
+  // Windows CI may provide an 8.3 alias in TEMP; production readers require
+  // canonical paths. Keep synthetic metadata canonical at its point of creation.
+  const home = options.home ?? await realpath(await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-fixture-")))
   if (!home.split(/[\\/]/).some(part => /^2dl-desktop-(fixture|home)-/.test(part))) throw new Error("Desktop fixture requires an isolated test home")
   if (process.platform === "win32" && process.env.ELECTRON_SMOKE_TEST !== "1") throw new Error("Windows fixture requires explicit smoke isolation")
   const ipcDir = join(home, "ipc"), databasePath = join(home, "state_5.sqlite")
