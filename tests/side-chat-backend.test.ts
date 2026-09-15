@@ -51,6 +51,13 @@ describe("dedicated side chat RPC", () => {
     expect(f.client.request.mock.calls.some(([method]) => method === "thread/resume")).toBe(false)
     await f.backend.close(); expect(f.processStop).toHaveBeenCalledTimes(1)
   })
+  it("cancels a queued reopen when close is called again", async () => {
+    const f = fixture(); await f.open(); await f.backend.close()
+    const opening = f.open(), closing = f.backend.close()
+    await expect(opening).rejects.toThrow("SESSION_LOST"); await closing
+    expect(f.backend.isSessionOpen()).toBe(false)
+    expect(f.client.request.mock.calls.filter(([method]) => method === "thread/fork")).toHaveLength(1)
+  })
   it("interrupts only the currently owned child turn", async () => {
     const f = fixture(); await f.open(); const result = f.backend.send("hi"); const checked = expect(result).rejects.toThrow("STOPPED")
     await f.backend.stop(); await checked
@@ -141,7 +148,7 @@ describe("authoritative item completion", () => {
   })
   it.each(["interrupted", "failed"])("does not promote late items after %s to success or the next turn", async status => {
     const f = fixture(); await f.open(); const sent = f.backend.send("hello")
-    const checked = expect(sent).rejects.toThrow(status === "interrupted" ? "STOPPED" : "SESSION_LOST")
+    const checked = expect(sent).rejects.toThrow(status === "interrupted" ? "STOPPED" : "TURN_FAILED")
     emit(f, "item/started", message()); end(f, [], status); await checked
     const next = f.backend.send("B"); emit(f, "item/completed", message()); f.final("child", "turn-2")
     await expect(next).resolves.toMatchObject({ text: "Hello" }); await f.backend.close()

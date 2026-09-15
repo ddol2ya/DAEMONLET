@@ -2,17 +2,18 @@ import { randomUUID } from "node:crypto"
 import { SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatSubmission, type ChatError, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
 import type { AppLanguage } from "../../shared/app-language"
 import type { PersonaBinding } from "./PersonaResolver"
-import type { ChatParent, SideChatBackend } from "./SideChatBackend"
+import type { ChatParent, ChatSessionClosed, SideChatBackend } from "./SideChatBackend"
 
-const errors = new Set<ChatError>(["CHAT_MODEL_UNAVAILABLE", "CHAT_PROFILE_MISSING", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_AUTH_REQUIRED", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY", "PARENT_UNSUPPORTED", "PARENT_CAPABILITIES", "CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "RESPONSE_LIMIT", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
+const errors = new Set<ChatError>(["TURN_FAILED", "CHAT_MODEL_UNAVAILABLE", "CHAT_PROFILE_MISSING", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_AUTH_REQUIRED", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY", "PARENT_UNSUPPORTED", "PARENT_CAPABILITIES", "CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "RESPONSE_LIMIT", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
 export function chatError(error: unknown): ChatError { const code = error instanceof Error ? error.message as ChatError : "SESSION_LOST"; return errors.has(code) ? code : "SESSION_LOST" }
 
 /** All transcripts, drafts and request IDs live only in this instance's memory. */
 export class SideChatService {
-  private state: SideChatSnapshot = { handle: randomUUID(), epoch: 1, enabled: false, mode: "hidden", language: "ko", character: { id: "gpichan", label: "지피쨩" }, parent: null, candidates: [], phase: "idle", applying: false, error: null, notice: null, messages: [], draft: "", draftRevision: 0, acceptedSubmission: null, task: { state: "unknown", checkedAt: null } }
+  private state: SideChatSnapshot = { handle: randomUUID(), epoch: 1, enabled: false, mode: "hidden", language: "ko", character: { id: "gpichan", label: "지피쨩" }, parent: null, candidates: [], phase: "idle", applying: false, requiresNewConversation: false, error: null, notice: null, messages: [], draft: "", draftRevision: 0, acceptedSubmission: null, task: { state: "unknown", checkedAt: null } }
   private persona: PersonaBinding | null = null
   private parent: ChatParent | null = null
   private backend: SideChatBackend | null = null
+  private unsubscribeBackend: (() => void) | null = null
   private candidates = new Map<string, ChatParent>()
   private requests = new Set<string>()
   private listeners = new Set<() => void>()
@@ -75,13 +76,29 @@ export class SideChatService {
     this.requests.add(request.requestId)
   }
   reset() { this.resetConversation("reset"); this.publish() }
+  private observeBackend(backend: SideChatBackend) {
+    this.unsubscribeBackend?.()
+    const epoch = this.state.epoch
+    this.unsubscribeBackend = backend.onSessionClosed(event => this.sessionClosed(backend, epoch, event))
+  }
+  private discardBackend(backend: SideChatBackend | null) {
+    if (!backend || this.backend !== backend) return
+    this.unsubscribeBackend?.(); this.unsubscribeBackend = null; this.backend = null
+    this.cleanup = Promise.allSettled([this.cleanup, backend.close()])
+  }
+  private sessionClosed(backend: SideChatBackend, epoch: number, event: ChatSessionClosed) {
+    if (this.backend !== backend || this.state.epoch !== epoch) return
+    this.discardBackend(backend); this.deferred = null
+    this.state.requiresNewConversation = event.hadSession || this.state.parent?.contextAt != null
+    this.state.error = chatError(event.error); this.state.phase = "error"
+    this.publish()
+  }
   private resetConversation(notice: SideChatSnapshot["notice"]) {
     this.state.acceptedSubmission = null
-    this.state.epoch++; this.state.messages = []; this.state.phase = "idle"; this.state.error = null; this.state.notice = notice
+    this.state.epoch++; this.state.messages = []; this.state.phase = "idle"; this.state.error = null; this.state.requiresNewConversation = false; this.state.notice = notice
     if (this.state.parent) this.state.parent.contextAt = null
     this.requests.clear(); this.deferred = null
-    const backend = this.backend; this.backend = null
-    if (backend) this.cleanup = Promise.allSettled([this.cleanup, backend.close()])
+    this.discardBackend(this.backend)
   }
   async send(text: string, submission: ChatSubmission = { requestId: randomUUID(), draftRevision: this.state.draftRevision + 1 }): Promise<void> {
     if (!this.state.enabled) throw new Error("CHAT_DISABLED")
@@ -89,7 +106,6 @@ export class SideChatService {
     if (!validChatInput(text)) throw new Error("INPUT_LIMIT")
     if (!this.persona) throw new Error("PACK_PERSONA")
     if (!this.parent) throw new Error("NO_PARENT")
-    if (["OUTCOME_UNKNOWN", "SESSION_LOST"].includes(this.state.error ?? "")) throw new Error(this.state.error!)
     const bytes = this.state.messages.reduce((sum, m) => sum + utf8Bytes(m.text) + utf8Bytes(m.preview), 0)
     if (this.state.messages.length + 2 > SIDE_CHAT_LIMITS.messages || bytes + utf8Bytes(text) + SIDE_CHAT_LIMITS.responseBytes + SIDE_CHAT_LIMITS.previewBytes > SIDE_CHAT_LIMITS.historyBytes) throw new Error("HISTORY_LIMIT")
     if (!Number.isSafeInteger(submission.draftRevision) || submission.draftRevision < 0) throw new Error("INVALID_REQUEST")
@@ -97,25 +113,36 @@ export class SideChatService {
     // Save the submitted edit before opening. A known predispatch failure leaves it intact;
     // later edits remain authoritative, even if they happen to contain the same text.
     this.state.draft = text; this.state.draftRevision = submission.draftRevision
+    if (this.state.requiresNewConversation) { this.publish(); throw new Error(this.state.error ?? "SESSION_LOST") }
     const epoch = this.state.epoch, parent = this.parent, persona = this.persona
+    let sendingBackend: SideChatBackend | null = this.backend
     this.state.phase = "preparing"; this.state.error = null; this.publish()
-    let dispatched = false
+    let dispatched = false, prepared = Boolean(this.backend?.isSessionOpen())
     try {
       await this.cleanup
-      if (epoch !== this.state.epoch) return
+      if (epoch !== this.state.epoch || this.state.requiresNewConversation || sendingBackend && this.backend !== sendingBackend) return
       if (!this.backend) {
-        const backend = this.createBackend(parent); this.backend = backend
+        const backend = this.createBackend(parent); this.backend = backend; sendingBackend = backend
+        this.observeBackend(backend)
         const fork = await backend.open(parent, persona.compiled)
         if (epoch !== this.state.epoch || this.backend !== backend) { await backend.close(); return }
         if (this.state.parent) this.state.parent.contextAt = fork.contextAt
       }
       const backend = this.backend
+      if (!backend?.isSessionOpen()) {
+        if (backend) this.sessionClosed(backend, epoch, { error: new Error("SESSION_LOST"), hadSession: this.state.parent?.contextAt != null })
+        return
+      }
+      prepared = true
       if (this.state.applying) throw new Error("BUSY")
       this.state.messages.push({ id: randomUUID(), role: "user", text, preview: "", at: Date.now() })
       this.state.acceptedSubmission = { ...submission }
       if (this.state.draftRevision === submission.draftRevision) this.state.draft = ""
-      this.state.phase = "answering"; this.state.notice = null; this.publish(); dispatched = true
-      const response = await backend.send(text, { ...this.state.task })
+      this.state.phase = "answering"; this.state.notice = null; dispatched = true
+      // No publication/user callback between the live-session check and handoff.
+      const pending = backend.send(text, { ...this.state.task })
+      this.publish()
+      const response = await pending
       const apply = () => {
         if (epoch !== this.state.epoch || this.backend !== backend) return
         this.appendResponse(response); this.state.phase = "idle"; this.publish()
@@ -123,15 +150,14 @@ export class SideChatService {
       if (epoch === this.state.epoch && this.state.applying) this.deferred = apply
       else apply()
     } catch (error) {
-      if (epoch !== this.state.epoch) return
+      if (epoch !== this.state.epoch || sendingBackend && this.backend !== sendingBackend) return
+      if (!dispatched && !prepared) this.discardBackend(sendingBackend)
       const apply = () => {
+        if (epoch !== this.state.epoch || dispatched && sendingBackend && this.backend !== sendingBackend) return
         this.state.error = chatError(error); this.state.phase = this.state.error === "STOPPED" ? "stopped" : "error"
         this.publish()
       }
       if (this.state.applying) this.deferred = apply; else apply()
-      if (!dispatched || ["SESSION_LOST", "OUTCOME_UNKNOWN", "CHAT_POLICY_UNENFORCEABLE"].includes(chatError(error))) {
-        const backend = this.backend; this.backend = null; if (backend) this.cleanup = backend.close()
-      }
     }
   }
   private appendResponse(response: ChatResponse) { this.state.messages.push({ id: randomUUID(), role: "assistant", text: response.text, preview: response.preview, at: Date.now() }) }
@@ -139,7 +165,8 @@ export class SideChatService {
     if (this.state.applying) throw new Error("BUSY")
     if (this.state.phase === "preparing") {
       this.state.epoch++; this.requests.clear(); this.state.phase = "stopped"; this.state.error = "STOPPED"
-      if (!this.state.messages.length) { const backend = this.backend; this.backend = null; if (backend) this.cleanup = backend.close(); if (this.state.parent) this.state.parent.contextAt = null }
+      if (!this.state.messages.length) { this.discardBackend(this.backend); if (this.state.parent) this.state.parent.contextAt = null }
+      else if (this.backend) this.observeBackend(this.backend)
       this.publish(); return
     }
     await this.backend?.stop()

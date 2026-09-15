@@ -7,7 +7,10 @@ import type { AppServerJsonlClient } from "../../../adapter/codex/app-server/App
 
 export type ChatParent = { threadId: string; title: string; cwd: string; path?: string; sourceHome?: string }
 export type ForkContext = { threadId: string; lastTurnId: string; contextAt: number }
+export type ChatSessionClosed = { error: Error; hadSession: boolean }
 export interface SideChatBackend {
+  isSessionOpen(): boolean
+  onSessionClosed(listener: (event: ChatSessionClosed) => void): () => void
   open(parent: ChatParent, persona: CompiledPersona): Promise<ForkContext>
   send(text: string, observation?: { state: string; checkedAt: number | null }): Promise<ChatResponse>
   stop(): Promise<void>
@@ -29,9 +32,21 @@ export class CodexSideChatBackend implements SideChatBackend {
   private generation = 0
   private active: ActiveSend | null = null
   private cleanup: Array<() => void> = []
+  private closing: Promise<void> | null = null
+  private closedListeners = new Set<(event: ChatSessionClosed) => void>()
+  isSessionOpen() { return Boolean(this.connection && this.child && this.persona) }
+  onSessionClosed(listener: (event: ChatSessionClosed) => void) {
+    this.closedListeners.add(listener)
+    return () => { this.closedListeners.delete(listener) }
+  }
   constructor(private readonly connect: () => Promise<ChatConnection>, private readonly owned: (id: string) => void | Promise<void> = () => {}) {}
   async open(parent: ChatParent, persona: CompiledPersona): Promise<ForkContext> {
     const generation = ++this.generation
+    if (this.closing) {
+      await this.closing
+      if (generation !== this.generation) throw new Error("SESSION_LOST")
+      this.closing = null
+    }
     const connection = await this.connect()
     if (generation !== this.generation) { await connection.stop(); throw new Error("SESSION_LOST") }
     this.connection = connection; this.persona = persona
@@ -40,8 +55,7 @@ export class CodexSideChatBackend implements SideChatBackend {
     this.cleanup.push(client.onClose(() => {
       if (!current()) return
       const request = this.active
-      if (request) this.finish(request, new Error(request.turnId ? "OUTCOME_UNKNOWN" : "SESSION_LOST"))
-      void this.close()
+      void this.close(request?.turnId ? "OUTCOME_UNKNOWN" : "SESSION_LOST")
     }))
     this.cleanup.push(client.onServerRequest(request => {
       if (!current()) return
@@ -49,15 +63,13 @@ export class CodexSideChatBackend implements SideChatBackend {
         void connection.refreshAuth().then(tokens => { if (current()) return client.respondToServerRequest(request.id, tokens) }).catch(() => {
           if (!current()) return
           void client.rejectServerRequest(request.id).catch(() => {})
-          if (this.active) this.finish(this.active, new Error("CHAT_AUTH_REQUIRED"))
-          void this.close()
+          void this.close("CHAT_AUTH_REQUIRED")
         })
         return
       }
       // Defense in depth: the policy gate must prevent tools before this point.
       void client.rejectServerRequest(request.id).catch(() => {})
-      if (this.active) this.finish(this.active, new Error("CHAT_POLICY_UNENFORCEABLE"))
-      void this.close()
+      void this.close("CHAT_POLICY_UNENFORCEABLE")
     }))
     this.cleanup.push(client.onNotification((method, params) => { if (current()) this.notification(method, params) }))
     if (client.handshakeState !== "READY") await client.initialize({ name: "daemonlet_side_chat", title: "Daemonlet side chat", version: "1" }, "side-chat")
@@ -92,7 +104,7 @@ export class CodexSideChatBackend implements SideChatBackend {
   }
   private failAndClose(request: ActiveSend, code: string): void {
     if (!this.owns(request)) return
-    this.finish(request, new Error(code)); void this.close()
+    void this.close(code)
   }
   async send(text: string, observation?: { state: string; checkedAt: number | null }): Promise<ChatResponse> {
     if (!this.connection || !this.child || !this.persona) throw new Error("SESSION_LOST")
@@ -133,7 +145,7 @@ export class CodexSideChatBackend implements SideChatBackend {
     }
     if (method !== "turn/completed" || !request.turnId || turn.id !== request.turnId) return
     if (turn.status === "interrupted") { this.finish(request, new Error("STOPPED")); return }
-    if (turn.status !== "completed") { this.finish(request, new Error("SESSION_LOST")); return }
+    if (turn.status !== "completed") { this.finish(request, new Error("TURN_FAILED")); return }
     try { this.finish(request, request.collector.finish(turn.items)) }
     catch (error) { this.finish(request, error instanceof Error ? error : new Error("RESPONSE_INVALID")) }
   }
@@ -148,11 +160,22 @@ export class CodexSideChatBackend implements SideChatBackend {
       this.finish(request, new Error("STOPPED"))
     } catch { this.failAndClose(request, "OUTCOME_UNKNOWN") }
   }
-  async close(): Promise<void> {
-    if (this.active) this.finish(this.active, new Error("SESSION_LOST"))
-    this.generation++
-    for (const unsubscribe of this.cleanup.splice(0)) unsubscribe()
-    const connection = this.connection; this.connection = null; this.child = null; this.persona = null
-    await connection?.stop()
+  close(code = "SESSION_LOST"): Promise<void> {
+    if (this.closing) { this.generation++; return this.closing }
+    let resolve!: () => void, reject!: (error: unknown) => void
+    const closing = this.closing = new Promise<void>((yes, no) => { resolve = yes; reject = no })
+    const connection = this.connection, hadSession = this.child !== null
+    try {
+      if (this.active) this.finish(this.active, new Error(code))
+      this.generation++
+      for (const unsubscribe of this.cleanup.splice(0)) unsubscribe()
+      this.connection = null; this.child = null; this.persona = null
+      // Reentrant service disposal observes this same cleanup promise.
+      if (connection) for (const listener of [...this.closedListeners]) listener({ error: new Error(code), hadSession })
+      Promise.resolve().then(() => connection?.stop()).then(resolve, reject)
+    } catch (error) {
+      Promise.resolve().then(() => connection?.stop()).then(() => reject(error), reject)
+    }
+    return closing
   }
 }

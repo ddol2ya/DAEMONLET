@@ -1,4 +1,5 @@
-import { app, BrowserWindow, clipboard, ipcMain } from "electron"
+import type { ChatSessionClosed } from "../../electron/main/side-chat/SideChatBackend"
+import { app, dialog, BrowserWindow, clipboard, ipcMain } from "electron"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { installAppProtocol, registerAppScheme } from "../../electron/main/AppProtocol"
@@ -37,7 +38,25 @@ ipcMain.handle(TASK_CONTROL_IPC.getView, () => ({ ok: true, value: { view: "acti
 bubbles.update(activity)
 await pet.loadURL("pet://app/pet.html")
 let answer: ChatResponse = { text: "듣고 있습니다. 무엇이 궁금하십니까?", preview: "", expression: "neutral" }
-const service = new SideChatService(() => ({ open: async () => { opens++; await openGate?.(); return { threadId: "owned-child", lastTurnId: "done", contextAt: Date.now() - 10000 } }, send: async text => { calls++; sentTexts.push(text); await wait(80); if (sendError) throw Error(sendError); return answer }, stop: async () => {}, close: async () => { closes++ } }))
+const service = new SideChatService(() => {
+  let opened = false
+  const listeners = new Set<(event: ChatSessionClosed) => void>()
+  return {
+    isSessionOpen: () => opened,
+    onSessionClosed: listener => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    open: async () => { opens++; await openGate?.(); opened = true; return { threadId: "owned-child", lastTurnId: "done", contextAt: Date.now() - 10000 } },
+    send: async text => {
+      calls++; sentTexts.push(text); await wait(80)
+      if (sendError) {
+        const error = Error(sendError)
+        opened = false; for (const listener of [...listeners]) listener({ error, hadSession: true })
+        throw error
+      }
+      return answer
+    },
+    stop: async () => {}, close: async () => { opened = false; closes++ },
+  }
+})
 const win = new SideChatWindowController({ preload: join(root, "dist-electron/side-chat-preload.cjs"), distRoot: join(root, "dist"), pet: () => pet, hidden: () => service.setMode("hidden"), visibility: value => bubbles.presentation.setSideChatVisible(value) })
 const ipc = new SideChatIpcController(service, win)
 ipc.register(); service.subscribe(() => win.show(service.snapshot()))
@@ -131,6 +150,30 @@ try {
   const unknownCalls = calls; await type("manual retry", 0); await enter(); await wait(280)
   assert(calls === unknownCalls && service.snapshot().error === "OUTCOME_UNKNOWN", "F3 unknown outcome stays blocked without retry")
   sendError = null; service.reset()
+
+  // Recovery UI: no send or receipt until the user explicitly starts a new conversation.
+  sendError = "CHAT_AUTH_REQUIRED"
+  await type("expire authenticated child", 0); await enter()
+  await until('document.querySelector(".recovery")?.textContent.includes("Check your Codex login")')
+  const recoveryCalls = calls, recoveryOpens = opens, recoveryReceipt = service.snapshot().acceptedSubmission
+  await type("keep next recovery draft", 0); await enter(); await wait(280)
+  assert(await js('document.querySelector(".send").disabled && document.querySelector("textarea").value === "keep next recovery draft"'), "Closed-child UI preserves draft and disables sending")
+  assert(calls === recoveryCalls && service.snapshot().acceptedSubmission?.requestId === recoveryReceipt?.requestId, "Closed child produces no fake receipt or extra request")
+  sendError = null; await wait(100); assert(opens === recoveryOpens, "Login recovery never reconnects automatically")
+  service.setMode("compact"); await wait(100)
+  await writeFile(join(output, "auth-new-conversation-required.png"), (await contents.capturePage()).toPNG())
+  // Deterministic synthetic user choice in the existing native reset confirmation.
+  const originalDialog = dialog.showMessageBox
+  let confirmations = 0
+  dialog.showMessageBox = (async () => { confirmations++; return { response: 1, checkboxChecked: false } }) as typeof dialog.showMessageBox
+  await js("document.querySelector('.quiet').click()")
+  await until('!document.querySelector(".recovery")')
+  dialog.showMessageBox = originalDialog; assert(confirmations === 1, "Existing reset confirmation was honored")
+  assert(await js('document.querySelector("textarea").value === "keep next recovery draft"'), "Explicit reset retains unsent draft")
+  assert(calls === recoveryCalls && opens === recoveryOpens && service.snapshot().messages.length === 0, "Reset itself makes no model request")
+  await enter(); await idle()
+  assert(calls === recoveryCalls + 1 && opens === recoveryOpens + 1 && sentTexts.at(-1) === "keep next recovery draft", "Only manual send opens a fresh context")
+  Object.assign(result, { closedChildRecovery: "PASS", recoveryDraftPreserved: "PASS", noAutomaticReconnect: "PASS" })
 
   // F1: actual dialogue controller expires through the production Pet hook + IPC while chat owns the surface.
   service.setMode("hidden")

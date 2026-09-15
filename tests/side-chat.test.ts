@@ -1,3 +1,4 @@
+import type { ChatSessionClosed } from "../electron/main/side-chat/SideChatBackend"
 import { describe, expect, it, vi } from "vitest"
 import { randomUUID } from "node:crypto"
 import { SideChatService } from "../electron/main/side-chat/SideChatService"
@@ -12,10 +13,11 @@ const response = { text: "응답입니다.", preview: "", expression: "neutral" 
 const persona = (id: string, language: "ko" | "en" = "ko") => ({ id, revision: "builtin", label: id, compiled: compilePersona(id, neutralPersona(), language) })
 function fixture() {
   let resolve!: (v: typeof response) => void, reject!: (error: Error) => void
-  const backend = { open: vi.fn(async () => ({ threadId: "child", lastTurnId: "done", contextAt: 123 })), send: vi.fn(() => new Promise<typeof response>((yes, no) => { resolve = yes; reject = no })), stop: vi.fn(async () => reject(new Error("STOPPED"))), close: vi.fn(async () => {}) }
+  const closed = new Set<(event: ChatSessionClosed) => void>()
+  const backend = { isSessionOpen: () => true, onSessionClosed: (listener: (event: ChatSessionClosed) => void) => { closed.add(listener); return () => { closed.delete(listener) } }, open: vi.fn(async () => ({ threadId: "child", lastTurnId: "done", contextAt: 123 })), send: vi.fn(() => new Promise<typeof response>((yes, no) => { resolve = yes; reject = no })), stop: vi.fn(async () => reject(new Error("STOPPED"))), close: vi.fn(async () => {}) }
   const factory = vi.fn(() => backend), service = new SideChatService(factory)
   service.configure(true, "ko"); service.applyPersona(persona("A")); service.setCandidates([{ threadId: "parent", title: "Selected task", cwd: "/synthetic" }], "parent")
-  return { service, backend, factory, finish: () => resolve(response), fail: () => reject(new Error("OUTCOME_UNKNOWN")) }
+  return { service, backend, factory, finish: () => resolve(response), fail: () => { const error = new Error("OUTCOME_UNKNOWN"); for (const listener of closed) listener({ error, hadSession: true }); reject(error) } }
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0))
 describe("side chat lifetime", () => {
