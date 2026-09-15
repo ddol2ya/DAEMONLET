@@ -13,6 +13,7 @@ import { neutralPersona } from "../../electron/shared/character-persona"
 const { values } = parseArgs({ options: { tool: { type: "string" }, codex: { type: "string" }, output: { type: "string" } } })
 if (!values.codex || !values.output) throw Error("--codex and --output required")
 const tools = ["apply_patch", "view_image", "exec_command", "request_user_input"] as const
+if (values.tool && !tools.some(name => name === values.tool)) throw Error("Unknown --tool; no controls executed")
 const report: any = { kind: "real-cli-tool-positive-negative-controls", realAccountCalls: 0, executableSha256: createHash("sha256").update(await readFile(values.codex)).digest("hex"), trials: [] }
 function pngFixture() {
   const chunk = (type: string, data: Buffer) => {
