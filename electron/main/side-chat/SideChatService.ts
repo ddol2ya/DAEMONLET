@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatError, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
+import { SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatSubmission, type ChatError, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
 import type { AppLanguage } from "../../shared/app-language"
 import type { PersonaBinding } from "./PersonaResolver"
 import type { ChatParent, SideChatBackend } from "./SideChatBackend"
@@ -9,7 +9,7 @@ export function chatError(error: unknown): ChatError { const code = error instan
 
 /** All transcripts, drafts and request IDs live only in this instance's memory. */
 export class SideChatService {
-  private state: SideChatSnapshot = { handle: randomUUID(), epoch: 1, enabled: false, mode: "hidden", language: "ko", character: { id: "gpichan", label: "지피쨩" }, parent: null, candidates: [], phase: "idle", applying: false, error: null, notice: null, messages: [], draft: "", task: { state: "unknown", checkedAt: null } }
+  private state: SideChatSnapshot = { handle: randomUUID(), epoch: 1, enabled: false, mode: "hidden", language: "ko", character: { id: "gpichan", label: "지피쨩" }, parent: null, candidates: [], phase: "idle", applying: false, error: null, notice: null, messages: [], draft: "", draftRevision: 0, acceptedSubmission: null, task: { state: "unknown", checkedAt: null } }
   private persona: PersonaBinding | null = null
   private parent: ChatParent | null = null
   private backend: SideChatBackend | null = null
@@ -26,7 +26,7 @@ export class SideChatService {
     if (this.state.language !== language) { this.state.language = language; this.resetConversation("language"); this.persona = null }
     if (this.state.enabled !== enabled) {
       this.state.enabled = enabled
-      if (!enabled) { this.resetConversation(null); this.state.draft = ""; this.state.mode = "hidden" }
+      if (!enabled) { this.resetConversation(null); this.state.draft = ""; this.state.draftRevision++; this.state.mode = "hidden" }
     }
     this.publish()
   }
@@ -56,7 +56,14 @@ export class SideChatService {
     this.resetConversation("parent"); this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null }; this.publish()
   }
   setMode(mode: SideChatSnapshot["mode"]) { if (mode !== "hidden" && !this.state.enabled) throw new Error("CHAT_DISABLED"); this.state.mode = mode; this.publish() }
-  setDraft(text: string) { if (!this.state.enabled) throw new Error("CHAT_DISABLED"); if (!validChatInput(text, true)) throw new Error("INPUT_LIMIT"); this.state.draft = text; this.publish() }
+  setDraft(text: string, revision = this.state.draftRevision + 1) {
+    if (!this.state.enabled) throw new Error("CHAT_DISABLED")
+    if (!validChatInput(text, true)) throw new Error("INPUT_LIMIT")
+    if (!Number.isSafeInteger(revision) || revision < 0) throw new Error("INVALID_REQUEST")
+    // A delayed debounce cannot restore a submitted revision or replace a newer edit.
+    if (revision <= this.state.draftRevision) return
+    this.state.draft = text; this.state.draftRevision = revision; this.publish()
+  }
   accept(request: ChatRequest) {
     if (request.handle !== this.state.handle || request.epoch !== this.state.epoch) throw new Error("STALE_REQUEST")
     if (this.requests.has(request.requestId)) throw new Error("STALE_REQUEST")
@@ -66,13 +73,14 @@ export class SideChatService {
   }
   reset() { this.resetConversation("reset"); this.publish() }
   private resetConversation(notice: SideChatSnapshot["notice"]) {
+    this.state.acceptedSubmission = null
     this.state.epoch++; this.state.messages = []; this.state.phase = "idle"; this.state.error = null; this.state.notice = notice
     if (this.state.parent) this.state.parent.contextAt = null
     this.requests.clear(); this.deferred = null
     const backend = this.backend; this.backend = null
     if (backend) this.cleanup = Promise.allSettled([this.cleanup, backend.close()])
   }
-  async send(text: string): Promise<void> {
+  async send(text: string, submission: ChatSubmission = { requestId: randomUUID(), draftRevision: this.state.draftRevision + 1 }): Promise<void> {
     if (!this.state.enabled) throw new Error("CHAT_DISABLED")
     if (this.state.applying || ["preparing", "answering"].includes(this.state.phase)) throw new Error("BUSY")
     if (!validChatInput(text)) throw new Error("INPUT_LIMIT")
@@ -81,6 +89,11 @@ export class SideChatService {
     if (["OUTCOME_UNKNOWN", "SESSION_LOST"].includes(this.state.error ?? "")) throw new Error(this.state.error!)
     const bytes = this.state.messages.reduce((sum, m) => sum + utf8Bytes(m.text) + utf8Bytes(m.preview), 0)
     if (this.state.messages.length + 2 > SIDE_CHAT_LIMITS.messages || bytes + utf8Bytes(text) + SIDE_CHAT_LIMITS.responseBytes + SIDE_CHAT_LIMITS.previewBytes > SIDE_CHAT_LIMITS.historyBytes) throw new Error("HISTORY_LIMIT")
+    if (!Number.isSafeInteger(submission.draftRevision) || submission.draftRevision < 0) throw new Error("INVALID_REQUEST")
+    if (submission.draftRevision < this.state.draftRevision || submission.draftRevision === this.state.draftRevision && this.state.draft !== text) throw new Error("STALE_REQUEST")
+    // Save the submitted edit before opening. A known predispatch failure leaves it intact;
+    // later edits remain authoritative, even if they happen to contain the same text.
+    this.state.draft = text; this.state.draftRevision = submission.draftRevision
     const epoch = this.state.epoch, parent = this.parent, persona = this.persona
     this.state.phase = "preparing"; this.state.error = null; this.publish()
     let dispatched = false
@@ -96,7 +109,8 @@ export class SideChatService {
       const backend = this.backend
       if (this.state.applying) throw new Error("BUSY")
       this.state.messages.push({ id: randomUUID(), role: "user", text, preview: "", at: Date.now() })
-      if (this.state.draft === text) this.state.draft = ""
+      this.state.acceptedSubmission = { ...submission }
+      if (this.state.draftRevision === submission.draftRevision) this.state.draft = ""
       this.state.phase = "answering"; this.state.notice = null; this.publish(); dispatched = true
       const response = await backend.send(text, { ...this.state.task })
       const apply = () => {
@@ -109,8 +123,6 @@ export class SideChatService {
       if (epoch !== this.state.epoch) return
       const apply = () => {
         this.state.error = chatError(error); this.state.phase = this.state.error === "STOPPED" ? "stopped" : "error"
-        // No retries. Preserve the input when the backend rejected before dispatch.
-        if (!dispatched) this.state.draft = text
         this.publish()
       }
       if (this.state.applying) this.deferred = apply; else apply()

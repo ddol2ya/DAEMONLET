@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import type { ChatAction, ChatError, SideChatApi, SideChatSnapshot } from "../../electron/shared/side-chat-contract"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import type { ChatSubmission, ChatAction, ChatError, SideChatApi, SideChatSnapshot } from "../../electron/shared/side-chat-contract"
 import { validChatInput } from "../../electron/shared/side-chat-contract"
 import { requiresPanel, isComposing } from "./presentation"
 
@@ -21,28 +21,48 @@ export function Answer({ text }: { text: string }) {
 }
 export function SideChatApp({ api }: { api: SideChatApi }) {
   const [snapshot, setSnapshot] = useState<SideChatSnapshot | null>(null), [draft, setDraft] = useState(""), [error, setError] = useState<ChatError | null>(null)
-  const stateRef = useRef(snapshot), draftRef = useRef(draft), submitted = useRef<string | null>(null), composing = useRef(false)
+  const stateRef = useRef(snapshot), draftRef = useRef(draft), revision = useRef(0), submitted = useRef<(ChatSubmission & { epoch: number; text: string }) | null>(null), composing = useRef(false)
   const history = useRef<HTMLDivElement>(null), atBottom = useRef(true), measurement = useRef<HTMLDivElement>(null), previewMeasure = useRef<HTMLDivElement>(null)
   const previousMode = useRef<SideChatSnapshot["mode"]>("hidden")
   const [long, setLong] = useState(false), [previewFits, setPreviewFits] = useState(true)
-  stateRef.current = snapshot; draftRef.current = draft
-  useEffect(() => {
-    const receive = (next: SideChatSnapshot) => {
-      setSnapshot(next)
-      if (!next.enabled) { setDraft(""); draftRef.current = ""; submitted.current = null }
-      if (next.phase === "answering" && !next.draft && draftRef.current === submitted.current) setDraft("")
+  const editDraft = (text: string) => { revision.current++; draftRef.current = text; setDraft(text) }
+  const receive = useCallback((next: SideChatSnapshot) => {
+    const previous = stateRef.current
+    if (previous && next.handle === previous.handle && next.epoch < previous.epoch) return
+    if (!previous) { revision.current = next.draftRevision; draftRef.current = next.draft; setDraft(next.draft) }
+    stateRef.current = next; setSnapshot(next)
+    if (!next.enabled) {
+      revision.current = Math.max(revision.current, next.draftRevision) + 1
+      draftRef.current = ""; setDraft(""); submitted.current = null
     }
+    const pending = submitted.current, receipt = next.acceptedSubmission
+    if (pending && pending.epoch !== next.epoch) submitted.current = null
+    else if (pending && receipt?.requestId === pending.requestId && receipt.draftRevision === pending.draftRevision) {
+      // Acceptance is explicit and survives a fast final response. New edits, including
+      // editing away and back to the same text, never belong to the earlier submission.
+      if (revision.current === pending.draftRevision && draftRef.current === pending.text) {
+        revision.current++; draftRef.current = ""; setDraft("")
+      }
+      submitted.current = null
+    }
+  }, [])
+  useEffect(() => {
     const unsubscribe = api.onChanged(receive)
-    void api.get().then(result => { if (result.ok) { receive(result.value); setDraft(result.value.draft) } else setError(result.code) })
+    void api.get().then(result => { if (result.ok) receive(result.value); else setError(result.code) })
     return unsubscribe
-  }, [api])
-  const action = async (name: ChatAction, text?: string) => {
+  }, [api, receive])
+  const action = async (name: ChatAction, text?: string, submission?: ChatSubmission) => {
     const current = stateRef.current; if (!current) return
-    const result = await api.action(name, { handle: current.handle, epoch: current.epoch, requestId: crypto.randomUUID(), ...(text === undefined ? {} : { text }) })
+    const result = await api.action(name, { handle: current.handle, epoch: current.epoch, requestId: submission?.requestId ?? crypto.randomUUID(), ...(text === undefined ? {} : { text }), ...(["send", "draft"].includes(name) ? { draftRevision: submission?.draftRevision ?? revision.current } : {}) })
+    if (stateRef.current?.epoch !== current.epoch) return
     if (!result.ok) setError(result.code)
-    else { setError(null); setSnapshot(result.value) }
+    else { setError(null); receive(result.value) }
   }
-  useEffect(() => { const timer = setTimeout(() => { if (stateRef.current?.enabled && validChatInput(draft, true)) void action("draft", draft) }, 200); return () => clearTimeout(timer) }, [draft])
+  useEffect(() => {
+    const draftRevision = revision.current
+    const timer = setTimeout(() => { if (stateRef.current?.enabled && validChatInput(draft, true)) void action("draft", draft, { requestId: crypto.randomUUID(), draftRevision }) }, 200)
+    return () => clearTimeout(timer)
+  }, [draft, snapshot?.epoch, snapshot?.enabled])
   useEffect(() => { if (snapshot) document.documentElement.lang = snapshot.language }, [snapshot?.language])
   const latest = snapshot?.messages.filter(m => m.role === "assistant").at(-1)
   useLayoutEffect(() => {
@@ -71,7 +91,14 @@ export function SideChatApp({ api }: { api: SideChatApi }) {
   if (!snapshot) return <main className="loading">Daemonlet…</main>
   const t = labels[snapshot.language], busy = snapshot.applying || ["answering", "preparing"].includes(snapshot.phase), panel = snapshot.mode === "panel", issue = error ?? snapshot.error
   const time = (value: number | null) => value ? new Date(value).toLocaleString(snapshot.language) : t.none
-  const send = () => { if (composing.current || busy) return; if (!validChatInput(draft)) { setError("INPUT_LIMIT"); return }; submitted.current = draft; void action("send", draft) }
+  const send = () => {
+    if (composing.current || busy || submitted.current) return
+    const text = draftRef.current
+    if (!validChatInput(text)) { setError("INPUT_LIMIT"); return }
+    const pending = { requestId: crypto.randomUUID(), draftRevision: revision.current, epoch: snapshot.epoch, text }
+    submitted.current = pending
+    void action("send", text, pending).finally(() => { if (submitted.current === pending) submitted.current = null })
+  }
   return <main className={panel ? "chat panel" : "chat compact"} onKeyDown={event => { if (event.key === "Escape" && !composing.current && !isComposing(event.nativeEvent)) { event.preventDefault(); void action("draft", draft).then(() => action("hide")) } }}>
     <header><div><strong>{snapshot.character.label}</strong><span className="eyebrow">{t.chat}</span></div><div className="header-actions"><button onClick={() => void action(panel ? "compact" : "panel")} aria-label={panel ? t.compact : t.expand}>{panel ? "↙" : "↗"}</button><button onClick={() => void action("draft", draft).then(() => action("hide"))} aria-label={t.close}>×</button></div></header>
     <section className="context"><label>{t.connection}<select aria-label={t.parent} value={snapshot.parent?.handle ?? ""} disabled={busy} onChange={event => void action("parent", event.target.value)}><option value="" disabled>{t.empty}</option>{snapshot.parent && !snapshot.candidates.some(c => c.handle === snapshot.parent?.handle) && <option value={snapshot.parent.handle}>{snapshot.parent.title}</option>}{snapshot.candidates.map(parent => <option key={parent.handle} value={parent.handle}>{parent.title}</option>)}</select></label><details><summary>{t.context}: {time(snapshot.parent?.contextAt ?? null)}</summary><p>{t.checked}: {time(snapshot.task.checkedAt)}</p><p>{t.privacy}</p></details><span className="task-status">{({ ko: { idle: "대기", running: "작업 중", waiting: "승인·입력 필요", failed: "실패", unknown: "상태 미확인" }, en: { idle: "Idle", running: "Working", waiting: "Approval or input needed", failed: "Failed", unknown: "Status unknown" } }[snapshot.language] as Record<string, string>)[snapshot.task.state] ?? snapshot.task.state}</span></section>
@@ -81,7 +108,7 @@ export function SideChatApp({ api }: { api: SideChatApi }) {
     </div>
     <div role="status" className="response-status">{snapshot.applying ? t.applying : snapshot.phase === "answering" ? t.answering : snapshot.phase === "preparing" ? t.preparing : ""}</div>
     {issue && <p className="error" role="alert">{errors[issue]?.[snapshot.language === "ko" ? 0 : 1] ?? issue}</p>}
-    <footer><label htmlFor="chat-input">{t.input}</label><textarea id="chat-input" rows={2} value={draft} onChange={e => { if (validChatInput(e.target.value, true)) setDraft(e.target.value); else setError("INPUT_LIMIT") }} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !composing.current && !isComposing(event.nativeEvent)) { event.preventDefault(); send() } }} /><div className="composer-actions"><button className="quiet" onClick={() => void action("reset")} disabled={snapshot.applying}>{t.reset}</button><span className="count">{Array.from(draft).length}/4000</span>{busy ? <button onClick={() => void action("stop")} disabled={snapshot.applying}>{t.stop}</button> : <button className="send" disabled={!draft.trim() || !snapshot.parent} onClick={send}>{t.send}</button>}</div></footer>
+    <footer><label htmlFor="chat-input">{t.input}</label><textarea id="chat-input" rows={2} value={draft} onChange={e => { if (validChatInput(e.target.value, true)) editDraft(e.target.value); else setError("INPUT_LIMIT") }} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !composing.current && !isComposing(event.nativeEvent)) { event.preventDefault(); send() } }} /><div className="composer-actions"><button className="quiet" onClick={() => void action("reset")} disabled={snapshot.applying}>{t.reset}</button><span className="count">{Array.from(draft).length}/4000</span>{busy ? <button onClick={() => void action("stop")} disabled={snapshot.applying}>{t.stop}</button> : <button className="send" disabled={!draft.trim() || !snapshot.parent} onClick={send}>{t.send}</button>}</div></footer>
     <div className="measure" aria-hidden="true"><div className="answer-text" ref={measurement}>{latest?.text}</div><div className="answer-text" ref={previewMeasure}>{latest?.preview}</div></div>
   </main>
 }

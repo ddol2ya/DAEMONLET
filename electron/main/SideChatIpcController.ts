@@ -16,7 +16,7 @@ export class SideChatIpcController {
         const now = Date.now()
         if (now - this.rate.since > 1000) this.rate = { since: now, count: 0 }
         if (++this.rate.count > 24) throw new Error("REQUEST_LIMITED")
-        const request = validateChatRequest(value, ["send", "draft", "parent", "copy"].includes(action))
+        const request = validateChatRequest(value, action)
         this.service.accept(request)
         if (action === "reset" && this.service.snapshot().draft) {
           const ko = this.service.snapshot().language === "ko"
@@ -24,10 +24,10 @@ export class SideChatIpcController {
           if (answer.response !== 1) return { ok: true, value: this.service.snapshot() }
           if (request.epoch !== this.service.snapshot().epoch) throw new Error("STALE_REQUEST")
         }
-        if (action === "send") await this.service.send(request.text!)
+        if (action === "send") await this.service.send(request.text!, { requestId: request.requestId, draftRevision: request.draftRevision! })
         else if (action === "stop") await this.service.stop()
         else if (action === "reset") this.service.reset()
-        else if (action === "draft") this.service.setDraft(request.text!)
+        else if (action === "draft") this.service.setDraft(request.text!, request.draftRevision!)
         else if (action === "parent") this.service.chooseParent(request.text!)
         else if (action === "copy") { const message = this.service.snapshot().messages.find(m => m.id === request.text); if (!message) throw new Error("INVALID_REQUEST"); clipboard.writeText(message.text) }
         else this.service.setMode(action === "hide" ? "hidden" : action)

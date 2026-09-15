@@ -76,8 +76,8 @@ describe("text and presentation contracts", () => {
   })
   it("rejects UI-injected raw IDs, config, prompt and paths", () => {
     const r = { handle: randomUUID(), epoch: 1, requestId: randomUUID(), text: "hi" }
-    expect(validateChatRequest(r, true)).toEqual(r)
-    for (const key of ["parentId", "childId", "config", "developerInstructions", "path"]) expect(() => validateChatRequest({ ...r, [key]: "bad" }, true)).toThrow()
+    expect(validateChatRequest(r, "parent")).toEqual(r)
+    for (const key of ["parentId", "childId", "config", "developerInstructions", "path"]) expect(() => validateChatRequest({ ...r, [key]: "bad" }, "parent")).toThrow()
   })
   it("uses measured five-line threshold, grapheme-safe previews and IME guard", () => {
     expect(requiresPanel("short", 100, 20)).toBe(false); expect(requiresPanel("long", 120, 20)).toBe(true)
@@ -91,5 +91,47 @@ describe("text and presentation contracts", () => {
     expect(coordinator.canShowActivity).toBe(false)
     expect((await coordinator.report({ epoch, sequence: 1, available: true, phase: "preparing", anchor: null })).granted).toBe(false)
     coordinator.setSideChatVisible(false); expect(coordinator.sideChatVisible).toBe(false)
+  })
+})
+
+describe("submitted draft ownership", () => {
+  const submission = (draftRevision: number) => ({ requestId: randomUUID(), draftRevision })
+  it("acknowledges the submitted revision even when its last edit beat draft debounce", async () => {
+    const f = fixture(), receipt = submission(2)
+    f.service.setDraft("hello", 1)
+    const sent = f.service.send("hello!", receipt); await tick()
+    expect(f.service.snapshot()).toMatchObject({ draft: "", draftRevision: 2, acceptedSubmission: receipt, phase: "answering" })
+    f.service.setDraft("hello", 1); f.service.setDraft("hello!", 2)
+    expect(f.service.snapshot().draft).toBe("")
+    f.finish(); await sent
+    expect(f.service.snapshot().acceptedSubmission).toEqual(receipt)
+    expect(f.backend.send).toHaveBeenCalledTimes(1)
+  })
+  it("keeps edits made during preparation and response, including identical text at a newer revision", async () => {
+    const f = fixture(); let opened!: () => void
+    f.backend.open.mockImplementationOnce(() => new Promise(resolve => { opened = () => resolve({ threadId: "child", lastTurnId: "done", contextAt: 123 }) }))
+    const receipt = submission(1), sent = f.service.send("same", receipt); await tick()
+    f.service.setDraft("same", 3); opened(); await tick()
+    expect(f.service.snapshot()).toMatchObject({ draft: "same", draftRevision: 3, acceptedSubmission: receipt })
+    f.service.setDraft("next response draft", 4); f.finish(); await sent
+    expect(f.service.snapshot().draft).toBe("next response draft")
+  })
+  it.each([false, true])("preserves the latest draft on a known predispatch failure (new edit: %s)", async newer => {
+    const f = fixture(); let failed!: () => void
+    f.backend.open.mockImplementationOnce(() => new Promise((_resolve, reject) => { failed = () => reject(Error("CHAT_POLICY_UNENFORCEABLE")) }))
+    const sent = f.service.send("submitted", submission(1)); await tick()
+    if (newer) f.service.setDraft("new draft", 2)
+    failed(); await sent
+    expect(f.service.snapshot()).toMatchObject({ draft: newer ? "new draft" : "submitted", acceptedSubmission: null, error: "CHAT_POLICY_UNENFORCEABLE" })
+    expect(f.backend.send).not.toHaveBeenCalled()
+  })
+  it("does not apply an old receipt across character replacement or accept older submitted drafts", async () => {
+    const f = fixture(); let opened!: () => void
+    f.backend.open.mockImplementationOnce(() => new Promise(resolve => { opened = () => resolve({ threadId: "child", lastTurnId: "done", contextAt: 123 }) }))
+    const sent = f.service.send("old", submission(1)); await tick()
+    f.service.setDraft("new", 2); f.service.applyPersona(persona("B")); opened(); await sent
+    expect(f.service.snapshot()).toMatchObject({ draft: "new", acceptedSubmission: null, messages: [] })
+    await expect(f.service.send("old", submission(1))).rejects.toThrow("STALE_REQUEST")
+    expect(f.backend.send).not.toHaveBeenCalled()
   })
 })

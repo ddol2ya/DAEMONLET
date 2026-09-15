@@ -4,14 +4,15 @@ export type ChatExpression = "neutral" | "happy" | "thinking"
 export type ChatResponse = { text: string; preview: string; expression: ChatExpression }
 export type ChatError = "CHAT_DISABLED" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
 export type ChatMessage = { id: string; role: "user" | "assistant"; text: string; preview: string; at: number }
+export type ChatSubmission = { requestId: string; draftRevision: number }
 export type SideChatSnapshot = {
   handle: string; epoch: number; enabled: boolean; mode: "hidden" | "compact" | "panel"; language: AppLanguage
   character: { id: string; label: string }; parent: { handle: string; title: string; contextAt: number | null } | null
   candidates: Array<{ handle: string; title: string }>; phase: "idle" | "preparing" | "answering" | "stopped" | "error"
   applying: boolean; error: ChatError | null; notice: "character" | "language" | "parent" | "reset" | null
-  messages: ChatMessage[]; draft: string; task: { state: string; checkedAt: number | null }
+  messages: ChatMessage[]; draft: string; draftRevision: number; acceptedSubmission: ChatSubmission | null; task: { state: string; checkedAt: number | null }
 }
-export type ChatRequest = { handle: string; epoch: number; requestId: string; text?: string }
+export type ChatRequest = { handle: string; epoch: number; requestId: string; text?: string; draftRevision?: number }
 export type ChatAction = "send" | "stop" | "reset" | "draft" | "compact" | "panel" | "hide" | "parent" | "copy"
 export type ChatResult = { ok: true; value: SideChatSnapshot } | { ok: false; code: ChatError }
 export type SideChatApi = { get(): Promise<ChatResult>; action(action: ChatAction, request: ChatRequest): Promise<ChatResult>; onChanged(listener: (snapshot: SideChatSnapshot) => void): () => void }
@@ -32,8 +33,11 @@ export function parseChatResponse(raw: string): ChatResponse {
   const preview = utf8Bytes(v.preview) <= SIDE_CHAT_LIMITS.previewBytes && Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(v.preview)).length <= 120 && v.preview.split(/\r?\n/).length <= 3 && !/[\u0000\ud800-\udfff]/u.test(v.preview) ? v.preview : ""
   return { text: v.text, preview, expression: ["neutral", "happy", "thinking"].includes(v.expression) ? v.expression as ChatExpression : "neutral" }
 }
-export function validateChatRequest(value: unknown, text = false): ChatRequest {
+export function validateChatRequest(value: unknown, action: ChatAction): ChatRequest {
   const v = value as ChatRequest
-  if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).sort().join() !== (text ? "epoch,handle,requestId,text" : "epoch,handle,requestId") || typeof v.handle !== "string" || !/^[\da-f-]{36}$/.test(v.handle) || typeof v.requestId !== "string" || !/^[\da-f-]{36}$/.test(v.requestId) || !Number.isSafeInteger(v.epoch) || v.epoch < 1 || text && !validChatInput(v.text, true)) throw new Error("INVALID_REQUEST")
+  const revision = action === "send" || action === "draft"
+  const text = revision || action === "parent" || action === "copy"
+  const keys = revision ? "draftRevision,epoch,handle,requestId,text" : text ? "epoch,handle,requestId,text" : "epoch,handle,requestId"
+  if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).sort().join() !== keys || typeof v.handle !== "string" || !/^[\da-f-]{36}$/.test(v.handle) || typeof v.requestId !== "string" || !/^[\da-f-]{36}$/.test(v.requestId) || !Number.isSafeInteger(v.epoch) || v.epoch < 1 || revision && (!Number.isSafeInteger(v.draftRevision) || v.draftRevision! < 0) || text && !validChatInput(v.text, true)) throw new Error("INVALID_REQUEST")
   return v
 }

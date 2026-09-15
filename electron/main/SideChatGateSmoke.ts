@@ -14,7 +14,7 @@ export async function runSideChatGateSmoke(service: SideChatService, window: Sid
   const win = window.window!
   for (let n = 0; n < 100; n++) { if (!win.webContents.isLoading() && await win.webContents.executeJavaScript('Boolean(document.querySelector("textarea"))').catch(() => false)) break; await wait(50) }
   const state = service.snapshot()
-  await win.webContents.executeJavaScript(`window.daemonletSideChat.action('send', ${JSON.stringify({ handle: state.handle, epoch: state.epoch, requestId: "00000000-0000-4000-8000-000000000001", text: "합성 전송 검사" })})`)
+  await win.webContents.executeJavaScript(`window.daemonletSideChat.action('send', ${JSON.stringify({ handle: state.handle, epoch: state.epoch, requestId: "00000000-0000-4000-8000-000000000001", text: "합성 전송 검사", draftRevision: state.draftRevision + 1 })})`)
   await wait(150)
   if (service.snapshot().error !== "CHAT_POLICY_UNENFORCEABLE" || service.snapshot().messages.length) throw new Error("Side chat smoke: runtime gate did not block before sending")
   if (!await win.webContents.executeJavaScript('Boolean(document.querySelector(".error"))')) throw new Error("Side chat smoke: error UI missing")
