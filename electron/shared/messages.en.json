@@ -815,5 +815,9 @@
   "결정": "Decision",
   "리깅 도구에서 숨김": "Hidden by rigger",
   "표시": "Show",
-  "숨기기": "Hide"
+  "숨기기": "Hide",
+  "캐릭터와 대화": "Chat with character",
+  "캐릭터 사이드 대화 (실험)": "Character side conversation (experimental)",
+  "검증된 Codex 런타임에서만 전송할 수 있습니다. 사용량이 발생하며 부모 대화 맥락이 전달될 수 있습니다.": "Sending requires a verified Codex runtime. Usage is billed to your allowance; parent conversation context may be sent.",
+  "캐릭터 페르소나의 형식·참조·권한 규격이 올바르지 않습니다.": "The persona format, reference or permission contract is invalid."
 }

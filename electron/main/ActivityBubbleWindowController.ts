@@ -72,7 +72,7 @@ export class ActivityBubbleWindowController {
   sync = (): void => {
     if (this.disposed) return
     this.syncActivity()
-    this.speech.sync(this.pet, this.settings, this.presentation.anchor, this.presentation.speech, this.inLayout, this.view === "control" ? this.window : null)
+    this.speech.sync(this.pet, this.settings, this.presentation.anchor, this.presentation.sideChatVisible ? null : this.presentation.speech, this.inLayout, this.view === "control" ? this.window : null)
   }
 
   private syncActivity(): void {
@@ -80,7 +80,7 @@ export class ActivityBubbleWindowController {
     const pet = this.pet
     const empty = !this.snapshot || !activityBubbleEntries(this.snapshot).length
     const retainInput = this.presentation.interactionLocked && this.window?.isVisible()
-    if (!this.settings?.taskBubblesEnabled || !this.settings.visible || !pet || pet.isDestroyed() || !pet.isVisible() || pet.isMinimized() || this.view === "activity" && (this.inLayout || !this.presentation.canShowActivity || empty && !retainInput)) {
+    if (this.presentation.sideChatVisible || !this.settings?.taskBubblesEnabled || !this.settings.visible || !pet || pet.isDestroyed() || !pet.isVisible() || pet.isMinimized() || this.view === "activity" && (this.inLayout || !this.presentation.canShowActivity || empty && !retainInput)) {
       if (this.view === "control" && this.window?.isVisible()) this.onHidden()
       this.window?.hide(); return
     }

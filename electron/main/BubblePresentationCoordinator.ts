@@ -4,6 +4,9 @@ type Clock = { setTimeout(callback: () => void, ms: number): ReturnType<typeof s
 
 /** Display arbitration only: never mutates activity, selection, dialogue or dictation. */
 export class BubblePresentationCoordinator {
+  private chatVisible = false
+  get sideChatVisible() { return this.chatVisible }
+  setSideChatVisible(value: boolean) { this.chatVisible = value; if (value) this.rejectPending(); this.changed() }
   private epoch = 0
   private sequence = 0
   private available = false
@@ -15,7 +18,7 @@ export class BubblePresentationCoordinator {
   speech: SpeechBubbleFrame | null = null
   constructor(private readonly changed: () => void, private readonly clock: Clock = { setTimeout, clearTimeout }) {}
 
-  get canShowActivity(): boolean { return this.available && !this.occupied }
+  get canShowActivity(): boolean { return !this.chatVisible && this.available && !this.occupied }
   get interactionLocked(): boolean { return this.locked }
   begin(): number {
     this.cancelReturn(); this.rejectPending(); this.epoch++; this.sequence = 0
@@ -24,6 +27,7 @@ export class BubblePresentationCoordinator {
   }
   report(report: PetBubblePresentation): Promise<BubblePermit> {
     const permit = (granted: boolean): BubblePermit => ({ epoch: report.epoch, sequence: report.sequence, granted })
+    if (this.chatVisible) return Promise.resolve(permit(false))
     if (report.epoch !== this.epoch || report.sequence <= this.sequence) return Promise.resolve(permit(false))
     this.sequence = report.sequence; this.rejectPending()
     this.available = report.available && report.anchor !== null; this.anchor = report.anchor

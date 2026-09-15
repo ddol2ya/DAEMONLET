@@ -5,6 +5,7 @@ import type { SanitizedAdapterDiagnostics } from "../shared/ipc-contract"
 import { sanitizeHookReceipts } from "../../adapter/codex/hooks/HookEvents"
 
 export type AdapterWorkerMessage =
+  | { type: "side-chat-excluded"; generation: number }
   | { type: "source-availability"; available: boolean }
   | { type: "ready"; protocolEndpoint: string; hookEndpoint: string }
   | { type: "diagnostics"; value: SanitizedAdapterDiagnostics }
@@ -14,12 +15,15 @@ export type AdapterWorkerMessage =
   | { type: "conversation-target"; value: import("../../adapter/codex/lifecycle/CodexLifecycleObserver").LocalConversationTarget }
 
 export type AdapterWorkerCommand =
+  | { type: "exclude-side-chats"; generation: number; ids: string[] }
   | { type: "start"; mode: "HOOK_OBSERVER" }
   | { type: "stop" }
   | { type: "restart" }
   | { type: "get-diagnostics" }
 
 const parentPort = process.parentPort
+const sideChats = new Set<string>()
+let sideChatGeneration = 0
 let service: CodexAdapterService | null = null
 let activityObserver: DesktopActivityObserver | null = null
 let sourceAvailable: boolean | undefined
@@ -51,6 +55,7 @@ async function start(): Promise<void> {
   if (service) return
   try {
     service = new CodexAdapterService(createCodexAdapterConfig({ mode: "HOOK_OBSERVER" }), {
+      excludeSession: id => sideChats.has(id),
       onConversationTarget: value => send({ type: "conversation-target", value }),
       onSourceAvailability: available => {
         if (available !== sourceAvailable) { sourceAvailable = available; send({ type: "source-availability", available }) }
@@ -85,6 +90,11 @@ async function stop(reason = "requested"): Promise<void> {
 parentPort?.on("message", (event: { data: AdapterWorkerCommand }) => {
   const command = event.data
   if (!command || typeof command !== "object") return
+  if (command.type === "exclude-side-chats" && Number.isSafeInteger(command.generation) && command.generation >= sideChatGeneration && Array.isArray(command.ids) && command.ids.length <= 512 && command.ids.every(id => typeof id === "string" && /^[a-f0-9-]{36}$/.test(id))) {
+    sideChatGeneration = command.generation
+    command.ids.forEach(id => sideChats.add(id))
+    send({ type: "side-chat-excluded", generation: command.generation })
+  }
   if (command.type === "start") void start()
   if (command.type === "stop") void stop().then(() => process.exit(0))
   if (command.type === "restart") void stop("restart").then(start)

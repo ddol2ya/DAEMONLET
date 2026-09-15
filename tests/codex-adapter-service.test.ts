@@ -12,6 +12,19 @@ const isolatedConfig = (dataDir: string, overrides: Parameters<typeof createCode
 afterEach(async () => { await Promise.all(dirs.splice(0).map((path) => rm(path, { recursive: true, force: true }))) })
 
 describe("CodexAdapterService", () => {
+  it("excludes owned side chat hooks while retaining other clients' events", async () => {
+    const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-side-owned-"))); dirs.push(dataDir)
+    const service = new CodexAdapterService(isolatedConfig(dataDir), { excludeSession: id => id === "owned-child" })
+    await service.start()
+    try {
+      const token = (await readFile(join(dataDir, "adapter-token"), "utf8")).trim(), observed: unknown[] = []
+      service.registry.subscribe(event => observed.push(event))
+      for (const sessionId of ["owned-child", "other-client"]) for (const hookEventName of ["UserPromptSubmit", "Stop"]) expect((await fetch(service.getDiagnostics().hookIngress.endpoint, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ payloadVersion: 1, sessionId, turnId: "turn", model: "synthetic", permissionMode: "default", hookEventName, stopHookActive: false }) })).status).toBe(202)
+      expect(observed).toHaveLength(2)
+      expect(service.getDiagnostics().eventTrace).toHaveLength(2)
+      expect(JSON.stringify(await readFile(join(dataDir, "adapter-state.json"), "utf8"))).not.toContain("owned-child")
+    } finally { await service.stop() }
+  })
   it("starts Hook Observer without executing a configured CLI candidate", async () => {
     const dataDir = await realpath(await mkdtemp(join(tmpdir(), "codex-no-cli-probe-")))
     dirs.push(dataDir)

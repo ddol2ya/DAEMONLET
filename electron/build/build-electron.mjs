@@ -30,6 +30,7 @@ const common = {
 }
 
 const bundles = await Promise.all([
+  build({ ...common, entryPoints: [resolve(root, "electron/preload/side-chat-preload.ts")], outfile: resolve(outdir, "side-chat-preload.cjs") }),
   build({ ...common, entryPoints: [resolve(root, "electron/utility/character-pack-worker.ts")], outfile: resolve(outdir, "character-pack-worker.cjs") }),
   build({ ...common, entryPoints: [resolve(root, "electron/main/main.ts")], outfile: resolve(outdir, "main.cjs") }),
   build({ ...common, entryPoints: [resolve(root, "electron/preload/pet-preload.ts")], outfile: resolve(outdir, "pet-preload.cjs") }),

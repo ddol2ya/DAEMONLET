@@ -126,6 +126,8 @@ try {
   if (code !== 0) throw new Error(`Electron smoke failed with exit ${String(code)}\n${stderr.slice(-4000)}`)
 
   result = JSON.parse(await readFile(resultPath, "utf8"))
+  if (process.env.ELECTRON_SMOKE_SIDE_CHAT_EVIDENCE && result.sideChatValidation?.status !== "PASS") throw new Error("Packaged side chat gate failed")
+  if (process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS && result.sideChatPackValidation?.status !== "PASS") throw new Error("Side chat pack switch smoke failed")
   const activityHistory = JSON.parse(await readFile(join(smokeUserData, "activity/history.json"), "utf8"))
   result.activityHistory = {
     schemaVersion: activityHistory.version,

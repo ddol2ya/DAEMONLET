@@ -31,6 +31,15 @@ export class AppServerJsonlClient {
 
   get pendingRequestCount(): number { return this.pending.size }
 
+  onClose(listener: () => void): () => void {
+    this.events.on("close", listener)
+    return () => this.events.off("close", listener)
+  }
+  async rejectServerRequest(id: unknown): Promise<void> {
+    if (typeof id !== "number" && typeof id !== "string") return
+    await this.write({ id, error: { code: -32601, message: "Side chat does not support server requests" } })
+  }
+
   onNotification(listener: (method: string, params: unknown) => void): () => void {
     this.events.on("notification", listener)
     return () => this.events.off("notification", listener)
@@ -126,16 +135,16 @@ export class AppServerJsonlClient {
     return result
   }
 
-  async initialize(clientInfo: { name: string; title: string; version: string }): Promise<unknown> {
+  async initialize(clientInfo: { name: string; title: string; version: string }, profile: "observer" | "side-chat" = "observer"): Promise<unknown> {
     if (this.handshakeState !== "NEW") throw new Error("app-server client was already initialized")
     this.handshakeState = "INITIALIZING"
     const result = await this.request("initialize", {
       clientInfo,
       capabilities: {
-        experimentalApi: false,
+        experimentalApi: profile === "side-chat",
         requestAttestation: false,
         optOutNotificationMethods: [
-          "item/agentMessage/delta",
+          ...(profile === "observer" ? ["item/agentMessage/delta"] : []),
           "item/reasoning/summaryTextDelta",
           "item/reasoning/textDelta",
           "item/commandExecution/outputDelta",
@@ -159,6 +168,7 @@ export class AppServerJsonlClient {
       pending.reject(reason)
     }
     this.pending.clear()
+    this.events.emit("close")
     this.events.removeAllListeners()
   }
 }
