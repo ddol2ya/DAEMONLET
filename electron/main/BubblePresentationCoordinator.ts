@@ -27,7 +27,6 @@ export class BubblePresentationCoordinator {
   }
   report(report: PetBubblePresentation): Promise<BubblePermit> {
     const permit = (granted: boolean): BubblePermit => ({ epoch: report.epoch, sequence: report.sequence, granted })
-    if (this.chatVisible) return Promise.resolve(permit(false))
     if (report.epoch !== this.epoch || report.sequence <= this.sequence) return Promise.resolve(permit(false))
     this.sequence = report.sequence; this.rejectPending()
     this.available = report.available && report.anchor !== null; this.anchor = report.anchor
@@ -41,6 +40,8 @@ export class BubblePresentationCoordinator {
       this.changed(); return Promise.resolve(permit(false))
     }
     this.cancelReturn()
+    // Chat owns display permission, but Pet still owns the latest lifetime/geometry.
+    if (this.chatVisible) { this.changed(); return Promise.resolve(permit(false)) }
     if (report.phase === "preparing" && this.locked && !this.occupied) {
       this.changed()
       return new Promise(resolve => { this.pending = { report, resolve } })
