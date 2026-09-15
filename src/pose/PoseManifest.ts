@@ -63,7 +63,7 @@ export function parseCharacterManifest(input: unknown): ValidationResult<Charact
   const root = object(input, "character")
   const base = object(root.base, "character.base")
   const warnings: string[] = []
-  warnUnknown(root, ["schemaVersion", "id", "label", "base", "poses", "behavior", "dialogue"], "character", warnings)
+  warnUnknown(root, ["schemaVersion", "id", "label", "base", "poses", "behavior", "dialogue", "persona"], "character", warnings)
   warnUnknown(base, ["source", "psd", "overrides"], "character.base", warnings)
   return {
     value: {
@@ -77,6 +77,7 @@ export function parseCharacterManifest(input: unknown): ValidationResult<Charact
       },
       poses: strings(root.poses, "character.poses"),
       ...(root.behavior === undefined ? {} : { behavior: string(root.behavior, "character.behavior") }),
+      ...(root.persona === undefined ? {} : { persona: string(root.persona, "character.persona") }),
       ...(root.dialogue === undefined ? {} : { dialogue: string(root.dialogue, "character.dialogue") }),
     },
     warnings,

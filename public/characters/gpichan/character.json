@@ -20,5 +20,6 @@
     "poses/head-pet/pose.json"
   ],
   "behavior": "behavior.json",
-  "dialogue": "dialogue.ko.json"
+  "dialogue": "dialogue.ko.json",
+  "persona": "persona.json"
 }

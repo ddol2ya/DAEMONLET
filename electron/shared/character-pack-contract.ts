@@ -1,5 +1,5 @@
 /** Application-owned data contract, not a third-party model format. */
-export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue"] } as const
+export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1"] } as const
 export const PACK_LIMITS = {
   archiveBytes: 256 * 1024 * 1024, payloadBytes: 384 * 1024 * 1024,
   fileBytes: 32 * 1024 * 1024, jsonBytes: 2 * 1024 * 1024, files: 256,
@@ -57,6 +57,7 @@ export interface CharacterManageApi extends CharacterReadApi {
   rollback(selection: CharacterSelection): Promise<boolean>
 }
 export const PACK_ERRORS: Record<string, string> = {
+  PACK_PERSONA: "캐릭터 페르소나의 형식·참조·권한 규격이 올바르지 않습니다.",
   PACK_INVALID: "손상되었거나 지원하지 않는 캐릭터 팩입니다.",
   PACK_PATH: "팩에 허용되지 않는 파일 경로가 있습니다.",
   PACK_LIMIT: "팩이 파일·메모리·픽셀 제한을 초과합니다.",

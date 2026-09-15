@@ -1,3 +1,4 @@
+import { parseCharacterPersona, PERSONA_MAX_BYTES } from "../shared/character-persona"
 import { createHash } from "node:crypto"
 import { lstat, readdir, readFile, realpath } from "node:fs/promises"
 import { join, relative, sep } from "node:path"
@@ -156,6 +157,12 @@ export async function validatePackDirectory(root: string, options: { rig?: boole
   if (character.id !== manifest.id || character.label !== manifest.name) throw new Error("PACK_MANIFEST")
   if (character.poses.length > PACK_LIMITS.variantPoses) throw new Error("PACK_LIMIT")
   if (character.poses.length > PACK_LIMITS.poses && !manifest.runtime.capabilities.includes("pose-variants")) throw new Error("PACK_INCOMPATIBLE")
+  if (Boolean(character.persona) !== manifest.runtime.capabilities.includes("side-chat-persona-v1")) throw new Error("PACK_PERSONA")
+  if (character.persona) {
+    const path = ref(character.persona, "character.json", "\\.json$")
+    usedJson.add(path)
+    parseCharacterPersona(await boundedFile(root, path, PERSONA_MAX_BYTES))
+  }
   const models: Array<{ psd: string; overrides: RigOverrides }> = []
   const model = (value: { psd: string; source: string; overrides?: string }, from: string) => {
     ref(value.source, from, "\\.(png|jpe?g|webp)$")

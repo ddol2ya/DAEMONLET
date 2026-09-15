@@ -60,6 +60,12 @@ const dialoguePath = join(target, 'input', character.dialogue), dialogue = JSON.
 for (const key of ['poseTriggers', 'poseLines']) if (dialogue[key]) for (const id of Object.keys(dialogue[key])) if (!poseIds.has(id)) delete dialogue[key][id]
 await writeFile(dialoguePath, JSON.stringify(dialogue, null, 2) + '\n')
 await exec(process.execPath, [join(skill, 'scripts/creator.mjs'), 'export', '--character-root', join(target, 'input'), '--version', '0.7.0', '--output', join(target, 'gpichan.petchar')], {cwd: target, env, timeout: 120000, maxBuffer: 4 * 1024 ** 2})
+// Exercise only files shipped in the extracted ZIP for persona-only work.
+for (const file of ['references/persona.md', 'assets/persona.example.json', 'runtime/schemas/character-persona-v1.schema.json']) await readFile(join(skill, file))
+await exec(process.execPath, [join(skill, 'scripts/creator.mjs'), 'validate-persona', '--input', join(skill, 'assets/persona.example.json')], {cwd: target, env, timeout: 60000})
+await exec(process.execPath, [join(skill, 'scripts/creator.mjs'), 'upgrade-persona', '--input', join(target, 'gpichan.petchar'), '--persona', join(skill, 'assets/persona.example.json'), '--version', '0.7.1', '--output', join(target, 'persona-updated.petchar'), '--report', join(target, 'persona-update.json')], {cwd: target, env, timeout: 240000, maxBuffer: 4 * 1024 ** 2})
+const personaUpdate = JSON.parse(await readFile(join(target, 'persona-update.json'), 'utf8'))
+if (personaUpdate.visualAssetChanges !== 0 || personaUpdate.rigChanges !== 0 || personaUpdate.validation.outputImport !== 'PASS') throw Error('Standalone persona migration failed')
 const exported = await promisify(open)(join(target, 'gpichan.petchar'), {lazyEntries: true})
 let noticePreserved = false
 await new Promise((done, reject) => {
@@ -80,7 +86,7 @@ if (!noticePreserved) throw Error('Exported Gpichan attribution/license was not 
 const python = env.DAEMONLET_CREATOR_PYTHON || (process.platform === 'win32' ? 'python' : 'python3')
 await exec(python, ['-c', 'import importlib.util; from pathlib import Path; p=Path("scripts/characters/lib/prepare.py"); s=importlib.util.spec_from_file_location("prepare",p); m=importlib.util.module_from_spec(s); s.loader.exec_module(m)'], {cwd: runtime, env, timeout: 60000})
 const {stdout: buildOutput} = await exec(process.execPath, ['--input-type=module', '-e', "import {build} from 'esbuild'; await build({entryPoints:['src/main.tsx'],bundle:true,write:false,outdir:'verification-build',external:['util'],loader:{'.png':'dataurl','.svg':'dataurl'},logLevel:'silent'}); console.log('renderer-source-bundled')"], {cwd: runtime, env, timeout: 60000, maxBuffer: 4 * 1024 ** 2})
-const result = {status: 'creator-extracted-verified', archive, sha256: digest(await readFile(archive)), extractedTo: target, files: count, bytes, runtimeCheck: check.technicalReadiness, licenseReview: check.licenseReview.status, export: join(target, 'gpichan.petchar'), exportSha256: digest(await readFile(join(target, 'gpichan.petchar'))), fixturePreparation: 'Only unselected dialogue pose references removed from temporary copy; original artwork and notice preserved', pythonHelpers: 'loaded', renderer: buildOutput.trim(), inferenceRun: false}
+const result = {status: 'creator-extracted-verified', archive, sha256: digest(await readFile(archive)), extractedTo: target, files: count, bytes, runtimeCheck: check.technicalReadiness, personaValidation: 'PASS', personaMigration: 'PASS', licenseReview: check.licenseReview.status, export: join(target, 'gpichan.petchar'), exportSha256: digest(await readFile(join(target, 'gpichan.petchar'))), fixturePreparation: 'Only unselected dialogue pose references removed from temporary copy; original artwork and notice preserved', pythonHelpers: 'loaded', renderer: buildOutput.trim(), inferenceRun: false}
 await mkdir(join(root, 'outputs/release-verification'), {recursive: true})
 await writeFile(join(root, 'outputs/release-verification/creator-result.json'), JSON.stringify(result, null, 2) + '\n')
 if (JSON.stringify(archiveBefore) !== JSON.stringify(await fileIdentity(dirname(archive), basename(archive)))) throw Error('Creator archive changed during verification')
