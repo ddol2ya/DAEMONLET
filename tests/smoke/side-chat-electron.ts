@@ -69,7 +69,7 @@ try {
   assert(await js('document.body.textContent.includes("Side conversation")'), "Language updates UI")
   assert(calls === 2, "Language switch made no call")
   await writeFile(join(output, "english.png"), (await contents.capturePage()).toPNG())
-  service.configure(false, "en"); assert(!window.isVisible() && !service.snapshot().messages.length && !service.snapshot().draft, "Disable clears memory and hides")
+  service.configure(false, "en"); await wait(80); assert(await js('document.querySelector("textarea").value === ""'), "Disable clears renderer draft"); assert(!window.isVisible() && !service.snapshot().messages.length && !service.snapshot().draft, "Disable clears memory and hides")
   Object.assign(result, { status: "PASS", calls, forks: opens, ownedBackendCloses: closes, ime: "PASS", compactPanel: "PASS", noExpansionCall: "PASS", copyFullSource: "PASS", htmlRemoteMediaInactive: "PASS", taskStateDraftScroll: "PASS", hidePreservesWindow: "PASS", zoom150: "PASS", language: "PASS", disable: "PASS" })
 } catch (error) { result.error = String(error) }
 finally { ipc.dispose(); await service.dispose(); win.destroy(); for (const w of BrowserWindow.getAllWindows()) w.destroy(); await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2) + "\n"); app.exit(result.status === "PASS" ? 0 : 1) }

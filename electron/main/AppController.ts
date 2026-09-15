@@ -795,7 +795,13 @@ export class AppController {
       const persistedFalse = !persistedAfterClose.value.visible
       app.emit("activate")
       await new Promise((resolveWait) => setTimeout(resolveWait, 450))
-      const persistedAfterActivate = await this.store.load()
+      let persistedAfterActivate = await this.store.load()
+      // Native move/activation callbacks may restart the 350 ms save debounce.
+      // Await the persisted condition instead of racing a fixed 450 ms delay.
+      for (let n = 0; n < 20 && !persistedAfterActivate.value.visible; n++) {
+        await new Promise(resolveWait => setTimeout(resolveWait, 100))
+        persistedAfterActivate = await this.store.load()
+      }
       const dockActivateShowedPet = this.settings.visible && win.isVisible()
       visibilitySync = { closeHidden, settingFalse, persistedFalse, petHiddenBeforeActivate: closeHidden, dockActivateShowedPet, visiblePersistedTrue: persistedAfterActivate.value.visible }
     }

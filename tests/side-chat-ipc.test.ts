@@ -10,7 +10,7 @@ afterEach(() => { mocks.handlers.clear(); vi.clearAllMocks() })
 function fixture() {
   const frame = { url: "pet://app/side-chat.html" }, contents = { id: 1, mainFrame: frame }, window = { isDestroyed: () => false, webContents: contents }
   const service = new SideChatService(() => { throw Error("must not start") }), controller = new SideChatIpcController(service, { window } as unknown as SideChatWindowController)
-  controller.register()
+  controller.register(); service.configure(true, "ko")
   const event = { sender: contents, senderFrame: frame }
   const invoke = (name: string, request: unknown, e: unknown = event, ...extra: unknown[]) => mocks.handlers.get(SIDE_CHAT_IPC.action)!(e, name, request, ...extra)
   const request = (text?: string) => ({ handle: service.snapshot().handle, epoch: service.snapshot().epoch, requestId: randomUUID(), ...(text === undefined ? {} : { text }) })

@@ -56,7 +56,7 @@ describe("side chat lifetime", () => {
   it("changes language without a call, resets safely and clears transcript on disable", async () => {
     const f = fixture(); f.service.setDraft("draft"); f.service.configure(true, "en"); f.service.applyPersona(persona("A", "en"))
     expect(f.service.snapshot().notice).toBe("language"); expect(f.factory).not.toHaveBeenCalled(); expect(f.service.snapshot().draft).toBe("draft")
-    f.service.configure(false, "en"); await expect(f.service.send("hello")).rejects.toThrow("CHAT_DISABLED"); expect(f.service.snapshot().draft).toBe("")
+    f.service.configure(false, "en"); await expect(f.service.send("hello")).rejects.toThrow("CHAT_DISABLED"); expect(f.service.snapshot().draft).toBe(""); expect(() => f.service.setDraft("late draft")).toThrow("CHAT_DISABLED")
   })
   it("rejects replayed request IDs and stale generations", () => {
     const f = fixture(), s = f.service.snapshot(), request = { handle: s.handle, epoch: s.epoch, requestId: randomUUID() }

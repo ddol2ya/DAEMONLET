@@ -56,7 +56,7 @@ export class SideChatService {
     this.resetConversation("parent"); this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null }; this.publish()
   }
   setMode(mode: SideChatSnapshot["mode"]) { if (mode !== "hidden" && !this.state.enabled) throw new Error("CHAT_DISABLED"); this.state.mode = mode; this.publish() }
-  setDraft(text: string) { if (!validChatInput(text, true)) throw new Error("INPUT_LIMIT"); this.state.draft = text; this.publish() }
+  setDraft(text: string) { if (!this.state.enabled) throw new Error("CHAT_DISABLED"); if (!validChatInput(text, true)) throw new Error("INPUT_LIMIT"); this.state.draft = text; this.publish() }
   accept(request: ChatRequest) {
     if (request.handle !== this.state.handle || request.epoch !== this.state.epoch) throw new Error("STALE_REQUEST")
     if (this.requests.has(request.requestId)) throw new Error("STALE_REQUEST")

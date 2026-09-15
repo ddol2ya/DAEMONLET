@@ -29,6 +29,7 @@ export function SideChatApp({ api }: { api: SideChatApi }) {
   useEffect(() => {
     const receive = (next: SideChatSnapshot) => {
       setSnapshot(next)
+      if (!next.enabled) { setDraft(""); draftRef.current = ""; submitted.current = null }
       if (next.phase === "answering" && !next.draft && draftRef.current === submitted.current) setDraft("")
     }
     const unsubscribe = api.onChanged(receive)
@@ -41,7 +42,7 @@ export function SideChatApp({ api }: { api: SideChatApi }) {
     if (!result.ok) setError(result.code)
     else { setError(null); setSnapshot(result.value) }
   }
-  useEffect(() => { const timer = setTimeout(() => { if (stateRef.current && validChatInput(draft, true)) void action("draft", draft) }, 200); return () => clearTimeout(timer) }, [draft])
+  useEffect(() => { const timer = setTimeout(() => { if (stateRef.current?.enabled && validChatInput(draft, true)) void action("draft", draft) }, 200); return () => clearTimeout(timer) }, [draft])
   useEffect(() => { if (snapshot) document.documentElement.lang = snapshot.language }, [snapshot?.language])
   const latest = snapshot?.messages.filter(m => m.role === "assistant").at(-1)
   useLayoutEffect(() => {
@@ -80,7 +81,7 @@ export function SideChatApp({ api }: { api: SideChatApi }) {
     </div>
     <div role="status" className="response-status">{snapshot.applying ? t.applying : snapshot.phase === "answering" ? t.answering : snapshot.phase === "preparing" ? t.preparing : ""}</div>
     {issue && <p className="error" role="alert">{errors[issue]?.[snapshot.language === "ko" ? 0 : 1] ?? issue}</p>}
-    <footer><label htmlFor="chat-input">{t.input}</label><textarea id="chat-input" rows={2} value={draft} onChange={e => setDraft(e.target.value)} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !composing.current && !isComposing(event.nativeEvent)) { event.preventDefault(); send() } }} /><div className="composer-actions"><button className="quiet" onClick={() => void action("reset")} disabled={snapshot.applying}>{t.reset}</button><span className="count">{Array.from(draft).length}/4000</span>{busy ? <button onClick={() => void action("stop")} disabled={snapshot.applying}>{t.stop}</button> : <button className="send" disabled={!draft.trim() || !snapshot.parent} onClick={send}>{t.send}</button>}</div></footer>
+    <footer><label htmlFor="chat-input">{t.input}</label><textarea id="chat-input" rows={2} value={draft} onChange={e => { if (validChatInput(e.target.value, true)) setDraft(e.target.value); else setError("INPUT_LIMIT") }} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !composing.current && !isComposing(event.nativeEvent)) { event.preventDefault(); send() } }} /><div className="composer-actions"><button className="quiet" onClick={() => void action("reset")} disabled={snapshot.applying}>{t.reset}</button><span className="count">{Array.from(draft).length}/4000</span>{busy ? <button onClick={() => void action("stop")} disabled={snapshot.applying}>{t.stop}</button> : <button className="send" disabled={!draft.trim() || !snapshot.parent} onClick={send}>{t.send}</button>}</div></footer>
     <div className="measure" aria-hidden="true"><div className="answer-text" ref={measurement}>{latest?.text}</div><div className="answer-text" ref={previewMeasure}>{latest?.preview}</div></div>
   </main>
 }

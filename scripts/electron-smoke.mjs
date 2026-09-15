@@ -53,7 +53,7 @@ if (activityEvidence) {
     records: [{ key: createHash("sha256").update("codex-adapter\0fixture-failure").digest("hex"), activityId: "activity-1", state: "failed", revision: 2, firstObservedAt: at, lastObservedAt: at, eventAt: at, endedAt: at, acknowledgedAt: null, confidence: null, category: null }],
   }), { mode: 0o600 })
 }
-const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence)
+const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence || process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS)
 const shortCodexHome = process.env.ELECTRON_SMOKE_DESKTOP_CONTROL_EVIDENCE || isolatedPresence
 const smokeCodexHome = shortCodexHome
   ? await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-home-"))
