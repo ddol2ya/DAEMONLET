@@ -106,6 +106,17 @@ describe("side chat display arbitration", () => {
     expect(f.c.anchor).toBeNull(); expect(f.c.speech).toBeNull(); expect(f.c.canShowActivity).toBe(false)
     expect(vi.getTimerCount()).toBe(0)
   })
+  it("does not let denied preparation retain an expired line's occupation", async () => {
+    const f = fixture(); await f.report("shown"); f.c.setSideChatVisible(true)
+    await f.report("hidden"); expect(await f.report("preparing")).toMatchObject({ granted: false })
+    await vi.advanceTimersByTimeAsync(BUBBLE_RETURN_DELAY_MS)
+    f.c.setSideChatVisible(false); expect(f.c.canShowActivity).toBe(true)
+  })
+  it("retains a latest shown lifetime during chat without allowing simultaneous activity on hide", async () => {
+    const f = fixture(); await f.report("hidden"); f.c.setSideChatVisible(true)
+    expect(await f.report("shown")).toMatchObject({ granted: false })
+    f.c.setSideChatVisible(false); expect(f.c.canShowActivity).toBe(false)
+  })
   it("rejects pending/new preparations during chat, including when the input lock releases", async () => {
     const f = fixture(); await f.report("hidden"); f.c.setInteractionLocked(true)
     const pending = f.report("preparing"); f.c.setSideChatVisible(true)

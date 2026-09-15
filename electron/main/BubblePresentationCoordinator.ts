@@ -39,9 +39,9 @@ export class BubblePresentationCoordinator {
       if (this.occupied && this.timer === null) this.timer = this.clock.setTimeout(() => { this.timer = null; this.occupied = false; this.changed() }, BUBBLE_RETURN_DELAY_MS)
       this.changed(); return Promise.resolve(permit(false))
     }
+    // A denied preparation cannot extend the previous line's release timer.
+    if (this.chatVisible && report.phase === "preparing") { this.changed(); return Promise.resolve(permit(false)) }
     this.cancelReturn()
-    // Chat owns display permission, but Pet still owns the latest lifetime/geometry.
-    if (this.chatVisible) { this.changed(); return Promise.resolve(permit(false)) }
     if (report.phase === "preparing" && this.locked && !this.occupied) {
       this.changed()
       return new Promise(resolve => { this.pending = { report, resolve } })
@@ -50,7 +50,8 @@ export class BubblePresentationCoordinator {
     // The callback synchronously hides the native activity window before the
     // invoking renderer receives permission to paint its dialogue.
     this.changed()
-    return Promise.resolve(permit(true))
+    // Pet lifetime remains current even while chat suppresses physical display.
+    return Promise.resolve(permit(!this.chatVisible))
   }
   setInteractionLocked(locked: boolean): void {
     if (this.locked === locked) return
