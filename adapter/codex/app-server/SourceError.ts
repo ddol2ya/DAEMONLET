@@ -1,0 +1,5 @@
+/** Exact native read-only-source failure vocabulary. Never forward arbitrary RPC
+ * messages: those may contain source paths or transcript fragments. */
+export const SOURCE_ERRORS = ["SOURCE_ACCESS", "SOURCE_SCOPE", "SOURCE_PERMISSIONS", "SOURCE_CHANGED", "SOURCE_IDENTITY", "SOURCE_SCHEMA", "SOURCE_COMPRESSION_UNSUPPORTED", "SOURCE_CAPABILITIES", "SOURCE_NO_COMPLETED_TURN", "SOURCE_BOUNDARY", "SOURCE_ORDINAL", "SOURCE_LIMIT", "SOURCE_SCAN_LIMIT", "SOURCE_CONTEXT_LIMIT", "SOURCE_RECORD_LIMIT", "SOURCE_LINEAGE_LIMIT", "SOURCE_LOOKUP_LIMIT", "SOURCE_MISSING_ANCESTOR", "SOURCE_AMBIGUOUS", "SOURCE_BUSY", "SOURCE_TIMEOUT", "SOURCE_CANCELLED", "SOURCE_READER_FAILED", "SOURCE_FORK_CONTRACT", "SOURCE_PLATFORM_UNSUPPORTED", "SOURCE_RUNTIME_UNSUPPORTED"] as const
+export type SourceError = typeof SOURCE_ERRORS[number]
+export function safeSourceError(value: unknown): SourceError | null { return typeof value === "string" && (SOURCE_ERRORS as readonly string[]).includes(value) ? value as SourceError : null }

@@ -1,9 +1,13 @@
+import { runPaginatedSideChatLiveSmoke } from "./SideChatPaginatedLiveSmoke"
 import { runSideChatLiveSmoke } from "./SideChatLiveSmoke"
 import { runSideChatPackSmoke } from "./SideChatPackSmoke"
 import { runSideChatGateSmoke } from "./SideChatGateSmoke"
 import { SideChatService } from "./side-chat/SideChatService"
 import { CodexSideChatBackend } from "./side-chat/SideChatBackend"
-import { connectVerifiedSideChat } from "./side-chat/SideChatPolicy"
+import { inspectChatSource } from "./side-chat/SideChatSource"
+import type { ChatParent } from "./side-chat/SideChatBackend"
+import { chatError } from "./side-chat/SideChatService"
+import { connectVerifiedSideChat, inspectSideChatRuntime } from "./side-chat/SideChatPolicy"
 import { PersonaResolver } from "./side-chat/PersonaResolver"
 import { SideChatWindowController } from "./SideChatWindowController"
 import { SideChatIpcController } from "./SideChatIpcController"
@@ -429,7 +433,19 @@ export class AppController {
     const home = this.integration.sideChatSelection().codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex")
     const catalog = await readDesktopThreadCatalog(home).catch(() => [])
     if (!this.settings.sideChatEnabled || this.quitting) return
-    this.sideChat.setCandidates(catalog.map(t => ({ threadId: t.id, title: t.title, cwd: t.cwd, path: t.path, sourceHome: home })), this.taskControl.selectedLocalChatThreadId())
+    const runtime = await inspectSideChatRuntime(this.integration.sideChatSelection().executablePath).catch(() => null)
+    const candidates: ChatParent[] = []
+    for (const item of catalog.slice(0, 64)) {
+      if (!this.settings.sideChatEnabled || this.quitting) return
+      const parent: ChatParent = { threadId: item.id, title: item.title, cwd: item.cwd, path: item.path, sourceHome: home }
+      try {
+        const source = await inspectChatSource(home, parent)
+        parent.source = { metadata: "checked", format: source.format, reason: source.capabilities ? "PARENT_CAPABILITIES" : source.format === "paginated" && runtime?.runtime.parentContract !== "read-only-source-v1" ? "SOURCE_RUNTIME_UNSUPPORTED" : null }
+      } catch (error) { parent.source = { metadata: "blocked", format: "unknown", reason: chatError(error) } }
+      candidates.push(parent)
+    }
+    if (!this.settings.sideChatEnabled || this.quitting) return
+    this.sideChat.setCandidates(candidates, this.taskControl.selectedLocalChatThreadId())
   }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
     await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
@@ -916,6 +932,11 @@ export class AppController {
       this.updateSettings({ sideChatEnabled: true })
       liveSideChatValidation = await runSideChatLiveSmoke({ service: this.sideChat, window: this.sideChatWindow, registry: this.characters, select: value => this.selectCharacter(value), authHome: process.env.ELECTRON_SMOKE_LIVE_AUTH_HOME!, output: process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT_EVIDENCE })
     }
+    let paginatedSideChatValidation: Awaited<ReturnType<typeof runPaginatedSideChatLiveSmoke>> | null = null
+    if (process.env.ELECTRON_SMOKE_PAGINATED_CHAT_OUTPUT && this.lastReady) {
+      this.updateSettings({ sideChatEnabled: true })
+      paginatedSideChatValidation = await runPaginatedSideChatLiveSmoke({ service: this.sideChat, window: this.sideChatWindow, home: this.integration.sideChatSelection().codexHome!, selectedId: process.env.ELECTRON_SMOKE_PAGINATED_PARENT!, output: process.env.ELECTRON_SMOKE_PAGINATED_CHAT_OUTPUT })
+    }
     const adapterDiagnostics = this.adapter.getDiagnostics()
     const protocolDiagnostics = this.protocol.getDiagnostics()
     const result = {
@@ -964,7 +985,7 @@ export class AppController {
       activityValidation,
       taskControlValidation,
       desktopControlValidation,
-      sideChatValidation, liveSideChatValidation,
+      sideChatValidation, liveSideChatValidation, paginatedSideChatValidation,
       sideChatPackValidation,
       settingsPath: "userData/desktop-settings.json",
       warnings: this.warnings,

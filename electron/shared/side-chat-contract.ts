@@ -1,14 +1,16 @@
+import type { SourceError } from "../../adapter/codex/app-server/SourceError"
 import type { AppLanguage } from "./app-language"
 export const SIDE_CHAT_LIMITS = { inputPoints: 4000, inputBytes: 16000, responseBytes: 65536, previewBytes: 4096, messages: 100, historyBytes: 2 * 1024 * 1024 } as const
 export type ChatExpression = "neutral" | "happy" | "thinking"
 export type ChatResponse = { text: string; preview: string; expression: ChatExpression }
-export type ChatError = "TURN_FAILED" | "CHAT_DISABLED" | "CHAT_PROFILE_MISSING" | "CHAT_MODEL_UNAVAILABLE" | "CHAT_RUNTIME_MISSING" | "CHAT_RUNTIME_UNSUPPORTED" | "CHAT_AUTH_REQUIRED" | "CHAT_MANAGED_POLICY" | "CHAT_EXECUTION_POLICY" | "PARENT_UNSUPPORTED" | "PARENT_CAPABILITIES" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
+export type ChatError = SourceError | "TURN_FAILED" | "CHAT_DISABLED" | "CHAT_PROFILE_MISSING" | "CHAT_MODEL_UNAVAILABLE" | "CHAT_RUNTIME_MISSING" | "CHAT_RUNTIME_UNSUPPORTED" | "CHAT_AUTH_REQUIRED" | "CHAT_MANAGED_POLICY" | "CHAT_EXECUTION_POLICY" | "PARENT_UNSUPPORTED" | "PARENT_CAPABILITIES" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
+export type ChatSourceReadiness = { metadata: "checked" | "blocked"; format: "legacy" | "paginated" | "unknown"; reason: ChatError | null }
 export type ChatMessage = { id: string; role: "user" | "assistant"; text: string; preview: string; at: number }
 export type ChatSubmission = { requestId: string; draftRevision: number }
 export type SideChatSnapshot = {
   handle: string; epoch: number; enabled: boolean; mode: "hidden" | "compact" | "panel"; language: AppLanguage
   character: { id: string; label: string }; parent: { handle: string; title: string; contextAt: number | null } | null
-  candidates: Array<{ handle: string; title: string }>; phase: "idle" | "preparing" | "answering" | "stopped" | "error"
+  candidates: Array<{ handle: string; title: string; source?: ChatSourceReadiness }>; phase: "idle" | "preparing" | "answering" | "stopped" | "error"
   applying: boolean; requiresNewConversation: boolean; error: ChatError | null; notice: "character" | "language" | "parent" | "reset" | null
   messages: ChatMessage[]; draft: string; draftRevision: number; acceptedSubmission: ChatSubmission | null; task: { state: string; checkedAt: number | null }
 }

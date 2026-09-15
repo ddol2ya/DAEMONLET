@@ -4,7 +4,9 @@ import type { AppLanguage } from "../../shared/app-language"
 import type { PersonaBinding } from "./PersonaResolver"
 import type { ChatParent, ChatSessionClosed, SideChatBackend } from "./SideChatBackend"
 
-const errors = new Set<ChatError>(["TURN_FAILED", "CHAT_MODEL_UNAVAILABLE", "CHAT_PROFILE_MISSING", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_AUTH_REQUIRED", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY", "PARENT_UNSUPPORTED", "PARENT_CAPABILITIES", "CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "RESPONSE_LIMIT", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
+import { SOURCE_ERRORS } from "../../../adapter/codex/app-server/SourceError"
+
+const errors = new Set<ChatError>([...SOURCE_ERRORS,"TURN_FAILED", "CHAT_MODEL_UNAVAILABLE", "CHAT_PROFILE_MISSING", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_AUTH_REQUIRED", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY", "PARENT_UNSUPPORTED", "PARENT_CAPABILITIES", "CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "RESPONSE_LIMIT", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
 export function chatError(error: unknown): ChatError { const code = error instanceof Error ? error.message as ChatError : "SESSION_LOST"; return errors.has(code) ? code : "SESSION_LOST" }
 
 /** All transcripts, drafts and request IDs live only in this instance's memory. */
@@ -45,7 +47,7 @@ export class SideChatService {
   setCandidates(parents: ChatParent[], preferredThreadId?: string) {
     const previous = this.candidates
     this.candidates = new Map(parents.slice(0, 64).map(parent => [([...previous].find(([, p]) => p.threadId === parent.threadId)?.[0] ?? randomUUID()), { ...parent }]))
-    this.state.candidates = [...this.candidates].map(([handle, p]) => ({ handle, title: p.title }))
+    this.state.candidates = [...this.candidates].map(([handle, p]) => ({ handle, title: p.title, ...(p.source ? { source: p.source } : {}) }))
     if (!this.parent && preferredThreadId) { const candidate = [...this.candidates].find(([, p]) => p.threadId === preferredThreadId); if (candidate) this.chooseParent(candidate[0]) }
     this.publish()
   }

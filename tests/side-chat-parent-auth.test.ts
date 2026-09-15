@@ -81,7 +81,7 @@ describe("model-free parent suitability report", () => {
   })
   it("distinguishes blocked formats, inherited tools and absent boundaries without converting parents", async () => {
     const paginated = await parentFixture({ history_mode: "paginated" }), dynamic = await parentFixture({ dynamic_tools: [{ name: "private-tool" }] }), empty = await parentFixture()
-    expect(await inspectParent(paginated.home, paginated.parent)).toMatchObject({ format: "paginated", dynamicTools: "NONE", terminalBoundary: "NOT_INSPECTED_UNSUPPORTED_FORMAT", status: "BLOCKED_UPSTREAM" })
+    expect(await inspectParent(paginated.home, paginated.parent)).toMatchObject({ format: "paginated", dynamicTools: "NONE", terminalBoundary: "NOT_INSPECTED_NATIVE_PREPARATION_REQUIRED", status: "PATCH_REQUIRED" })
     expect(await inspectParent(dynamic.home, dynamic.parent)).toMatchObject({ format: "legacy", dynamicTools: "PRESENT", reason: "PARENT_CAPABILITIES" })
     await writeFile(empty.path, empty.bytes.split("\n")[0] + "\n")
     expect(await inspectParent(empty.home, empty.parent)).toMatchObject({ terminalBoundary: "ABSENT", reason: "NO_COMPLETED_BOUNDARY" })

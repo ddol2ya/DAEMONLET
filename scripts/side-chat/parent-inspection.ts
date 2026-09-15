@@ -13,7 +13,7 @@ export async function inspectParent(home: string, parent: ChatParent) {
     const root = await realpath(home), path = await realpath(parent.path), stat = await lstat(parent.path)
     result.sourceHome = belongsToLocalCodexHome(path, parent.threadId, root) ? "MATCH" : "OUTSIDE"
     if (result.sourceHome !== "MATCH") return result
-    const fileIssue = stat.isSymbolicLink() ? "REDIRECTED_FILE" : !stat.isFile() ? "UNSUPPORTED_FILE_TYPE" : stat.nlink !== 1 ? "LINKED_FILE" : stat.size > 128 * 1024 * 1024 ? "FILE_SIZE_LIMIT" : process.platform !== "win32" && (stat.uid !== process.getuid?.() || (stat.mode & 0o022)) ? "FILE_PERMISSIONS" : null
+    const fileIssue = stat.isSymbolicLink() ? "REDIRECTED_FILE" : !stat.isFile() ? "UNSUPPORTED_FILE_TYPE" : stat.nlink !== 1 ? "LINKED_FILE" : process.platform !== "win32" && (stat.uid !== process.getuid?.() || (stat.mode & 0o022)) ? "FILE_PERMISSIONS" : null
     if (fileIssue) { result.access = "UNSAFE"; result.reason = fileIssue; return result }
     file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
     const opened = await file.stat()
@@ -34,7 +34,7 @@ export async function inspectParent(home: string, parent: ChatParent) {
     result.format = meta.history_mode === undefined || meta.history_mode === "legacy" ? "legacy" : meta.history_mode === "paginated" ? "paginated" : "UNKNOWN"
     result.dynamicTools = meta.dynamic_tools == null || Array.isArray(meta.dynamic_tools) && !meta.dynamic_tools.length ? "NONE" : Array.isArray(meta.dynamic_tools) ? "PRESENT" : "UNKNOWN"
     await file.close(); file = null
-    if (result.format !== "legacy") { result.status = result.format === "paginated" ? "BLOCKED_UPSTREAM" : "BLOCKED_INPUT"; result.reason = result.format === "paginated" ? "PAGINATED_CROSS_HOME_UNSUPPORTED" : "PARENT_UNSUPPORTED"; result.terminalBoundary = "NOT_INSPECTED_UNSUPPORTED_FORMAT"; return result }
+    if (result.format !== "legacy") { result.status = result.format === "paginated" ? "PATCH_REQUIRED" : "BLOCKED_INPUT"; result.reason = result.format === "paginated" ? "SOURCE_RUNTIME_UNSUPPORTED" : "PARENT_UNSUPPORTED"; result.terminalBoundary = "NOT_INSPECTED_NATIVE_PREPARATION_REQUIRED"; return result }
     if (result.dynamicTools !== "NONE") { result.reason = "PARENT_CAPABILITIES"; result.terminalBoundary = "NOT_INSPECTED_BLOCKED_CAPABILITIES"; return result }
     // Production validator remains the authority; inspection cannot admit a parent.
     await readChatParentContext(home, parent)

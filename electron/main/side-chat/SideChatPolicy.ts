@@ -1,4 +1,4 @@
-import { constants } from "node:fs"
+import { constants, createReadStream } from "node:fs"
 import { access, lstat, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises"
 import { createHash } from "node:crypto"
 import { basename, dirname, join } from "node:path"
@@ -6,15 +6,16 @@ import { tmpdir } from "node:os"
 import { stringify } from "smol-toml"
 import type { ChatConnection } from "./SideChatBackend"
 import { CHAT_LAUNCH_CONSTRAINTS, CHAT_MODEL_CATALOG, launchIsolatedChatProcess, writeChatModelCatalog } from "./SideChatLaunchProfile"
-import { readChatParentContext } from "./SideChatParent"
+import { resolveChatParentSource } from "./SideChatSource"
+import { PAGINATED_CHAT_RUNTIME } from "./SideChatRuntime"
 import { readChatAuthTokens } from "./SideChatAuth"
 
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex")
-export const SIDE_CHAT_SUPPORT = { policyVersion: 2, supportedRuntimes: [{ version: "0.154.0", platform: "darwin", arch: "arm64", executableSha256: "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc", model: "gpt-5.6-luna", parentContract: "legacy-no-dynamic-tools" }], code: "CHAT_PROFILE_MISSING" } as const
-export const CHAT_PROFILE_HASH = sha(JSON.stringify({ constraints: CHAT_LAUNCH_CONSTRAINTS, catalog: CHAT_MODEL_CATALOG, environments: [], instructions: "collaboration-mode", parentContract: "legacy-no-dynamic-tools" }))
+export const SIDE_CHAT_SUPPORT = { policyVersion: 3, supportedRuntimes: [{ version: "0.154.0", platform: "darwin", arch: "arm64", executableSha256: "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc", model: "gpt-5.6-luna", parentContract: "legacy-no-dynamic-tools", kind: "official" }, PAGINATED_CHAT_RUNTIME], code: "CHAT_PROFILE_MISSING" } as const
+export const CHAT_PROFILE_HASH = sha(JSON.stringify({ constraints: CHAT_LAUNCH_CONSTRAINTS, catalog: CHAT_MODEL_CATALOG, environments: [], instructions: "collaboration-mode", parentContracts: ["legacy-no-dynamic-tools", "read-only-source-v1"] }))
 export type SideChatConnectOptions = { codexHome: string; authHome?: string; executable?: string | null }
 
-export async function inspectSideChatExecutable(selected?: string | null): Promise<string> {
+export async function inspectSideChatRuntime(selected?: string | null) {
   if (process.platform !== "darwin" || process.arch !== "arm64") throw Error("CHAT_RUNTIME_UNSUPPORTED")
   const candidates = selected ? [selected] : ["/opt/homebrew/bin/codex", "/usr/local/bin/codex"]
   let found = false
@@ -24,13 +25,19 @@ export async function inspectSideChatExecutable(selected?: string | null): Promi
       // Resolve an npm shim without executing it; only the pinned native bytes are admitted.
       if (basename(path) === "codex.js") path = await realpath(join(dirname(dirname(path)), "node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"))
       const stat = await lstat(path); found = true
-      if (!stat.isFile() || stat.size > 350 * 1024 * 1024 || ![0, process.getuid?.()].includes(stat.uid) || (stat.mode & 0o022)) continue
+      if (!stat.isFile() || stat.size > (selected ? Math.max(350 * 1024 * 1024, PAGINATED_CHAT_RUNTIME.executableBytes) : 350 * 1024 * 1024) || ![0, process.getuid?.()].includes(stat.uid) || (stat.mode & 0o022)) continue
       await access(path, constants.X_OK)
-      if (sha(await readFile(path)) === SIDE_CHAT_SUPPORT.supportedRuntimes[0].executableSha256) return path
+      const hash = createHash("sha256")
+      for await (const chunk of createReadStream(path)) hash.update(chunk)
+      const digest = hash.digest("hex")
+      const runtime = SIDE_CHAT_SUPPORT.supportedRuntimes.find(runtime => runtime.executableSha256 === digest && (runtime.kind === "official" || Boolean(selected)))
+      if (runtime) return { executable: path, runtime }
     } catch { /* Try only the next fixed installation path. */ }
   }
   throw Error(found ? "CHAT_RUNTIME_UNSUPPORTED" : "CHAT_RUNTIME_MISSING")
 }
+
+export async function inspectSideChatExecutable(selected?: string | null): Promise<string> { return (await inspectSideChatRuntime(selected)).executable }
 
 function constraintMismatches(actual: any, expected: any, prefix = ""): string[] {
   return Object.entries(expected).flatMap(([key, value]) => value !== null && typeof value === "object" && !Array.isArray(value)
@@ -53,7 +60,7 @@ export function assertChatConfiguration(requirements: any, effective: any, confi
  * switch, pack or renderer can admit an unverified executable/profile combination. */
 export async function connectVerifiedSideChat(options?: SideChatConnectOptions): Promise<ChatConnection> {
   if (!options) throw Error("CHAT_PROFILE_MISSING")
-  const executable = await inspectSideChatExecutable(options.executable)
+  const { executable, runtime } = await inspectSideChatRuntime(options.executable)
   const root = await realpath(await mkdtemp(join(tmpdir(), "daemonlet-side-chat-")))
   let connection: ChatConnection | null = null, stage = "launch"
   try {
@@ -89,7 +96,7 @@ export async function connectVerifiedSideChat(options?: SideChatConnectOptions):
     if (!models.data?.some((model: any) => model.model === "gpt-5.6-luna" && model.supportedReasoningEfforts?.some((level: any) => level.reasoningEffort === "low"))) throw Error("CHAT_MODEL_UNAVAILABLE")
     await discovery.stop()
     connection = await start(true)
-    connection.parentContext = parent => readChatParentContext(options.codexHome, parent)
+    connection.parentContext = parent => resolveChatParentSource(options.codexHome, parent, runtime.parentContract === "read-only-source-v1" ? "read-only-source-v1" : "legacy")
     connection.refreshAuth = async () => {
       const next = await readChatAuthTokens(options.authHome ?? options.codexHome)
       if (next.chatgptAccountId !== tokens.chatgptAccountId || next.accessToken === tokens.accessToken) throw Error("CHAT_AUTH_REQUIRED")

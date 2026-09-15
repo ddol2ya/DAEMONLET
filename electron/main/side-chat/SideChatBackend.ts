@@ -1,11 +1,12 @@
-import { SIDE_CHAT_OUTPUT_SCHEMA, type ChatResponse } from "../../shared/side-chat-contract"
+import { SIDE_CHAT_OUTPUT_SCHEMA, type ChatResponse, type ChatSourceReadiness } from "../../shared/side-chat-contract"
 import type { ChatAuthTokens } from "./SideChatAuth"
 import type { ChatParentContext } from "./SideChatParent"
+import { validateSourceSnapshot, type ChatParentSource } from "./SideChatSource"
 import { SideChatItemCollector } from "./SideChatItemCollector"
 import type { CompiledPersona } from "./PersonaCompiler"
 import type { AppServerJsonlClient } from "../../../adapter/codex/app-server/AppServerJsonlClient"
 
-export type ChatParent = { threadId: string; title: string; cwd: string; path?: string; sourceHome?: string }
+export type ChatParent = { threadId: string; title: string; cwd: string; path?: string; sourceHome?: string; source?: ChatSourceReadiness }
 export type ForkContext = { threadId: string; lastTurnId: string; contextAt: number }
 export type ChatSessionClosed = { error: Error; hadSession: boolean }
 export interface SideChatBackend {
@@ -17,7 +18,7 @@ export interface SideChatBackend {
   close(): Promise<void>
 }
 export type ChatExecutionProfile = { cwd: string; model: string; instructions: "fork" | "collaboration-mode"; noEnvironment: boolean }
-export type ChatConnection = { refreshAuth?: () => Promise<ChatAuthTokens>; parentContext?: (parent: ChatParent) => Promise<ChatParentContext>; execution?: ChatExecutionProfile; client: AppServerJsonlClient; stop(): Promise<void> }
+export type ChatConnection = { refreshAuth?: () => Promise<ChatAuthTokens>; parentContext?: (parent: ChatParent) => Promise<ChatParentSource>; execution?: ChatExecutionProfile; client: AppServerJsonlClient; stop(): Promise<void> }
 type ActiveSend = {
   generation: number; connection: ChatConnection; child: string; turnId: string | null
   collector: SideChatItemCollector; timer: ReturnType<typeof setTimeout>; settle: (value: ChatResponse | Error) => void
@@ -74,7 +75,7 @@ export class CodexSideChatBackend implements SideChatBackend {
     this.cleanup.push(client.onNotification((method, params) => { if (current()) this.notification(method, params) }))
     if (client.handshakeState !== "READY") await client.initialize({ name: "daemonlet_side_chat", title: "Daemonlet side chat", version: "1" }, "side-chat")
     if (!current()) throw new Error("SESSION_LOST")
-    let context: Omit<ChatParentContext, "path"> & { path?: string }
+    let context: ChatParentSource | (Omit<ChatParentContext, "path"> & { path?: string })
     if (connection.parentContext) context = await connection.parentContext(parent)
     else {
       const metadata = object(object(await client.request("thread/read", { threadId: parent.threadId, includeTurns: false })).thread)
@@ -87,10 +88,11 @@ export class CodexSideChatBackend implements SideChatBackend {
       context = { lastTurnId: last.id, contextAt: typeof last.completedAt === "number" ? last.completedAt * 1000 : typeof metadata.updatedAt === "number" ? metadata.updatedAt * 1000 : Date.now() }
     }
     if (!current()) throw new Error("SESSION_LOST")
-    const result = object(await client.request("thread/fork", { threadId: parent.threadId, ...(context.path ? { path: context.path } : {}), ...(connection.execution ? { model: connection.execution.model } : {}), lastTurnId: context.lastTurnId, ephemeral: true, excludeTurns: true, cwd: connection.execution?.cwd ?? parent.cwd, approvalPolicy: "never", sandbox: "read-only", developerInstructions: persona.developerInstructions }))
+    const result = object(await client.request("thread/fork", { threadId: parent.threadId, ...(context.path ? { path: context.path } : {}), ...(connection.execution ? { model: connection.execution.model } : {}), ...("readOnlySource" in context ? { readOnlySource: context.readOnlySource } : { lastTurnId: context.lastTurnId }), ephemeral: true, excludeTurns: true, cwd: connection.execution?.cwd ?? parent.cwd, approvalPolicy: "never", sandbox: "read-only", developerInstructions: persona.developerInstructions }))
     const child = object(result.thread)
     if (generation !== this.generation) throw new Error("SESSION_LOST")
     if (typeof child.id !== "string" || child.id === parent.threadId || child.ephemeral !== true) throw new Error("CHAT_POLICY_UNENFORCEABLE")
+    if ("readOnlySource" in context) context = validateSourceSnapshot(result.sourceSnapshot, context)
     this.child = child.id; await this.owned(child.id)
     if (!current()) throw new Error("SESSION_LOST")
     return { threadId: child.id, lastTurnId: context.lastTurnId, contextAt: context.contextAt }

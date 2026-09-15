@@ -1,6 +1,8 @@
 import { EventEmitter, once } from "node:events"
 import type { Readable, Writable } from "node:stream"
 
+import { safeSourceError } from "./SourceError"
+
 type JsonObject = Record<string, unknown>
 
 export type JsonlClientOptions = {
@@ -13,7 +15,7 @@ export type JsonlClientOptions = {
 export class AppServerJsonlClient {
   private readonly options: JsonlClientOptions
   private readonly events = new EventEmitter()
-  private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
+  private readonly pending = new Map<number, { method: string; resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
   private nextId = 1
   private buffer = Buffer.alloc(0)
   private closed = false
@@ -92,7 +94,7 @@ export class AppServerJsonlClient {
       if (!pending) return
       clearTimeout(pending.timer)
       this.pending.delete(message.id)
-      if (Object.hasOwn(message, "error")) pending.reject(new Error("app-server request failed"))
+      if (Object.hasOwn(message, "error")) pending.reject(new Error(pending.method === "thread/fork" ? safeSourceError((message.error as JsonObject)?.message) ?? "app-server request failed" : "app-server request failed"))
       else pending.resolve(message.result)
       return
     }
@@ -124,7 +126,7 @@ export class AppServerJsonlClient {
         reject(new Error(`app-server request timed out: ${method}`))
       }, timeoutMs)
       timer.unref()
-      this.pending.set(id, { resolve, reject, timer })
+      this.pending.set(id, { method, resolve, reject, timer })
     })
     // Return the response promise immediately so close/error rejection is always
     // observed, including when the transport breaks while a write is draining.

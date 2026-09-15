@@ -1,3 +1,5 @@
+> Paginated follow-up: see [current support and evidence](side-chat-paginated.md). The legacy and historical account results below retain their original scope.
+
 # Side-chat launch profile v2
 
 Validated 2026-09-16 against the official [Codex 0.154.0 release](https://github.com/openai/codex/releases/tag/rust-v0.154.0), source commit `6b9826e3aa83b1a5947db50f4332cb9c65f1b340`. The installed native macOS arm64 executable hash and profile digest are recorded in [the validation record](side-chat-validation.md). Generated native schemas, raw fixture reports and account evidence remain private. No modified Codex binary is shipped.
@@ -87,7 +89,7 @@ npm run side-chat:probe -- --codex <native> --output <guard.json> --catalog --en
 
 Native `thread/start(historyMode=paginated)` plus a completed synthetic turn succeeds in the source home. Forking its known path/ID/boundary from a new isolated home with `ephemeral=true, excludeTurns=true` returns **RPC -32600, `no rollout found for thread id <synthetic-id>`**, before any child model request.
 
-In [thread_processor.rs](https://github.com/openai/codex/blob/6b9826e3aa83b1a5947db50f4332cb9c65f1b340/codex-rs/app-server/src/request_processors/thread_processor.rs#L4837), `self.thread_store.prepare_fork` uses the receiving process's store. Supplying a path does not bind that paginated store to the external source. The app currently validates only legacy rollouts and rejects paginated parents; it does not copy user databases or run the child inside the user's configuration home.
+In [thread_processor.rs](https://github.com/openai/codex/blob/6b9826e3aa83b1a5947db50f4332cb9c65f1b340/codex-rs/app-server/src/request_processors/thread_processor.rs#L4837), `self.thread_store.prepare_fork` uses the receiving process's store. Supplying a path does not bind that paginated store to the external source. The official-runtime profile validates only legacy rollouts and rejects paginated parents; it does not copy user databases or run the child inside the user's configuration home.
 
 Minimum upstream proposal: allow the fork preparation path to open an explicitly supplied source paginated store read-only, validate ID and terminal boundary in that store, and keep all child writes/configuration in the destination store. Add cross-store ephemeral-fork tests proving source immutability, complete ordered history and no child persistence. This is a proposed contract change, not an implemented or validated upstream patch.
 
