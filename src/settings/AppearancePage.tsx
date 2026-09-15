@@ -4,6 +4,7 @@ import { SCALE_PRESETS, type DesktopSettingsPatch, type DesktopSettingsV1 } from
 import type { SettingsPageProps } from "./SettingsApp"
 
 const toggles = [
+  { key: "sideChatEnabled", label: "캐릭터 사이드 대화 (실험)", description: "검증된 Codex 런타임에서만 전송할 수 있습니다. 사용량이 발생하며 부모 대화 맥락이 전달될 수 있습니다." },
   { key: "visible", label: "캐릭터 표시", description: null },
   { key: "alwaysOnTop", label: "항상 위에 표시", description: null },
   { key: "speechBubblesEnabled", label: "캐릭터 대사 표시", description: null },

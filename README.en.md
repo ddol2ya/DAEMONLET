@@ -136,3 +136,11 @@ The terms for the referenced community character designs, images and sheets are 
 External code, upstream assets, models and other character packs remain subject to [their own terms](THIRD_PARTY_NOTICES.md). Packaging files as `.petchar` does not place the entire pack under a single artwork license.
 
 The links above point to files in the source repository. In an installed app, notices are available in `resources/licenses/` on Windows/Linux and `Contents/Resources/licenses/` inside the macOS app bundle; you do not need to open the ASAR archive to read them. The existing MIT credit to `Momo Motion Lab contributors` is retained because there is no basis for changing the copyright holder.
+
+### Character side conversation (experimental, OFF by default)
+
+Enable the experiment in Settings → Character & display, then use **Chat with character** in the character's context menu or tray. The separate window uses a selected local Codex conversation as context and automatically binds the persona of the character that successfully appeared on screen. There is no per-project character assignment. Expanding a long answer reuses its complete text and fork.
+
+**Real account replies passed on macOS arm64 with the verified official CLI 0.154.0 binary and gpt-5.6-luna.** Only local legacy parents without dynamic tools are supported; paginated parents, other CLI builds and Windows remain blocked. The setting defaults to OFF, and the first send checks execution restrictions, authentication and model availability. See the [support and validation record](docs/side-chat-validation.md).
+
+On a supported runtime, parent history may be sent back to Codex and consume your allowance. Messages and drafts are memory-only. Hiding preserves them; reset, character changes and language changes start a new conversation; disabling or quitting clears chat. File/coding execution, voice, long-term memory and native Codex side-UI synchronization are out of scope. Legacy packs use a neutral fallback; older apps may reject the new persona capability.

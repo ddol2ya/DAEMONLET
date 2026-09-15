@@ -22,6 +22,7 @@ export async function checkCandidate(asar) {
   if (JSON.stringify(catalog.characters) !== JSON.stringify(expected)) throw new Error('Unexpected built-in characters')
   const mode = json('dist-electron/build-mode.json')
   if (!mode.production || mode.setupSmoke) throw new Error('Not a production build')
+  for (const required of ['dist/side-chat.html', 'dist-electron/side-chat-preload.cjs', 'dist/characters/gpichan/persona.json']) if (!files.includes(required)) throw new Error('Missing side chat runtime asset: ' + required)
   const needed = await runtimeAssetPaths(resolve(root, 'public/characters'))
   for (const path of needed) {
     const packaged = extract('dist/characters/' + path)

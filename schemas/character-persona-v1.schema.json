@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ddol2ya/DAEMONLET/schema/persona-v1",
+  "title": "Character persona v1",
+  "$comment": "UTF-8 input <= 16384 bytes. Runtime additionally rejects dangerous keys, invalid Unicode, C0/C1 controls (except tab/CR/LF), bidi overrides; normalizes NFC, whitespace and optional fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string",
+          "maxLength": 240,
+          "minLength": 1
+        },
+        "traits": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1
+          }
+        },
+        "background": {
+          "type": "string",
+          "maxLength": 1200
+        }
+      },
+      "required": [
+        "role",
+        "traits"
+      ]
+    },
+    "speech": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "formality": {
+          "enum": [
+            "casual",
+            "polite",
+            "formal"
+          ]
+        },
+        "defaultLength": {
+          "const": "brief"
+        },
+        "humor": {
+          "enum": [
+            "none",
+            "light",
+            "dry"
+          ]
+        },
+        "languagePolicy": {
+          "const": "follow-app"
+        },
+        "addressTerm": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "styleNotes": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "formality",
+        "defaultLength",
+        "humor",
+        "languagePolicy"
+      ]
+    },
+    "examples": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "user": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1
+          },
+          "reply": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 1
+          }
+        },
+        "required": [
+          "user",
+          "reply"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "identity",
+    "speech",
+    "examples"
+  ]
+}

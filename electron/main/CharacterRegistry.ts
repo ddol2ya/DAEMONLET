@@ -4,7 +4,7 @@ import { join, dirname, resolve, sep } from "node:path"
 import { PACK_LIMITS, isCharacterId, isRevision, comparePackVersions, type CharacterEntry, type CharacterSnapshot, type ImportPreview, type CharacterSelection, type PackProgress } from "../shared/character-pack-contract"
 import { parsePackManifest } from "../shared/character-pack-validation"
 import { packAssetUrl } from "../shared/character-pack-path"
-import { containedFile, sha256, type ValidatedPack } from "./CharacterPackAssets"
+import { boundedFile, containedFile, sha256, type ValidatedPack } from "./CharacterPackAssets"
 import type { PackValidator } from "./CharacterPackWorker"
 
 type StoredEntry = { id: string; current: string; previous?: string; revisions: string[] }
@@ -254,6 +254,16 @@ export class CharacterRegistry {
       for (const revision of stored.revisions) { await this.removeRevision(stored.id, revision); this.verified.delete(this.key(stored.id, revision)); this.inventories.delete(this.key(stored.id, revision)) }
       this.usedBytes = await this.diskUsage(); this.changed()
     })
+  }
+  async readPersonaAsset(selection: CharacterSelection, path: string): Promise<Uint8Array> {
+    if (selection.id === "gpichan" && selection.revision === "builtin") return boundedFile(join(this.builtinRoot, "gpichan"), path, 64 * 1024)
+    const pack = this.verified.get(this.key(selection.id, selection.revision))
+    const expected = pack?.manifest.files.find(f => f.path === path)
+    const file = await this.resolveAsset(selection.id, selection.revision, path)
+    if (!file || !expected || expected.bytes > 64 * 1024) throw new Error("PACK_PERSONA")
+    const bytes = await boundedFile(this.revisionRoot(selection.id, selection.revision), path, 64 * 1024)
+    if (bytes.length !== expected.bytes || sha256(bytes) !== expected.sha256) throw new Error("PACK_PERSONA")
+    return bytes
   }
   async resolveAsset(id: string, revision: string, path: string): Promise<string | null> {
     const entry = this.index.entries.find(e => e.id === id)

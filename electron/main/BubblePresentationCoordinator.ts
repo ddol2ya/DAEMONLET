@@ -4,6 +4,9 @@ type Clock = { setTimeout(callback: () => void, ms: number): ReturnType<typeof s
 
 /** Display arbitration only: never mutates activity, selection, dialogue or dictation. */
 export class BubblePresentationCoordinator {
+  private chatVisible = false
+  get sideChatVisible() { return this.chatVisible }
+  setSideChatVisible(value: boolean) { this.chatVisible = value; if (value) this.rejectPending(); this.changed() }
   private epoch = 0
   private sequence = 0
   private available = false
@@ -15,7 +18,7 @@ export class BubblePresentationCoordinator {
   speech: SpeechBubbleFrame | null = null
   constructor(private readonly changed: () => void, private readonly clock: Clock = { setTimeout, clearTimeout }) {}
 
-  get canShowActivity(): boolean { return this.available && !this.occupied }
+  get canShowActivity(): boolean { return !this.chatVisible && this.available && !this.occupied }
   get interactionLocked(): boolean { return this.locked }
   begin(): number {
     this.cancelReturn(); this.rejectPending(); this.epoch++; this.sequence = 0
@@ -36,6 +39,8 @@ export class BubblePresentationCoordinator {
       if (this.occupied && this.timer === null) this.timer = this.clock.setTimeout(() => { this.timer = null; this.occupied = false; this.changed() }, BUBBLE_RETURN_DELAY_MS)
       this.changed(); return Promise.resolve(permit(false))
     }
+    // A denied preparation cannot extend the previous line's release timer.
+    if (this.chatVisible && report.phase === "preparing") { this.changed(); return Promise.resolve(permit(false)) }
     this.cancelReturn()
     if (report.phase === "preparing" && this.locked && !this.occupied) {
       this.changed()
@@ -45,7 +50,8 @@ export class BubblePresentationCoordinator {
     // The callback synchronously hides the native activity window before the
     // invoking renderer receives permission to paint its dialogue.
     this.changed()
-    return Promise.resolve(permit(true))
+    // Pet lifetime remains current even while chat suppresses physical display.
+    return Promise.resolve(permit(!this.chatVisible))
   }
   setInteractionLocked(locked: boolean): void {
     if (this.locked === locked) return

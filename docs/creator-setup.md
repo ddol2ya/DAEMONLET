@@ -54,3 +54,9 @@ Node가 쓰는 Python이 다르면 `DAEMONLET_CREATOR_PYTHON`을 해당 Python �
 라이선스 경고 확인은 허락 취득이 아니며, 실제 설치 revision은 이 소스 검토로 검증되지
 않습니다. 미확인 상태 때문에 모델이 필요 없는 앱 실행·소스 빌드를 막지는 않습니다.
 [확인 근거와 범위](external-license-review.md)를 함께 확인하세요.
+
+## Persona-only updates
+
+For an existing pack, personality updates need Node and the creator runtime's npm dependencies; they do not need images, ComfyUI, Python, model weights or a GPU. `creator.mjs validate-persona` and `creator.mjs upgrade-persona` work from the complete extracted skill ZIP. Reuse the supplied, consistent character sources; see the skill's `references/persona.md`. `info` and `check` retain their read-only behavior. For new characters, pass `--persona <json>` to the payload command using the same confirmed profile as fixed dialogue.
+
+The source HTML and full extracts remain in private production outputs. Updated packs require an app recognizing `side-chat-persona-v1`. Chat support is independently gated by the Codex runtime; a successfully migrated persona pack is not proof of real-model chat support.

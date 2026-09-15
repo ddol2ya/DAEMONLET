@@ -225,3 +225,13 @@ version의 다른 내용, `PACK_DOWNGRADE`는 낮은 버전, `PACK_TRANSACTION`�
 들어 있습니다. export/import의 기존 inventory 해시와 크기·경로 검증 대상이며 새로운
 확장자나 제한 완화는 없습니다. 다른 팩의 LICENSE.txt는 바이트 그대로 보존하고
 출처 미상 팩에 자동 라이선스를 붙이지 않습니다. 팩 컨테이너 전체를 CC BY로 선언하지 않습니다.
+
+## Side-chat persona v1
+
+`character.json` may explicitly reference a relative JSON file through `persona`. A valid external reference requires the `side-chat-persona-v1` capability and an inventory entry with verified bytes/SHA-256. Declaring only one side is an error. Persona-free legacy packs keep their behavior and use a neutral conversational fallback based on their label; orphan files are not selected by filename. Invalid explicit profiles fail import. Post-install corruption stops chat safely.
+
+The authoritative contract is `schemas/character-persona-v1.schema.json` plus the shared `electron/shared/character-persona.ts` validator (UTF-8 byte bounds and normalization). Profiles describe identity, traits, speech and examples; they cannot configure model/provider, credentials, prompts, tools, hooks or autonomous activity. Names come from `character.label`. The sole built-in Gpichan references its own validated persona without an external pack manifest.
+
+`validate-persona.mjs --input <json>` validates offline. `upgrade-pack-persona.mjs --input <old.petchar> --persona <json> --version <higher-X.Y.Z> --output <new.petchar> --report <private-report.json>` uses the existing safe importer, preserves the ID and optional author/thumbnail/profile/reaction metadata, regenerates inventory, and verifies all other payload bytes. Originals and installed user profiles are preserved; output/report overwrite is rejected. Existing persona references are updated in place in the new pack. A failed report publication may leave the validated output pack; inspect it before allocating new paths.
+
+New exporter calls add the capability only for an explicit validated reference. New packs can be rejected by older apps that do not recognize this capability; this is intentional, and does not affect new-app support for old packs. Source HTML, full extracts, source dialogue collections and private paths do not belong in packs. GPU/ComfyUI is unnecessary for persona-only updates. Use isolated profiles for import/update/rollback tests and separate byte-preservation from visual and actual-model quality checks.

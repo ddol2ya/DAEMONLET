@@ -35,6 +35,7 @@ export type TrayActions = {
   activity?(): ActivitySnapshot
   openActivity?(): void
   openTaskControl?(): void
+  openSideChat?(): void
   characters?(): CharacterEntry[]
   toggleVisible(): void
   setLayout(enabled: boolean): void
@@ -57,6 +58,7 @@ export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatu
       { label: t("작업 목록"), click: actions.openActivity },
       ...(actions.activity ? [{ label: activitySummary(actions.activity(), settings.language), enabled: false }] : []),
     ] : []),
+    ...(actions.openSideChat ? [{ label: t("캐릭터와 대화"), enabled: settings.sideChatEnabled, click: actions.openSideChat }] : []),
     { type: "separator" },
     { label: t("캐릭터 이동·크기 조절"), click: () => actions.setLayout(true) },
     { label: t("위치 초기화"), click: actions.resetPosition },

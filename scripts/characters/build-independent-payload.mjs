@@ -1,9 +1,10 @@
+import { withPackTools } from './pack-tools.mjs'
 import { parseArgs } from 'node:util'
 import { createHash } from 'node:crypto'
 import { access, copyFile, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 
-const { values } = parseArgs({ options: Object.fromEntries(['source', 'id', 'label', 'profile', 'behavior', 'dialogue', 'output', 'runtime-patches'].map(k => [k, { type: 'string' }])) })
+const { values } = parseArgs({ options: Object.fromEntries(['source', 'id', 'label', 'profile', 'behavior', 'dialogue', 'persona', 'output', 'runtime-patches'].map(k => [k, { type: 'string' }])) })
 if (!values.source || !values.output || !values.behavior || !values.dialogue || !values.label?.trim() || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.id ?? '') || values.id.length > 64 || !['trial', 'full'].includes(values.profile)) throw new Error('Usage: node scripts/characters/build-independent-payload.mjs --source <selected-run> --id <id> --label <name> --profile trial|full --behavior <json> --dialogue <json> --output <payload> [--runtime-patches <pose-to-file-map.json>]')
 const source = await realpath(resolve(values.source)), destination = resolve(values.output)
 if (await access(destination).then(() => true, () => false)) throw new Error('Output exists. Choose a new output directory; no files were replaced.')
@@ -51,7 +52,8 @@ try {
   for (const id of Object.keys(dialogue.poseTriggers ?? {})) if (id !== 'base' && !available.has(id)) throw new Error(`Unmade dialogue pose: ${id}`)
   for (const id of Object.keys(dialogue.poseLines ?? {})) if (!Object.hasOwn(dialogue.poseTriggers ?? {}, id)) throw new Error(`Unbound dialogue pose: ${id}`)
   await writeJson(join(stage, 'behavior.json'), behavior); await writeJson(join(stage, 'dialogue.ko.json'), dialogue)
-  await writeJson(join(stage, 'character.json'), { schemaVersion: 1, id: values.id, label: values.label, base: { source: 'poses/waiting/source.png', psd: 'poses/waiting/model.psd', overrides: 'poses/waiting/rig-overrides.json' }, poses: selected.map(m => `poses/${m.id}/pose.json`), behavior: 'behavior.json', dialogue: 'dialogue.ko.json' })
+  if (values.persona) await withPackTools(async tools => writeJson(join(stage, 'persona.json'), tools.parseCharacterPersona(await readFile(resolve(values.persona)))))
+  await writeJson(join(stage, 'character.json'), { schemaVersion: 1, id: values.id, label: values.label, base: { source: 'poses/waiting/source.png', psd: 'poses/waiting/model.psd', overrides: 'poses/waiting/rig-overrides.json' }, poses: selected.map(m => `poses/${m.id}/pose.json`), behavior: 'behavior.json', dialogue: 'dialogue.ko.json', ...(values.persona ? { persona: 'persona.json' } : {}) })
   await writeJson(join(stage, 'provenance.json'), { schemaVersion: 1, characterId: values.id, profile: values.profile, ...(values.profile === 'trial' ? { unsupportedReactions: ['실패', '취소', '연결 끊김', '지루함', '기쁨', '몸통 클릭', '쓰다듬기 전용 포즈'] } : {}), sourceIndexSha256: await hash(join(source, 'models.json')), strategy: 'whole-model-per-pose', sharedBaseArtwork: false, models: records })
   await rename(stage, destination)
   console.log(JSON.stringify({ id: values.id, profile: values.profile, models: selected.length, output: destination }, null, 2))
