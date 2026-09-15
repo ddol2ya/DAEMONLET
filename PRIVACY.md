@@ -43,3 +43,13 @@ helper는 음성을 자체 파일로 녹음하지 않습니다. 부분·최종 �
 설정의 진단 내보내기는 경로를 대체하고 이벤트 이름·횟수·시각, 단계별 상태를 중심으로 저장합니다. 사용자 보고한 Hook 검토·중단 여부는 자동 검증 증거가 아닙니다. 공유 전 화면의 대화 제목·질문, 사용자명, 홈·프로젝트 경로, IP/호스트명, 세션·턴 ID, Hook command, token, 인증 파일, 원본 transcript와 Hook 백업을 가리세요. 원본 Codex 설정·전체 로그를 공개 이슈에 올리지 마세요.
 
 구현 근거: `adapter/codex/hooks/hook-forwarder.mjs`, `adapter/codex/lifecycle/CodexLifecycleObserver.ts`, `electron/main/control/DesktopThreadCatalog.ts`, `electron/main/control/TaskControlService.ts`, `electron/main/activity/ActivityHistoryStore.ts`, `electron/main/SetupDiagnostics.ts`, `electron/native/Dictation.swift`.
+
+## Experimental character side conversations
+
+The feature defaults to OFF. OFF starts no additional Codex process and makes no model request. Opening a window, changing layout, compiling a persona or applying a character makes no model request. A supported runtime would create an owned ephemeral fork on the first explicit send, using a selected local parent's completed-turn boundary. Parent history may be sent again to the model provider and consume account allowance. Ephemeral does not mean provider-side zero retention; hiding a window does not destroy the server session.
+
+Chat bodies and drafts live only in Main/renderer memory: no localStorage, IndexedDB, activity history, diagnostics or transcript logs. Copy is an explicit user action that writes the selected message to the system clipboard. Limit: 4,000 code points and 16,000 UTF-8 bytes per input, 64 KiB per response text, 100 messages and 2 MiB of displayed history. Reaching limits asks for a new conversation rather than silently deleting history. There are no automatic retries after uncertain delivery.
+
+The UI receives opaque handles, safe display metadata and validated responses; it cannot submit filesystem paths, raw parent/child IDs, provider config or developer instructions. External persona data does not grant permissions. Raw HTML and full character-source extracts are production references, never runtime imports or shipped assets. Main reads explicitly referenced personas with the same validator for built-in and external characters; installed external bytes are checked against the verified inventory.
+
+Currently no production runtime profile has passed first-request persona and pre-execution tool isolation checks. CLI 0.153.4 is blocked before starting an account-bearing process or reading parent history. Only explicit synthetic probes use a loopback fake provider and temporary Codex state, without real account calls. Global Codex configuration, Hook/MCP configuration, credentials, signing state and running user sessions are not modified. See `docs/side-chat-validation.md` for actual scope and unresolved checks.
