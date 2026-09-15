@@ -125,3 +125,29 @@ The synthetic UI backend made seven fixture sends and zero account calls. These 
 ## Remaining limits
 
 Live success is limited to the registered host/runtime/model/parent combination and three inspected character answers. Exhaustive voice quality, physical monitor removal, every-pose review and Windows live execution are **NOT_RUN**. Paginated/dynamic-tool parent limitations are described separately above. CI cannot establish those native capabilities. The prior pack/creator evidence remains historical; this follow-up does not regenerate those assets.
+
+## Review of 8df6299: closed-child recovery (2026-09-16)
+
+The P2 was reproduced using direct imports of the repository's production Service, Backend and Collector. After an auth-refresh failure, excessive item count/bytes or malformed completed item, the old implementation retained a closed backend and consumed the next input without a new `turn/start`. The regression records distinguish those observed failures from new assertions for the recovery contract. The supplied source copies/stubs were not copied into production tests.
+
+Backend lifetime now has an explicit `onSessionClosed({error, hadSession})` notification plus `isSessionOpen()` for the predispatch check. Service invalidates that exact backend/epoch synchronously, preserves the cause and publishes `requiresNewConversation` when a child context has been lost. It does not infer connection death from a growing list of error strings. Reentrant close calls share one process-cleanup promise; an explicit new conversation waits for cleanup, and a canceled queued reopen cannot restart the old instance.
+
+| Outcome | Context / action |
+| --- | --- |
+| Login failure before a child is prepared | Draft and receipt remain unconsumed. After normal login, a new manual send may prepare the conversation |
+| Auth refresh or item-processing failure closes the child | Cause remains visible; sending/Enter is blocked. Check login if needed, explicitly choose New conversation, then manually send the retained draft |
+| Terminal JSON/response-format error with live backend | No automatic retry or hidden fork. A manual follow-up uses the same child |
+| Known failed turn with live backend | `TURN_FAILED` reports request failure separately from session loss; no automatic retry |
+| Transport loss / uncertain delivery | Requires explicit new conversation; no replay |
+
+The renderer keeps the draft editable while requiring a new conversation and preserves the existing reset confirmation. The native UI fixture supplies a deterministic confirmation choice; it does not claim automated interaction with a real native confirmation dialog. An initial UI test waited at that confirmation and failed; only the corrected fixture run is counted as passing. Existing F1/F2/F3 and parent-status binding remain covered. Additional regressions cover late old close/auth callbacks, close during preparation, stopping preparation, cleanup serialization and character-apply failure without silent context replacement.
+
+### Model-free suitability inspection
+
+`npm run side-chat:check-parent -- --codex-home <selected-home> --project <project> --output <new-private-report.json>` reads the app's bounded local metadata catalog and selected parent metadata, then uses the production parent validator for eligible legacy files. The default home is CODEX_HOME or the normal Codex home; use the app's selected home if customized. It never starts Codex, reads auth, creates/converts a parent, calls a model, changes parent capabilities or overrides the launch gate. Reports omit titles, paths, IDs, tool definitions and transcript text. Parent eligibility is not runtime/authentication readiness.
+
+The current local inspection returned 20 metadata candidates: 17 paginated parents and 3 files exceeding the existing 128-MiB parent limit. The two candidates for the current project were paginated, readable, within the selected source home and without dynamic tools. Their terminal boundaries were **not inspected** because the production cross-home format is unsupported. The large files were not read for format, capabilities or boundaries. No candidate was represented as ready. This is a bounded current inspection, not a claim about every user task.
+
+This correction made **zero new real-account model calls**. The earlier seven-attempt account test, its limited legacy QA parent and its artifact/source distinction remain historical evidence. Final correction-build, synthetic native UI, fake-provider CLI and CI identities are recorded separately in the PR/private review report. Runtime hash admission, default OFF, parent-format/capability guards, packs/artwork/rigs/creator and publication restrictions are unchanged.
+
+Executed for the recovery correction: TypeScript PASS; **151 test files, 1,543 passed, 5 skipped**, including **95 side-chat/persona tests**. Source/private-data check: 673 files / 49 runtime assets / no findings. The production backend with pinned native CLI and fake provider still passes exact response collection, consecutive turns, two remote compactions, zero exposed tools, parent preservation and cleanup. This does not repeat the old real-account voice test or broaden the admitted runtime/profile.

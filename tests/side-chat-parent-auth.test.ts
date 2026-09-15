@@ -1,3 +1,4 @@
+import { inspectParent } from "../scripts/side-chat/parent-inspection"
 import { afterEach, describe, expect, it } from "vitest"
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, chmod } from "node:fs/promises"
 import { join } from "node:path"
@@ -67,5 +68,25 @@ describe("read-only existing Codex auth broker", () => {
     const home = await root(), path = join(home, "unverified-codex")
     await writeFile(path, "#!/bin/sh\nexit 0\n", { mode: 0o700 })
     await expect(inspectSideChatExecutable(path)).rejects.toThrow(/CHAT_RUNTIME_/)
+  })
+})
+
+describe("model-free parent suitability report", () => {
+  it("reports production-validated legacy boundaries without identifiers, titles or content", async () => {
+    const f = await parentFixture({ private_marker: "DO_NOT_REPORT_TRANSCRIPT" })
+    const report = await inspectParent(f.home, f.parent)
+    expect(report).toEqual({ sourceHome: "MATCH", access: "READABLE", format: "legacy", dynamicTools: "NONE", terminalBoundary: "CONFIRMED", status: "ELIGIBLE_PARENT_ONLY", reason: "AUTH_AND_RUNTIME_NOT_CHECKED" })
+    for (const secret of [f.path, f.turn, f.parent.threadId, "DO_NOT_REPORT_TRANSCRIPT"]) expect(JSON.stringify(report)).not.toContain(secret)
+    expect(await readFile(f.path, "utf8")).toBe(f.bytes)
+  })
+  it("distinguishes blocked formats, inherited tools and absent boundaries without converting parents", async () => {
+    const paginated = await parentFixture({ history_mode: "paginated" }), dynamic = await parentFixture({ dynamic_tools: [{ name: "private-tool" }] }), empty = await parentFixture()
+    expect(await inspectParent(paginated.home, paginated.parent)).toMatchObject({ format: "paginated", dynamicTools: "NONE", terminalBoundary: "NOT_INSPECTED_UNSUPPORTED_FORMAT", status: "BLOCKED_UPSTREAM" })
+    expect(await inspectParent(dynamic.home, dynamic.parent)).toMatchObject({ format: "legacy", dynamicTools: "PRESENT", reason: "PARENT_CAPABILITIES" })
+    await writeFile(empty.path, empty.bytes.split("\n")[0] + "\n")
+    expect(await inspectParent(empty.home, empty.parent)).toMatchObject({ terminalBoundary: "ABSENT", reason: "NO_COMPLETED_BOUNDARY" })
+    expect(await inspectParent(await root(), empty.parent)).toMatchObject({ sourceHome: "OUTSIDE", access: "NOT_CHECKED" })
+    expect(await readFile(paginated.path, "utf8")).toBe(paginated.bytes)
+    expect(await readFile(dynamic.path, "utf8")).toBe(dynamic.bytes)
   })
 })
