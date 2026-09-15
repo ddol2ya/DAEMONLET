@@ -79,6 +79,12 @@ describe("model-free parent suitability report", () => {
     for (const secret of [f.path, f.turn, f.parent.threadId, "DO_NOT_REPORT_TRANSCRIPT"]) expect(JSON.stringify(report)).not.toContain(secret)
     expect(await readFile(f.path, "utf8")).toBe(f.bytes)
   })
+  it("does not label selected capability roots as eligible before native preparation", async () => {
+    for (const history_mode of ["legacy", "paginated"]) {
+      const f = await parentFixture({ history_mode, selected_capability_roots: [{ path: "fixture-capability" }] })
+      expect(await inspectParent(f.home, f.parent)).toMatchObject({ reason: "PARENT_CAPABILITIES", terminalBoundary: "NOT_INSPECTED_BLOCKED_CAPABILITIES", status: "BLOCKED_INPUT" })
+    }
+  })
   it("distinguishes blocked formats, inherited tools and absent boundaries without converting parents", async () => {
     const paginated = await parentFixture({ history_mode: "paginated" }), dynamic = await parentFixture({ dynamic_tools: [{ name: "private-tool" }] }), empty = await parentFixture()
     expect(await inspectParent(paginated.home, paginated.parent)).toMatchObject({ format: "paginated", dynamicTools: "NONE", terminalBoundary: "NOT_INSPECTED_NATIVE_PREPARATION_REQUIRED", status: "PATCH_REQUIRED" })

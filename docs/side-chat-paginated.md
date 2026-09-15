@@ -62,8 +62,8 @@ the paginated live harness.
   the real resolver and backend, with one CLI, no auth read, no parent RPCs and
   zero model requests. Three metadata candidates were observed; this does not
   claim all three were prepared.
-- App regression: 1,551 tests passed and 5 skipped before final artifact creation;
-  existing 95 side-chat/persona cases remain, with 8 new source/backend cases.
+- App regression: 1,552 tests passed and 5 skipped before final artifact creation;
+  existing 95 side-chat/persona cases remain, with 9 new source/backend/inspection cases.
 - Native scoped regression: 1,955 passed, 7 failed, 2 skipped. Remaining failures
   require codex-code-mode-host; locked rusty_v8 150.4.0's macOS arm64 prebuilt URL
   returns 404. They are not reported as passing. The first run also lacked

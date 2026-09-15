@@ -1,6 +1,8 @@
 import { constants } from "node:fs"
 import { lstat, open, realpath } from "node:fs/promises"
 import { belongsToLocalCodexHome } from "../../electron/main/control/CodexThreadLauncher"
+import { inspectChatSource } from "../../electron/main/side-chat/SideChatSource"
+import { safeSourceError } from "../../adapter/codex/app-server/SourceError"
 import { readChatParentContext } from "../../electron/main/side-chat/SideChatParent"
 import type { ChatParent } from "../../electron/main/side-chat/SideChatBackend"
 
@@ -34,6 +36,8 @@ export async function inspectParent(home: string, parent: ChatParent) {
     result.format = meta.history_mode === undefined || meta.history_mode === "legacy" ? "legacy" : meta.history_mode === "paginated" ? "paginated" : "UNKNOWN"
     result.dynamicTools = meta.dynamic_tools == null || Array.isArray(meta.dynamic_tools) && !meta.dynamic_tools.length ? "NONE" : Array.isArray(meta.dynamic_tools) ? "PRESENT" : "UNKNOWN"
     await file.close(); file = null
+    const source = await inspectChatSource(home, parent)
+    if (source.capabilities) { result.reason = "PARENT_CAPABILITIES"; result.terminalBoundary = "NOT_INSPECTED_BLOCKED_CAPABILITIES"; return result }
     if (result.format !== "legacy") { result.status = result.format === "paginated" ? "PATCH_REQUIRED" : "BLOCKED_INPUT"; result.reason = result.format === "paginated" ? "SOURCE_RUNTIME_UNSUPPORTED" : "PARENT_UNSUPPORTED"; result.terminalBoundary = "NOT_INSPECTED_NATIVE_PREPARATION_REQUIRED"; return result }
     if (result.dynamicTools !== "NONE") { result.reason = "PARENT_CAPABILITIES"; result.terminalBoundary = "NOT_INSPECTED_BLOCKED_CAPABILITIES"; return result }
     // Production validator remains the authority; inspection cannot admit a parent.
@@ -42,7 +46,7 @@ export async function inspectParent(home: string, parent: ChatParent) {
   } catch (error) {
     const code = (error as NodeJS.ErrnoException)?.code
     if (result.access === "NOT_CHECKED") result.access = code === "ENOENT" ? "MISSING" : "UNREADABLE"
-    result.reason = error instanceof Error && error.message === "NO_PARENT" ? "NO_COMPLETED_BOUNDARY" : "PARENT_UNSUPPORTED"
+    result.reason = error instanceof Error && error.message === "NO_PARENT" ? "NO_COMPLETED_BOUNDARY" : safeSourceError(error instanceof Error ? error.message : null) ?? "PARENT_UNSUPPORTED"
     if (result.reason === "NO_COMPLETED_BOUNDARY") result.terminalBoundary = "ABSENT"
   } finally { await file?.close() }
   return result
