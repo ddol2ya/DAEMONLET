@@ -1,30 +1,50 @@
 # Character side conversation: implementation and validation
 
-Unreleased implementation. Experimental setting defaults to **OFF**. No runtime is currently admitted by the production policy gate; this is **not release-ready AI chat support**. No public release or automatic merge is part of this work.
+Unreleased implementation; the experimental setting defaults to **OFF**. One production combination has passed real account testing. No public release or automatic merge is part of this work.
 
-## Runtime support (2026-09-15)
+## Runtime support (2026-09-16)
 
-Tested: macOS / arm64, Homebrew-resolved `codex-cli 0.153.4`, executable SHA-256 `61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70`. The executable-generated experimental protocol schema was inspected. The probe used new temporary Codex state, a synthetic local parent and a loopback fake Responses provider, with no account credentials or real account model calls. It did not resume, interrupt or modify any user parent, change global config or attach to the user's Codex process.
+| Component | Admitted combination |
+| --- | --- |
+| Host | macOS / arm64 |
+| Codex CLI | Official stable **0.154.0**, installed with explicit user authorization |
+| Native executable SHA-256 | `4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc` |
+| Model | `gpt-5.6-luna`, low reasoning; must appear in the authenticated official `model/list` before the app pins its capability catalog |
+| Launch profile | Version 2; digest `1f6ae3ea160b0b1f5742903abe61f464df66156beafe5e8671ed5b52d6623523` |
+| Parent | Selected local legacy rollout, last durable terminal turn, **no inherited dynamic tools** |
+| Authentication | Official in-memory `chatgptAuthTokens`, brokered from an existing unexpired Codex ChatGPT login; no OAuth refresh or credential-file writes |
+| Configuration | Fresh app-owned HOME/CODEX_HOME/cwd/temp; sole nonempty owned config layer; managed requirements cause an explicit block |
 
-| Check | Result | Meaning |
+The desktop-bundled `0.154.0-alpha.6.2`, other hashes/versions, Windows and other architectures are not admitted. The global npm CLI was updated as explicitly requested; the desktop CLI, PATH and installed Daemonlet app were not replaced.
+
+The production factory now returns a real authenticated connection after static binary checks, native configuration reflection and model discovery. No model canary runs when opening the window or toggling the setting. The first explicit send creates the ephemeral child. Candidate test connections remain constructor-only test dependencies; renderer, packs and ordinary environment settings cannot select them.
+
+See [the launch profile, tool controls and upstream limitations](side-chat-launch-profile.md) for exact settings, source locations and reproductions. Paginated parents remain **BLOCKED_UPSTREAM** for the isolated cross-home path; parents with dynamic tools are blocked before fork. This is a deliberately limited working combination, not universal desktop-task support.
+
+### Evidence levels
+
+| Check | Result | Scope |
 | --- | --- | --- |
-| Initialize, paginated parent, completed-turn ephemeral fork, response | PASS | Real CLI protocol with synthetic provider |
-| `deferGoalContinuation` with `ephemeral` | FAIL | Runtime rejects the combination; it is omitted from the implemented fork request |
-| New developer instructions in first fork model request | FAIL | Captured first fork request omitted the unique persona marker |
-| Zero exposed tools | FAIL | `request_user_input`, `apply_patch`, `view_image` remained exposed after tested restrictions |
-| Parent completed history unchanged by side request | PASS | Before/after parent turn pages matched |
-| Stop child while parent remains in progress | PASS | Only child interrupted, synthetic parent stayed in progress |
-| SessionStart command hook disabled | PASS | Explicit synthetic hook canary did not run under `features.hooks=false` |
-| Ephemeral absent from normal thread list | PASS | Child was not listed |
-| No child rollout / child-ID or marker bytes in inspected state files | PASS, scoped | With `features.shell_snapshot=false`; initial profile without this setting created a shell snapshot file |
-| Hostile provider canary write absent | Observed | Canary absent, but tool execution was NOT_OBSERVED; this does not establish pre-execution isolation |
-| Owned process termination | PASS | Probe's process stopped and its temporary state was removed |
-| Actual account character voice/quality | NOT_RUN | Runtime gate failed; zero actual account calls |
-| Windows / other CLI builds | NOT_RUN | No native support claim |
+| Production service → JSONL → real CLI → fake provider → service originals | PASS | Exact short Korean, long/code and commentary/final answers; three child turns |
+| Developer policy and user-role persona | PASS | First turn, continuation, two actual native remote compactions with synthetic retention pressure; policy present after both |
+| Zero tools / hostile execution | PASS | All child model requests expose zero tools. Four accepted hostile tool-call shapes reject execution; matching enabled controls actually execute |
+| Startup Hook / MCP controls | PASS | Trusted synthetic hook and MCP execute in positive control; neither executes under restrictions at spawn/initialize/thread/turn/fork checkpoints |
+| Child history / parent preservation | PASS, scoped | No child ID or unique response bytes in inspected fixture state; selected parent history unchanged |
+| Production packaged app, official ChatGPT account | PASS | Gpichan short + follow-up/long, exact copy, external Toki switch/response, child stop while parent is running |
+| Regression UI | PASS | Existing F1/F2/F3 native synthetic UI checks retained; separate from account validation |
+| Windows live CLI / native UI | NOT_RUN | CI is not runtime admission |
 
-The production factory rejects with `CHAT_POLICY_UNENFORCEABLE` **before starting an account-bearing process or reading a parent transcript**. A configuration key, read-only sandbox, approval policy, prompt delimiter, empty dynamic tool list, or post-event process kill is insufficient evidence for chat-only execution. There is no user/pack/UI/environment bypass, alternate API, main-session send fallback or disk-backed fork fallback. The real RPC backend is exercised through an injected synthetic transport; no verified production launch implementation exists yet.
+### Actual account request accounting
 
-Future admission requires a versioned launch implementation tied to the actual executable and enforced managed policy, pre-start Hook/MCP/plugin isolation, first-request profile delivery, zero executable tools, adversarial probes, and explicit account-based voice review. Do not interpret one successful schema/probe as a production permit. The [official App Server contract](https://learn.chatgpt.com/docs/app-server) and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference) are reference material; observations above come from the tested executable.
+The user authorized an isolated non-sensitive parent and finally **seven logical `turn/start` attempts including failures**. The first attempt used retired `gpt-5.4`; the parent failed and no character answer was produced. Its initial harness did not retain the provider error, so an exact original RPC error is unavailable. The official model list excluded it and the [official retirement notice](https://learn.chatgpt.com/docs/models#deprecated-codex-models) gives August 31, 2026 for Codex ChatGPT sign-in support. It is not registered in the new profile.
+
+The remaining six attempts on `gpt-5.6-luna` produced one completed parent seed, **three completed character answers** (Gpichan twice, Toki once), one confirmed child stop and a concurrent parent turn whose stop was requested separately by its QA owner. Before the child stop the parent was `inProgress`; after it the parent was not interrupted. No subsequent model request was made. These are logical API attempts, not a measured billing/HTTP retry count.
+
+The actual packaged path used the app's service, production connector, validated IPC and mounted renderer. Long expansion and copy made zero additional model requests and preserved the source exactly. Real parent history was unchanged by the first two child turns. Toki selection advanced the epoch and removed old chat messages. The short Gpichan screenshot was captured before its renderer update and is **not visual proof of that answer**; the recorded service response, long-panel and Toki rendered captures provide their respective evidence. Future QA waits for renderer content before capture. Non-sensitive response bodies/screens remain private, outside Git.
+
+### Earlier runtime investigation (historical)
+
+CLI 0.153.4 exposed tools and omitted new first-fork developer instructions in the earlier standalone RPC probe. The earlier hash `61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70` identified the npm **JavaScript wrapper**, not the native executable; it must not be used as native admission evidence. Those failures remain historical observations. The current 0.154.0 profile uses verified native bytes, per-turn collaboration-mode developer instructions and separately proven execution gates.
 
 ## Implemented behavior
 
@@ -54,7 +74,9 @@ npm test
 npm run test:side-chat
 npm run build:renderer
 npm run build:electron:production
-npm run side-chat:probe -- --codex <absolute-cli> --output <new-private-report.json>
+npm run side-chat:probe -- --codex <absolute-native-cli> --output <new-private-report.json> --catalog --environments --instructions collaboration-mode --legacyParent --crossHome --compaction
+npm run side-chat:probe:tools -- --codex <absolute-native-cli> --output <new-private-report.json>
+npm run side-chat:probe:startup -- --codex <absolute-native-cli> --output <new-private-report.json>
 npm run side-chat:ui-smoke -- <private-evidence-directory>
 npm run creator:package -- --output <new-private-output-directory>
 npm run creator:verify -- <generated-skill.zip>
@@ -92,6 +114,14 @@ Executed for this correction:
 
 The synthetic UI backend made seven fixture sends and zero account calls. These corrections do not change `SideChatPolicy`, admit a runtime, enable the default setting, regenerate character art, or repeat the earlier external-pack/creator/runtime-probe validation. The existing private outputs remain separate from this review's new evidence.
 
-## Remaining acceptance conditions
+## Current deterministic checks (2026-09-16)
 
-Real account persona quality, admitted production runtime, Windows execution, physical monitor removal and exhaustive every-pose review are not established by the deterministic tests. A draft PR can be reviewed while these remain explicit blockers for enabling real chat or releasing it.
+- `npm run typecheck`: PASS.
+- Full Vitest: **150 files, 1,527 passed, 5 skipped**; side-chat/persona subset: **79 passed**.
+- New native-policy reflection regressions reject changed shell/image/input/plan/web/MCP/provider/model/catalog, missing/extra config layers and managed requirements. File/auth guards reject unsupported parent metadata, external paths, redirects, excessive records, expired/non-ChatGPT credentials and unsafe file permissions.
+- Source/private-data check: **669 files, 49 runtime assets, no failures**. Original art, rigs and external pack bytes were not edited for this follow-up.
+- Native synthetic UI smoke: PASS for the retained F1/F2/F3 cases and existing layout/copy/IME/language/zoom behavior. Separate actual-account packaged evidence is described above.
+
+## Remaining limits
+
+Live success is limited to the registered host/runtime/model/parent combination and three inspected character answers. Exhaustive voice quality, physical monitor removal, every-pose review and Windows live execution are **NOT_RUN**. Paginated/dynamic-tool parent limitations are described separately above. CI cannot establish those native capabilities. The prior pack/creator evidence remains historical; this follow-up does not regenerate those assets.
