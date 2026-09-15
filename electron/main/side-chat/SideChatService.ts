@@ -4,7 +4,7 @@ import type { AppLanguage } from "../../shared/app-language"
 import type { PersonaBinding } from "./PersonaResolver"
 import type { ChatParent, SideChatBackend } from "./SideChatBackend"
 
-const errors = new Set<ChatError>(["CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
+const errors = new Set<ChatError>(["CHAT_MODEL_UNAVAILABLE", "CHAT_PROFILE_MISSING", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_AUTH_REQUIRED", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY", "PARENT_UNSUPPORTED", "PARENT_CAPABILITIES", "CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "RESPONSE_LIMIT", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
 export function chatError(error: unknown): ChatError { const code = error instanceof Error ? error.message as ChatError : "SESSION_LOST"; return errors.has(code) ? code : "SESSION_LOST" }
 
 /** All transcripts, drafts and request IDs live only in this instance's memory. */
@@ -18,7 +18,7 @@ export class SideChatService {
   private listeners = new Set<() => void>()
   private deferred: (() => void) | null = null
   private cleanup: Promise<unknown> = Promise.resolve()
-  constructor(private readonly createBackend: () => SideChatBackend) {}
+  constructor(private readonly createBackend: (parent: ChatParent) => SideChatBackend) {}
   snapshot(): SideChatSnapshot { return structuredClone(this.state) }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private publish() { for (const listener of this.listeners) listener() }
@@ -48,12 +48,15 @@ export class SideChatService {
     if (!this.parent && preferredThreadId) { const candidate = [...this.candidates].find(([, p]) => p.threadId === preferredThreadId); if (candidate) this.chooseParent(candidate[0]) }
     this.publish()
   }
-  updateTask(state: string, checkedAt: number) { this.state.task = { state, checkedAt }; this.publish() }
+  updateTask(parentId: string | null, state: string, checkedAt: number) {
+    if (!this.parent || parentId !== this.parent.threadId) return
+    this.state.task = { state, checkedAt }; this.publish()
+  }
   parentThreadId() { return this.parent?.threadId ?? null }
   chooseParent(handle: string) {
     const parent = this.candidates.get(handle)
     if (!parent) throw new Error("NO_PARENT")
-    this.resetConversation("parent"); this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null }; this.publish()
+    this.resetConversation("parent"); this.state.task = { state: "unknown", checkedAt: null }; this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null }; this.publish()
   }
   setMode(mode: SideChatSnapshot["mode"]) { if (mode !== "hidden" && !this.state.enabled) throw new Error("CHAT_DISABLED"); this.state.mode = mode; this.publish() }
   setDraft(text: string, revision = this.state.draftRevision + 1) {
@@ -101,7 +104,7 @@ export class SideChatService {
       await this.cleanup
       if (epoch !== this.state.epoch) return
       if (!this.backend) {
-        const backend = this.createBackend(); this.backend = backend
+        const backend = this.createBackend(parent); this.backend = backend
         const fork = await backend.open(parent, persona.compiled)
         if (epoch !== this.state.epoch || this.backend !== backend) { await backend.close(); return }
         if (this.state.parent) this.state.parent.contextAt = fork.contextAt

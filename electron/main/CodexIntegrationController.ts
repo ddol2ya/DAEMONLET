@@ -103,6 +103,7 @@ export class CodexIntegrationController {
   subscribe(listener: (status: PublicSetupStatus) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   private emit(): PublicSetupStatus { const value = this.getStatus(); for (const listener of this.listeners) listener(value); return value }
 
+  sideChatSelection() { return this.store.get().selection }
   getStatus(): PublicSetupStatus {
     const adapter = this.options.getAdapterDiagnostics()
     this.observation.update(adapter.hookEvents, this.discovery?.capability.events ?? allEventSupport("unknown"), adapter.adapterOwnership === "OWNED_UTILITY")

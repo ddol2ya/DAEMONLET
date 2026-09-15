@@ -77,7 +77,7 @@ try {
   await writeFile(join(output, "panel.png"), (await contents.capturePage()).toPNG())
   await type("보존할 초안")
   await js("document.querySelector('.history').scrollTop=0;document.querySelector('.history').dispatchEvent(new Event('scroll'))")
-  service.updateTask("waiting", Date.now()); await wait(80)
+  service.updateTask("parent", "waiting", Date.now()); await wait(80)
   assert(await js('document.querySelector("textarea").value === "보존할 초안" && document.querySelector(".history").scrollTop === 0'), "Task updates preserve draft and scroll")
   service.setMode("hidden"); service.setMode("panel"); await wait(80)
   assert(win.window?.id === initialWindowId && opens === 1, "Hide preserves window and fork")

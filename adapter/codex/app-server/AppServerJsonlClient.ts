@@ -35,6 +35,10 @@ export class AppServerJsonlClient {
     this.events.on("close", listener)
     return () => this.events.off("close", listener)
   }
+  async respondToServerRequest(id: unknown, result: unknown): Promise<void> {
+    if (typeof id !== "number" && typeof id !== "string") return
+    await this.write({ id, result })
+  }
   async rejectServerRequest(id: unknown): Promise<void> {
     if (typeof id !== "number" && typeof id !== "string") return
     await this.write({ id, error: { code: -32601, message: "Side chat does not support server requests" } })

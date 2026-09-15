@@ -62,7 +62,7 @@ describe("side chat lifetime", () => {
     const f = fixture(), s = f.service.snapshot(), request = { handle: s.handle, epoch: s.epoch, requestId: randomUUID() }
     f.service.accept(request); expect(() => f.service.accept(request)).toThrow("STALE_REQUEST"); f.service.reset(); expect(() => f.service.accept({ ...request, requestId: randomUUID() })).toThrow("STALE_REQUEST")
   })
-  it("fails closed before starting a process in unsupported production runtimes", async () => { await expect(connectVerifiedSideChat()).rejects.toThrow("CHAT_POLICY_UNENFORCEABLE") })
+  it("fails closed before starting a process in unsupported production runtimes", async () => { await expect(connectVerifiedSideChat()).rejects.toThrow("CHAT_PROFILE_MISSING") })
 })
 describe("text and presentation contracts", () => {
   it("bounds Unicode input and keeps complete output including code and emoji", () => {
@@ -72,7 +72,7 @@ describe("text and presentation contracts", () => {
     expect(parseChatResponse(JSON.stringify({ ...response, preview: "가".repeat(121) })).preview).toBe("")
     expect(parseChatResponse(JSON.stringify({ ...response, expression: "unknown-pose" })).expression).toBe("neutral")
     expect(() => parseChatResponse('{"text":')).toThrow("RESPONSE_INVALID")
-    expect(() => parseChatResponse(JSON.stringify({ ...response, text: "a".repeat(65537) }))).toThrow("RESPONSE_INVALID")
+    expect(() => parseChatResponse(JSON.stringify({ ...response, text: "a".repeat(65537) }))).toThrow("RESPONSE_LIMIT")
   })
   it("rejects UI-injected raw IDs, config, prompt and paths", () => {
     const r = { handle: randomUUID(), epoch: 1, requestId: randomUUID(), text: "hi" }
@@ -133,5 +133,19 @@ describe("submitted draft ownership", () => {
     expect(f.service.snapshot()).toMatchObject({ draft: "new", acceptedSubmission: null, messages: [] })
     await expect(f.service.send("old", submission(1))).rejects.toThrow("STALE_REQUEST")
     expect(f.backend.send).not.toHaveBeenCalled()
+  })
+})
+
+describe("observed status parent binding", () => {
+  it.each(["running", "failed"])("sends unknown immediately after switching away from %s parent A and ignores late A updates", async state => {
+    const f = fixture(); f.service.updateTask("parent", state, 100)
+    f.service.setCandidates([{ threadId: "B", title: "B", cwd: "/synthetic" }])
+    f.service.chooseParent(f.service.snapshot().candidates[0].handle)
+    f.service.updateTask("parent", state, 200)
+    expect(f.service.snapshot().task).toEqual({ state: "unknown", checkedAt: null })
+    const sent = f.service.send("status?"); await tick()
+    expect(f.backend.send.mock.calls[0]).toEqual(["status?", { state: "unknown", checkedAt: null }])
+    f.service.updateTask("B", "idle", 300); expect(f.service.snapshot().task.state).toBe("idle")
+    f.finish(); await sent
   })
 })

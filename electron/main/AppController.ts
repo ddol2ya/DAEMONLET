@@ -1,3 +1,4 @@
+import { runSideChatLiveSmoke } from "./SideChatLiveSmoke"
 import { runSideChatPackSmoke } from "./SideChatPackSmoke"
 import { runSideChatGateSmoke } from "./SideChatGateSmoke"
 import { SideChatService } from "./side-chat/SideChatService"
@@ -57,7 +58,7 @@ const RECOVERY_SMOKE_SESSION_ID = "smoke-recovery-session"
 const RECOVERY_SMOKE_CONFIRMED_TURN_ID = "smoke-confirmed-turn"
 
 export class AppController {
-  private readonly sideChat = new SideChatService(() => new CodexSideChatBackend(connectVerifiedSideChat, id => this.adapter.excludeSideChat(id)))
+  private readonly sideChat = new SideChatService(parent => new CodexSideChatBackend(() => connectVerifiedSideChat({ codexHome: parent.sourceHome ?? this.integration.sideChatSelection().codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"), authHome: this.integration.sideChatSelection().codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"), executable: this.integration.sideChatSelection().executablePath }), id => this.adapter.excludeSideChat(id)))
   private readonly sideChatWindow: SideChatWindowController
   private readonly sideChatIpc: SideChatIpcController
   private readonly personaResolver: PersonaResolver
@@ -193,7 +194,7 @@ export class AppController {
     this.activityIpc.register()
     this.bubbleIpc.register()
     this.taskControlIpc.register()
-    this.subscriptions.push(this.taskControl.subscribe(() => { this.integration.notifyAdapterChanged(); this.sideChat.updateTask(this.taskControl.observedChatTask(this.sideChat.parentThreadId()), Date.now()) }))
+    this.subscriptions.push(this.taskControl.subscribe(() => { this.integration.notifyAdapterChanged(); this.sideChat.updateTask(this.sideChat.parentThreadId(), this.taskControl.observedChatTask(this.sideChat.parentThreadId()), Date.now()) }))
     this.taskControl.connectDesktop()
     this.subscriptions.push(this.activity.subscribe(value => { this.rebuildTray(); this.activityBubble.update(value) }))
     await this.activity.start()
@@ -425,9 +426,10 @@ export class AppController {
   private async openSideChat() {
     if (!this.settings.sideChatEnabled) return
     this.sideChat.setMode("compact")
-    const catalog = await readDesktopThreadCatalog(process.env.CODEX_HOME ?? join(homedir(), ".codex")).catch(() => [])
+    const home = this.integration.sideChatSelection().codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex")
+    const catalog = await readDesktopThreadCatalog(home).catch(() => [])
     if (!this.settings.sideChatEnabled || this.quitting) return
-    this.sideChat.setCandidates(catalog.map(t => ({ threadId: t.id, title: t.title, cwd: t.cwd })), this.taskControl.selectedLocalChatThreadId())
+    this.sideChat.setCandidates(catalog.map(t => ({ threadId: t.id, title: t.title, cwd: t.cwd, path: t.path, sourceHome: home })), this.taskControl.selectedLocalChatThreadId())
   }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
     await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
@@ -909,6 +911,11 @@ export class AppController {
       try { sideChatValidation = await runSideChatGateSmoke(this.sideChat, this.sideChatWindow, this.personaResolver, this.lastReady, process.env.ELECTRON_SMOKE_SIDE_CHAT_EVIDENCE) }
       catch { this.warn("Side chat packaged smoke failed") }
     }
+    let liveSideChatValidation: Awaited<ReturnType<typeof runSideChatLiveSmoke>> | null = null
+    if (process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT_EVIDENCE && this.lastReady) {
+      this.updateSettings({ sideChatEnabled: true })
+      liveSideChatValidation = await runSideChatLiveSmoke({ service: this.sideChat, window: this.sideChatWindow, registry: this.characters, select: value => this.selectCharacter(value), authHome: process.env.ELECTRON_SMOKE_LIVE_AUTH_HOME!, output: process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT_EVIDENCE })
+    }
     const adapterDiagnostics = this.adapter.getDiagnostics()
     const protocolDiagnostics = this.protocol.getDiagnostics()
     const result = {
@@ -957,7 +964,7 @@ export class AppController {
       activityValidation,
       taskControlValidation,
       desktopControlValidation,
-      sideChatValidation,
+      sideChatValidation, liveSideChatValidation,
       sideChatPackValidation,
       settingsPath: "userData/desktop-settings.json",
       warnings: this.warnings,

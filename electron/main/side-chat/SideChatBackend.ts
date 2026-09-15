@@ -1,8 +1,11 @@
-import { SIDE_CHAT_OUTPUT_SCHEMA, parseChatResponse, type ChatResponse } from "../../shared/side-chat-contract"
+import { SIDE_CHAT_OUTPUT_SCHEMA, type ChatResponse } from "../../shared/side-chat-contract"
+import type { ChatAuthTokens } from "./SideChatAuth"
+import type { ChatParentContext } from "./SideChatParent"
+import { SideChatItemCollector } from "./SideChatItemCollector"
 import type { CompiledPersona } from "./PersonaCompiler"
 import type { AppServerJsonlClient } from "../../../adapter/codex/app-server/AppServerJsonlClient"
 
-export type ChatParent = { threadId: string; title: string; cwd: string }
+export type ChatParent = { threadId: string; title: string; cwd: string; path?: string; sourceHome?: string }
 export type ForkContext = { threadId: string; lastTurnId: string; contextAt: number }
 export interface SideChatBackend {
   open(parent: ChatParent, persona: CompiledPersona): Promise<ForkContext>
@@ -10,10 +13,11 @@ export interface SideChatBackend {
   stop(): Promise<void>
   close(): Promise<void>
 }
-export type ChatConnection = { client: AppServerJsonlClient; stop(): Promise<void> }
+export type ChatExecutionProfile = { cwd: string; model: string; instructions: "fork" | "collaboration-mode"; noEnvironment: boolean }
+export type ChatConnection = { refreshAuth?: () => Promise<ChatAuthTokens>; parentContext?: (parent: ChatParent) => Promise<ChatParentContext>; execution?: ChatExecutionProfile; client: AppServerJsonlClient; stop(): Promise<void> }
 type ActiveSend = {
   generation: number; connection: ChatConnection; child: string; turnId: string | null
-  timer: ReturnType<typeof setTimeout>; settle: (value: ChatResponse | Error) => void
+  collector: SideChatItemCollector; timer: ReturnType<typeof setTimeout>; settle: (value: ChatResponse | Error) => void
 }
 const object = (v: unknown): Record<string, any> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, any> : {}
 
@@ -41,29 +45,43 @@ export class CodexSideChatBackend implements SideChatBackend {
     }))
     this.cleanup.push(client.onServerRequest(request => {
       if (!current()) return
+      if (request.method === "account/chatgptAuthTokens/refresh" && connection.refreshAuth) {
+        void connection.refreshAuth().then(tokens => { if (current()) return client.respondToServerRequest(request.id, tokens) }).catch(() => {
+          if (!current()) return
+          void client.rejectServerRequest(request.id).catch(() => {})
+          if (this.active) this.finish(this.active, new Error("CHAT_AUTH_REQUIRED"))
+          void this.close()
+        })
+        return
+      }
       // Defense in depth: the policy gate must prevent tools before this point.
       void client.rejectServerRequest(request.id).catch(() => {})
       if (this.active) this.finish(this.active, new Error("CHAT_POLICY_UNENFORCEABLE"))
       void this.close()
     }))
     this.cleanup.push(client.onNotification((method, params) => { if (current()) this.notification(method, params) }))
-    await client.initialize({ name: "daemonlet_side_chat", title: "Daemonlet side chat", version: "1" }, "side-chat")
+    if (client.handshakeState !== "READY") await client.initialize({ name: "daemonlet_side_chat", title: "Daemonlet side chat", version: "1" }, "side-chat")
     if (!current()) throw new Error("SESSION_LOST")
-    const metadata = object(object(await client.request("thread/read", { threadId: parent.threadId, includeTurns: false })).thread)
+    let context: Omit<ChatParentContext, "path"> & { path?: string }
+    if (connection.parentContext) context = await connection.parentContext(parent)
+    else {
+      const metadata = object(object(await client.request("thread/read", { threadId: parent.threadId, includeTurns: false })).thread)
+      if (!current()) throw new Error("SESSION_LOST")
+      const page = object(await client.request("thread/turns/list", { threadId: parent.threadId, limit: 100, sortDirection: "desc" }))
+      if (!current()) throw new Error("SESSION_LOST")
+      const turns = Array.isArray(page.data) ? page.data : []
+      const last = turns.map(object).find(t => typeof t.id === "string" && ["completed", "interrupted", "failed"].includes(t.status))
+      if (!last) throw new Error("NO_PARENT")
+      context = { lastTurnId: last.id, contextAt: typeof last.completedAt === "number" ? last.completedAt * 1000 : typeof metadata.updatedAt === "number" ? metadata.updatedAt * 1000 : Date.now() }
+    }
     if (!current()) throw new Error("SESSION_LOST")
-    // Page newest first; choose a terminal turn, never an in-progress boundary.
-    const page = object(await client.request("thread/turns/list", { threadId: parent.threadId, limit: 100, sortDirection: "desc" }))
-    if (!current()) throw new Error("SESSION_LOST")
-    const turns = Array.isArray(page.data) ? page.data : []
-    const last = turns.map(object).find(t => typeof t.id === "string" && ["completed", "interrupted", "failed"].includes(t.status))
-    if (!last) throw new Error("NO_PARENT")
-    const result = object(await client.request("thread/fork", { threadId: parent.threadId, lastTurnId: last.id, ephemeral: true, excludeTurns: true, cwd: parent.cwd, approvalPolicy: "never", sandbox: "read-only", developerInstructions: persona.developerInstructions }))
+    const result = object(await client.request("thread/fork", { threadId: parent.threadId, ...(context.path ? { path: context.path } : {}), ...(connection.execution ? { model: connection.execution.model } : {}), lastTurnId: context.lastTurnId, ephemeral: true, excludeTurns: true, cwd: connection.execution?.cwd ?? parent.cwd, approvalPolicy: "never", sandbox: "read-only", developerInstructions: persona.developerInstructions }))
     const child = object(result.thread)
     if (generation !== this.generation) throw new Error("SESSION_LOST")
     if (typeof child.id !== "string" || child.id === parent.threadId || child.ephemeral !== true) throw new Error("CHAT_POLICY_UNENFORCEABLE")
     this.child = child.id; await this.owned(child.id)
     if (!current()) throw new Error("SESSION_LOST")
-    return { threadId: child.id, lastTurnId: last.id, contextAt: typeof last.completedAt === "number" ? last.completedAt * 1000 : typeof metadata.updatedAt === "number" ? metadata.updatedAt * 1000 : Date.now() }
+    return { threadId: child.id, lastTurnId: context.lastTurnId, contextAt: context.contextAt }
   }
   private owns(request: ActiveSend): boolean {
     return this.active === request && request.generation === this.generation && request.connection === this.connection && request.child === this.child
@@ -84,11 +102,14 @@ export class CodexSideChatBackend implements SideChatBackend {
     const result = new Promise<ChatResponse>((resolve, reject) => {
       settle = value => value instanceof Error ? reject(value) : resolve(value)
     })
-    const request: ActiveSend = { connection, child, generation, turnId: null, settle,
+    const request: ActiveSend = { connection, child, generation, turnId: null, settle, collector: new SideChatItemCollector(),
       timer: setTimeout(() => this.failAndClose(request, "OUTCOME_UNKNOWN"), 180_000) }
     request.timer.unref(); this.active = request
     // Notifications may finish A before its RPC response. Every continuation still owns only A.
-    void connection.client.request("turn/start", { threadId: child, input: [{ type: "text", text: `${this.persona.profileInput}\n\nApp-observed parent status (not history): ${JSON.stringify(observation ?? { state: "unknown", checkedAt: null })}\n\nUser message:\n${text}`, text_elements: [] }], outputSchema: SIDE_CHAT_OUTPUT_SCHEMA }).then(value => {
+    const execution = connection.execution
+    const policy = execution ? { ...(execution.noEnvironment ? { environments: [] } : {}),
+      ...(execution.instructions === "collaboration-mode" ? { collaborationMode: { mode: "default", settings: { model: execution.model, reasoning_effort: null, developer_instructions: this.persona.developerInstructions } } } : {}) } : {}
+    void connection.client.request("turn/start", { ...policy, threadId: child, input: [{ type: "text", text: `${this.persona.profileInput}\n\nApp-observed parent status (not history): ${JSON.stringify(observation ?? { state: "unknown", checkedAt: null })}\n\nUser message:\n${text}`, text_elements: [] }], outputSchema: SIDE_CHAT_OUTPUT_SCHEMA }).then(value => {
       if (!this.owns(request)) return
       const turn = object(object(value).turn)
       if (typeof turn.id !== "string" || request.turnId && request.turnId !== turn.id) this.failAndClose(request, "OUTCOME_UNKNOWN")
@@ -105,15 +126,18 @@ export class CodexSideChatBackend implements SideChatBackend {
     }
     if (!request || !this.owns(request)) return
     if (method === "turn/started" && typeof turn.id === "string" && !request.turnId) request.turnId = turn.id
+    if (p.turnId === request.turnId && request.turnId && (method === "item/started" || method === "item/completed")) {
+      try { method === "item/started" ? request.collector.start(p.item) : request.collector.complete(p.item) }
+      catch (error) { this.failAndClose(request, error instanceof Error ? error.message : "RESPONSE_INVALID") }
+      return
+    }
     if (method !== "turn/completed" || !request.turnId || turn.id !== request.turnId) return
     if (turn.status === "interrupted") { this.finish(request, new Error("STOPPED")); return }
     if (turn.status !== "completed") { this.finish(request, new Error("SESSION_LOST")); return }
-    const items = Array.isArray(turn.items) ? turn.items.map(object) : []
-    if (items.some(i => i.type === "refusal")) { this.finish(request, new Error("REFUSED")); return }
-    const answers = items.filter(i => i.type === "agentMessage" && (i.phase === "final_answer" || !i.phase))
-    try { if (answers.length !== 1 || typeof answers[0].text !== "string") throw new Error("RESPONSE_INVALID"); this.finish(request, parseChatResponse(answers[0].text)) }
-    catch { this.finish(request, new Error("RESPONSE_INVALID")) }
+    try { this.finish(request, request.collector.finish(turn.items)) }
+    catch (error) { this.finish(request, error instanceof Error ? error : new Error("RESPONSE_INVALID")) }
   }
+
   async stop(): Promise<void> {
     const request = this.active
     if (!request || !this.owns(request)) return

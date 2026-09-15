@@ -2,7 +2,7 @@ import type { AppLanguage } from "./app-language"
 export const SIDE_CHAT_LIMITS = { inputPoints: 4000, inputBytes: 16000, responseBytes: 65536, previewBytes: 4096, messages: 100, historyBytes: 2 * 1024 * 1024 } as const
 export type ChatExpression = "neutral" | "happy" | "thinking"
 export type ChatResponse = { text: string; preview: string; expression: ChatExpression }
-export type ChatError = "CHAT_DISABLED" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
+export type ChatError = "CHAT_DISABLED" | "CHAT_PROFILE_MISSING" | "CHAT_MODEL_UNAVAILABLE" | "CHAT_RUNTIME_MISSING" | "CHAT_RUNTIME_UNSUPPORTED" | "CHAT_AUTH_REQUIRED" | "CHAT_MANAGED_POLICY" | "CHAT_EXECUTION_POLICY" | "PARENT_UNSUPPORTED" | "PARENT_CAPABILITIES" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
 export type ChatMessage = { id: string; role: "user" | "assistant"; text: string; preview: string; at: number }
 export type ChatSubmission = { requestId: string; draftRevision: number }
 export type SideChatSnapshot = {
@@ -26,9 +26,10 @@ export function validChatInput(text: unknown, allowEmpty = false): text is strin
   return typeof text === "string" && (allowEmpty || Boolean(text.trim())) && Array.from(text).length <= SIDE_CHAT_LIMITS.inputPoints && utf8Bytes(text) <= SIDE_CHAT_LIMITS.inputBytes && !/[\u0000\ud800-\udfff]/u.test(text)
 }
 export function parseChatResponse(raw: string): ChatResponse {
-  if (utf8Bytes(raw) > SIDE_CHAT_LIMITS.responseBytes * 6) throw new Error("RESPONSE_INVALID")
+  if (utf8Bytes(raw) > SIDE_CHAT_LIMITS.responseBytes * 6) throw new Error("RESPONSE_LIMIT")
   let v: Record<string, unknown>
   try { v = JSON.parse(raw) } catch { throw new Error("RESPONSE_INVALID") }
+  if (v && typeof v.text === "string" && utf8Bytes(v.text) > SIDE_CHAT_LIMITS.responseBytes) throw new Error("RESPONSE_LIMIT")
   if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).sort().join() !== "expression,preview,text" || typeof v.text !== "string" || !v.text.trim() || typeof v.preview !== "string" || typeof v.expression !== "string" || utf8Bytes(v.text) > SIDE_CHAT_LIMITS.responseBytes || /[\u0000\ud800-\udfff]/u.test(v.text)) throw new Error("RESPONSE_INVALID")
   const preview = utf8Bytes(v.preview) <= SIDE_CHAT_LIMITS.previewBytes && Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(v.preview)).length <= 120 && v.preview.split(/\r?\n/).length <= 3 && !/[\u0000\ud800-\udfff]/u.test(v.preview) ? v.preview : ""
   return { text: v.text, preview, expression: ["neutral", "happy", "thinking"].includes(v.expression) ? v.expression as ChatExpression : "neutral" }

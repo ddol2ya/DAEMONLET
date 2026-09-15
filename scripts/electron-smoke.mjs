@@ -44,7 +44,7 @@ const smokeAdapterData = await mkdtemp(join(tmpdir(), "daemonlet-electron-smoke-
 if (process.env.ELECTRON_SMOKE_CHARACTER_STORE) await cp(resolve(process.env.ELECTRON_SMOKE_CHARACTER_STORE), join(smokeUserData, "characters"), { recursive: true })
 // This existing runtime smoke tests a returning user. Fresh onboarding has its
 // own setup:smoke; there is no production flag that silently skips onboarding.
-await writeFile(join(smokeUserData, "codex-integration.json"), JSON.stringify({ version: 1, onboarding: "skipped", selection: { executablePath: null, codexHome: null }, reviewedFingerprint: null }), { mode: 0o600 })
+await writeFile(join(smokeUserData, "codex-integration.json"), JSON.stringify({ version: 1, onboarding: "skipped", selection: { executablePath: null, codexHome: process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT === "user-authorized-six-requests" ? process.env.ELECTRON_SMOKE_LIVE_AUTH_HOME ?? null : null }, reviewedFingerprint: null }), { mode: 0o600 })
 if (activityEvidence) {
   const at = Date.now() - 30_000
   await mkdir(join(smokeUserData, "activity"), { mode: 0o700 })
@@ -53,7 +53,7 @@ if (activityEvidence) {
     records: [{ key: createHash("sha256").update("codex-adapter\0fixture-failure").digest("hex"), activityId: "activity-1", state: "failed", revision: 2, firstObservedAt: at, lastObservedAt: at, eventAt: at, endedAt: at, acknowledgedAt: null, confidence: null, category: null }],
   }), { mode: 0o600 })
 }
-const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence || process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS)
+const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence || process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS || process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT_EVIDENCE)
 const shortCodexHome = process.env.ELECTRON_SMOKE_DESKTOP_CONTROL_EVIDENCE || isolatedPresence
 const smokeCodexHome = shortCodexHome
   ? await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-home-"))
@@ -119,13 +119,14 @@ try {
   let timedOut = false
   const requestedNativeWait = Number(process.env.ELECTRON_SMOKE_NATIVE_WAIT_MS ?? 60000)
   const nativeWaitMs = Number.isFinite(requestedNativeWait) ? Math.max(60000, Math.min(300000, requestedNativeWait)) : 60000
-  const timeout = setTimeout(() => { timedOut = true; child.kill("SIGTERM") }, process.env.ELECTRON_SMOKE_NATIVE_CLICK === "1" ? 240_000 + 2 * nativeWaitMs : dialogueEvidence || activityEvidence || hybridEvidence ? 420_000 : 120_000)
+  const timeout = setTimeout(() => { timedOut = true; child.kill("SIGTERM") }, process.env.ELECTRON_SMOKE_NATIVE_CLICK === "1" ? 240_000 + 2 * nativeWaitMs : dialogueEvidence || activityEvidence || hybridEvidence || process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT_EVIDENCE ? 420_000 : 120_000)
   const code = await new Promise((resolveExit, reject) => { child.once("error", reject); child.once("exit", resolveExit) })
   clearTimeout(timeout)
   if (timedOut) throw new Error(`Electron smoke timed out before completion\n${stderr.slice(-4000)}`)
   if (code !== 0) throw new Error(`Electron smoke failed with exit ${String(code)}\n${stderr.slice(-4000)}`)
 
   result = JSON.parse(await readFile(resultPath, "utf8"))
+  if (process.env.ELECTRON_SMOKE_LIVE_SIDE_CHAT_EVIDENCE && result.liveSideChatValidation?.status !== "PASS") throw new Error("Packaged live side chat did not fully pass; inspect live-result.json")
   if (process.env.ELECTRON_SMOKE_SIDE_CHAT_EVIDENCE && result.sideChatValidation?.status !== "PASS") throw new Error("Packaged side chat gate failed")
   if (process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS && result.sideChatPackValidation?.status !== "PASS") throw new Error("Side chat pack switch smoke failed")
   const activityHistory = JSON.parse(await readFile(join(smokeUserData, "activity/history.json"), "utf8"))

@@ -35,7 +35,7 @@ function fixture(manual = false) {
   }
   const processStop = vi.fn(async () => {}), owned = vi.fn(async (_id: string) => {}), backend = new CodexSideChatBackend(async () => ({ client: client as unknown as AppServerJsonlClient, stop: processStop }), owned)
   const open = () => backend.open({ threadId: "parent", title: "Parent", cwd: "/synthetic" }, compilePersona("A", neutralPersona(), "ko"))
-  const final = (threadId = "child", turnId = `turn-${turnSequence}`, text = JSON.stringify({ text: "Hello", preview: "", expression: "neutral" })) => notification("turn/completed", { threadId, turn: { id: turnId, status: "completed", items: [{ type: "agentMessage", phase: "final_answer", text }] } })
+  const final = (threadId = "child", turnId = `turn-${turnSequence}`, text = JSON.stringify({ text: "Hello", preview: "", expression: "neutral" })) => notification("turn/completed", { threadId, turn: { id: turnId, status: "completed", items: [{ id: `answer-${turnId}`, type: "agentMessage", phase: "final_answer", text }] } })
   return { starts, interrupts, notify: (method: string, params: unknown) => notification(method, params), backend, client, processStop, owned, open, final, closed: () => closed(), request: () => request({ id: 42, method: "item/commandExecution/requestApproval", params: { threadId: "child" } }) }
 }
 describe("dedicated side chat RPC", () => {
@@ -121,4 +121,45 @@ describe("per-send RPC ownership", () => {
       await expect(b).resolves.toMatchObject({ text: "Hello" }); await f.backend.close()
     })
   }
+})
+
+describe("authoritative item completion", () => {
+  const answer = JSON.stringify({ text: "고유한 실제 수신 본문", preview: "", expression: "neutral" })
+  const message = (id = "answer", text = answer, phase = "final_answer") => ({ type: "agentMessage", id, text, phase })
+  const emit = (f: ReturnType<typeof fixture>, method: string, item: unknown, threadId = "child", turnId = "turn-1") => f.notify(method, { threadId, turnId, item })
+  const end = (f: ReturnType<typeof fixture>, items: unknown[] = [], status = "completed") => f.notify("turn/completed", { threadId: "child", turn: { id: "turn-1", status, items } })
+  it("collects item-only final output, excludes commentary/unknown items and deduplicates turn fallback", async () => {
+    for (const duplicate of [false, true]) {
+      const f = fixture(); await f.open(); const sent = f.backend.send("hello")
+      emit(f, "item/started", message("comment", "thinking", "commentary")); emit(f, "item/completed", message("comment", "thinking", "commentary"))
+      emit(f, "item/completed", message("unknown"))
+      emit(f, "item/started", message()); emit(f, "item/completed", message(), "parent"); emit(f, "item/completed", message(), "child", "old")
+      emit(f, "item/completed", message()); emit(f, "item/completed", message())
+      end(f, duplicate ? [message()] : [])
+      await expect(sent).resolves.toMatchObject({ text: "고유한 실제 수신 본문" }); await f.backend.close()
+    }
+  })
+  it.each(["interrupted", "failed"])("does not promote late items after %s to success or the next turn", async status => {
+    const f = fixture(); await f.open(); const sent = f.backend.send("hello")
+    const checked = expect(sent).rejects.toThrow(status === "interrupted" ? "STOPPED" : "SESSION_LOST")
+    emit(f, "item/started", message()); end(f, [], status); await checked
+    const next = f.backend.send("B"); emit(f, "item/completed", message()); f.final("child", "turn-2")
+    await expect(next).resolves.toMatchObject({ text: "Hello" }); await f.backend.close()
+  })
+  it.each([["{broken", "RESPONSE_INVALID"], ["x".repeat(65536 * 6 + 1), "RESPONSE_LIMIT"]])("rejects malformed/oversized output distinctly", async (text, code) => {
+    const f = fixture(); await f.open(); const sent = f.backend.send("hello"), checked = expect(sent).rejects.toThrow(code)
+    emit(f, "item/started", message()); emit(f, "item/completed", message("answer", text)); end(f)
+    await checked; await f.backend.close()
+  })
+  it("bounds accumulated commentary and item counts and rejects contradictory duplicates", async () => {
+    for (const scenario of ["bytes", "count", "conflict"]) {
+      const f = fixture(); await f.open(); const sent = f.backend.send("hello")
+      const checked = expect(sent).rejects.toThrow(scenario === "conflict" ? "RESPONSE_INVALID" : "RESPONSE_LIMIT")
+      for (let n = 0; n < (scenario === "count" ? 65 : 3); n++) {
+        const item = message(scenario === "conflict" ? "same" : `item-${n}`, scenario === "bytes" ? "x".repeat(300000) : String(n), "commentary")
+        emit(f, "item/started", item); if (scenario !== "count") emit(f, "item/completed", item)
+      }
+      await checked; await f.backend.close()
+    }
+  })
 })

@@ -44,7 +44,10 @@
     "release:validation": "node scripts/release/validation-cli.mjs",
     "language:smoke": "node scripts/language-smoke.mjs",
     "test:side-chat": "vitest run tests/side-chat*.test.ts tests/character-persona.test.ts",
-    "side-chat:probe": "node scripts/side-chat-runtime-probe.mjs",
+    "side-chat:probe": "node scripts/side-chat-backend-probe.mjs",
+    "side-chat:probe:legacy": "node scripts/side-chat-runtime-probe.mjs",
+    "side-chat:probe:tools": "node scripts/side-chat-tool-probe.mjs",
+    "side-chat:probe:startup": "node scripts/side-chat-startup-probe.mjs",
     "side-chat:ui-smoke": "node scripts/side-chat-ui-smoke.mjs"
   },
   "dependencies": {

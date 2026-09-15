@@ -16,12 +16,12 @@ export async function runSideChatGateSmoke(service: SideChatService, window: Sid
   const state = service.snapshot()
   await win.webContents.executeJavaScript(`window.daemonletSideChat.action('send', ${JSON.stringify({ handle: state.handle, epoch: state.epoch, requestId: "00000000-0000-4000-8000-000000000001", text: "합성 전송 검사", draftRevision: state.draftRevision + 1 })})`)
   await wait(150)
-  if (service.snapshot().error !== "CHAT_POLICY_UNENFORCEABLE" || service.snapshot().messages.length) throw new Error("Side chat smoke: runtime gate did not block before sending")
+  if (!["CHAT_AUTH_REQUIRED", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_PROFILE_MISSING", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY"].includes(service.snapshot().error ?? "") || service.snapshot().messages.length) throw new Error("Side chat smoke: runtime gate did not block before sending")
   if (!await win.webContents.executeJavaScript('Boolean(document.querySelector(".error"))')) throw new Error("Side chat smoke: error UI missing")
   await writeFile(join(output, "packaged-compact.png"), (await win.webContents.capturePage()).toPNG())
   service.setMode("panel"); await wait(120)
   await writeFile(join(output, "packaged-panel.png"), (await win.webContents.capturePage()).toPNG())
-  const result = { status: "PASS", character: state.character.id, explicitPersona: true, runtimeGate: "CHAT_POLICY_UNENFORCEABLE", displayedMessages: 0, realAccountCalls: 0, packagedUiLoaded: true }
+  const result = { status: "PASS", character: state.character.id, explicitPersona: true, runtimeGate: service.snapshot().error, displayedMessages: 0, realAccountCalls: 0, packagedUiLoaded: true }
   service.configure(false, "ko")
   await writeFile(join(output, "gate-result.json"), JSON.stringify(result, null, 2) + "\n")
   return result
