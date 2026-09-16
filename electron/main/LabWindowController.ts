@@ -21,7 +21,7 @@ export class LabWindowController {
       frame: true,
       transparent: false,
       backgroundColor: "#08090d",
-      skipTaskbar: false,
+      skipTaskbar: true,
       alwaysOnTop: false,
       webPreferences: { additionalArguments: languageArguments(),
         nodeIntegration: false,

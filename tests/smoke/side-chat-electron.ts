@@ -3,6 +3,9 @@ import { app, dialog, BrowserWindow, clipboard, ipcMain } from "electron"
 import { mkdir, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { installAppProtocol, registerAppScheme } from "../../electron/main/AppProtocol"
+import { PetWindowController } from "../../electron/main/PetWindowController"
+import { SideChatEntryController } from "../../electron/main/side-chat/SideChatEntryController"
+import { WindowBoundsStore } from "../../electron/main/WindowBoundsStore"
 import { SideChatService } from "../../electron/main/side-chat/SideChatService"
 import { SideChatSetupController } from "../../electron/main/side-chat/SideChatSetupController"
 import { SideChatPreferences, SIDE_CHAT_CONSENT_VERSION } from "../../electron/main/side-chat/SideChatPreferences"
@@ -28,17 +31,21 @@ let calls = 0, opens = 0, closes = 0
 let openGate: (() => Promise<void>) | null = null, sendError: string | null = null
 const sentTexts: string[] = []
 installAppProtocol(process.env.DAEMONLET_CHAT_SMOKE_FIXTURE_DIST!)
-const pet = new BrowserWindow({ width: 360, height: 360, x: 850, y: 250, show: true, webPreferences: { preload: join(root, "dist-electron/pet-preload.cjs"), sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
-const bubbles = new ActivityBubbleWindowController(join(root, "dist-electron/activity-preload.cjs"))
+const settings = defaultDesktopSettings(); settings.bounds = { x: 850, y: 250, width: 360, height: 360, displayId: null }
+const petController = new PetWindowController({ preloadPath: join(root, "dist-electron/pet-preload.cjs"), onBoundsChanged: () => {}, onWarning: () => {}, onCloseRequested: () => {} })
+const pet = petController.create(settings)
+const placementStore = new WindowBoundsStore(process.env.DAEMONLET_CHAT_SMOKE_USER!)
+let placementSave = Promise.resolve()
+const bubbles = new ActivityBubbleWindowController(join(root, "dist-electron/activity-preload.cjs"), undefined, undefined, undefined, placement => { settings.bubblePlacement = placement; bubbles.applySettings(settings); placementSave = placementStore.save(settings) })
 const bubbleIpc = new BubblePresentationIpcController(bubbles)
-bubbles.attach(pet, defaultDesktopSettings()); bubbleIpc.register()
+bubbles.attach(pet, settings); bubbleIpc.register()
 const store = new ActivityStore()
 store.accept({ protocolVersion: 1, source: "codex-adapter", sourceInstanceId: "synthetic", sessionId: "wire", messageId: "one", sequence: 1, sentAt: Date.now(), frameType: "event", payload: { type: "run.completed", runId: "A" } })
 const activity = { ...store.view(), revision: 1, storage: "saved" as const, historyRecovered: false, navigation: "none" as const }
 ipcMain.handle(ACTIVITY_IPC.get, () => ({ ok: true, value: activity }))
 ipcMain.handle(TASK_CONTROL_IPC.getView, () => ({ ok: true, value: { view: "activity", collapsed: false } }))
 bubbles.update(activity)
-await pet.loadURL("pet://app/pet.html")
+await pet.loadURL("pet://app/pet.html"); petController.reportReady()
 let answer: ChatResponse = { text: "듣고 있습니다. 무엇이 궁금하십니까?", preview: "", expression: "neutral" }
 const service = new SideChatService(() => {
   let opened = false
@@ -127,6 +134,27 @@ try {
     await js("document.querySelector('.file-selection summary').click()")
     result.fileSelection = "PASS"
   } finally { dialog.showOpenDialog = originalPicker }
+  const retained = service.snapshot(), previousCalls = calls
+  await type("배치 중 보존할 초안")
+  const beforeEntry = service.snapshot()
+  settings.visible = false; petController.applySettings(settings); bubbles.applySettings(settings); service.setMode("hidden")
+  const entry = new SideChatEntryController(service, { revealPet: async signal => { settings.visible = true; petController.applySettings(settings); bubbles.applySettings(settings); return petController.reveal(signal) }, focus: () => bubbles.focusConversation(), refreshParents: async () => {}, check: () => setup.check() })
+  await entry.open({ threadId: "parent", activityId: activity.entries[0].activityId }, true)
+  assert(pet.isVisible() && window.isVisible() && window.id === initialWindowId, "R3 restored the same native task window")
+  assert(service.snapshot().epoch === beforeEntry.epoch && JSON.stringify(service.snapshot().attachments) === JSON.stringify(beforeEntry.attachments) && service.snapshot().draft === beforeEntry.draft && calls === previousCalls, "R3 retained context and draft without submission")
+  bubbles.beginPlacement()
+  await until('!document.querySelector(".placement-preview").hidden')
+  await writeFile(join(output, "placement-preview.png"), (await contents.capturePage()).toPNG())
+  await js('Array.from(document.querySelectorAll(".placement-preview footer button")).find(e=>e.textContent==="취소").click()')
+  await until('document.querySelector(".placement-preview").hidden')
+  assert(settings.bubblePlacement.mode === "auto", "Preview cancel kept auto")
+  bubbles.beginPlacement(); await until('!document.querySelector(".placement-preview").hidden')
+  await js('document.querySelector(".placement-apply").click()')
+  await until('document.querySelector(".placement-preview").hidden'); await placementSave
+  assert((await new WindowBoundsStore(process.env.DAEMONLET_CHAT_SMOKE_USER!).load()).value.bubblePlacement.mode === "relative", "Applied placement persisted")
+  assert(JSON.stringify(service.snapshot().messages) === JSON.stringify(retained.messages) && service.snapshot().draft === beforeEntry.draft && JSON.stringify(service.snapshot().attachments) === JSON.stringify(beforeEntry.attachments) && calls === previousCalls, "Preview preserved conversation, attachment and draft")
+  settings.bubblePlacement = { schemaVersion: 1, mode: "auto" }; bubbles.applySettings(settings)
+  result.hiddenEntryAndPlacement = "PASS (real controllers/UI, synthetic backend; no OS modifier-drag claim)"
   answer = { text: "긴 답변의 첫 전제입니다.\n\n" + "한글과 English 설명, 이모지 👨‍👩‍👧‍👦를 포함합니다.\n".repeat(12) + "\n```typescript\nconst longIdentifier = '" + "wide".repeat(30) + "';\n```\n\n| 열 | 긴 값 |\n| --- | --- |\n| 결과 | " + "table".repeat(40) + " |\n<script>alert(1)</script>\n![remote](https://invalid.example/image.png)", preview: "긴 설명과 코드를 준비했습니다. 전체 답변에서 전제를 확인해 주세요.", expression: "neutral" }
   await type("자세히 설명해 주세요"); await js("document.querySelector('.send').click()")
   await until('Boolean(document.querySelector(".expand"))')

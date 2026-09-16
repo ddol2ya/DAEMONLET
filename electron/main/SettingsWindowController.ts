@@ -13,6 +13,7 @@ export class SettingsWindowController {
     devServerUrl?: string
     onOpened: (owner: string) => void
     onClosed: (owner: string) => void
+    taskbarVisible?: () => boolean
   }) {}
 
   currentOwner(): string | null {
@@ -30,11 +31,11 @@ export class SettingsWindowController {
   }
 
   open(): BrowserWindow {
-    if (this.window && !this.window.isDestroyed()) { this.window.show(); this.window.focus(); return this.window }
+    if (this.window && !this.window.isDestroyed()) { if (this.window.isMinimized()) this.window.restore(); this.window.setSkipTaskbar(!this.options.taskbarVisible?.()); this.window.show(); this.window.focus(); return this.window }
     const win = new BrowserWindow({
       width: 1060, height: 820, minWidth: 800, minHeight: 650,
       title: appText("Daemonlet 설정"), show: false, frame: true, transparent: false,
-      backgroundColor: "#f7f7f4", alwaysOnTop: false, skipTaskbar: false,
+      backgroundColor: "#f7f7f4", alwaysOnTop: false, skipTaskbar: !this.options.taskbarVisible?.(),
       webPreferences: { additionalArguments: languageArguments(), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.options.preloadPath, devTools: !process.env.ELECTRON_IS_PACKAGED },
     })
     bindWindowLanguage(win, "Daemonlet 설정"); this.window = win

@@ -3,6 +3,12 @@ import { describe, expect, it, vi } from "vitest"
 import { registerActivationHandler } from "../electron/main/AppActivation"
 
 describe("macOS app activation", () => {
+  it("uses the same resident recovery entry when available", () => {
+    const app = new EventEmitter(), controller = { showPet: vi.fn(), activate: vi.fn() }
+    const unregister = registerActivationHandler(app as never, () => controller)
+    app.emit("activate"); expect(controller.activate).toHaveBeenCalledOnce(); expect(controller.showPet).not.toHaveBeenCalled()
+    unregister(); app.emit("activate"); expect(controller.activate).toHaveBeenCalledOnce()
+  })
   it("shows the Pet through the controller when the app activates", () => {
     const app = new EventEmitter()
     const controller = { showPet: vi.fn() }

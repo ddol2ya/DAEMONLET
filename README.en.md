@@ -45,6 +45,15 @@ For installation, recovery and removal details, see the [Mac guide](docs/install
 - **Loading feedback:** See progress while importing characters and preparing the app at startup.
 - **Mac voice input:** Use Korean or English dictation to compose a message to send to Codex.
 
+## Desktop controls in the development branch
+
+These controls are in the review build, separate from the existing public v0.7.1 download above.
+
+- **Move:** Option-drag on Mac or Alt-drag on Windows from a painted part of the character. Release to save; Esc restores the starting position. Ordinary clicks, petting and the existing move/resize menu remain available.
+- **Bubble position:** Use the menu or Settings → Character & Display → Bubble position. Choose Auto, Adjust position or Reset position. Drag the local preview handle and Apply; Cancel/Esc keeps the previous setting. Reset affects only bubble placement.
+- **Resident app:** Use the menu bar/tray for Show Character, Conversation, Settings and Quit. Closing a normal window leaves the app running. Tray creation failure restores an accessible Settings window and Dock/taskbar route. You may need to check the OS hidden-icon area.
+- **Conversation** restores a hidden/offscreen character. An explicit saved chat OFF stays OFF with a visible enable control. Opening the menu does not send a model request.
+
 ## Add a character
 
 The default app includes **Gpichan only**.

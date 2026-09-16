@@ -165,6 +165,7 @@ export class AppController {
     })
     this.settingsWindow = new SettingsWindowController({
       preloadPath: preload("settings"), devServerUrl: this.devServerUrl,
+      taskbarVisible: () => this.dockFallbackRestored,
       onOpened: (owner) => {
         this.integration.windowOpened(owner)
         if (!this.settingsPoll) this.settingsPoll = setInterval(() => { this.adapter.requestDiagnostics(); void this.integration.refresh().catch(() => {}) }, 3000)
@@ -238,15 +239,14 @@ export class AppController {
     this.pet.create(this.settings)
     if (this.pet.window) this.activityBubble.attach(this.pet.window, this.settings)
     this.trayCreated = this.tray.create(this.settings, this.adapter.getStatus(), this.trayActions())
-    if (packagedMac && !this.trayCreated) app.setActivationPolicy("regular")
+    if (!this.trayCreated) this.restoreResidentAccess()
     else if (!packagedMac && app.isPackaged && this.trayCreated) app.dock?.hide()
     if (packagedMac && this.trayCreated) {
       this.trayVisibilityTimer = setTimeout(() => {
         this.trayVisibilityTimer = null
         const forceOffscreen = __APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1" && process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1"
         if (!forceOffscreen && this.tray.isVisibleOn(screen.getAllDisplays().map((display) => display.bounds))) return
-        this.dockFallbackRestored = true
-        app.setActivationPolicy("regular")
+        this.restoreResidentAccess()
         this.warn("macOS did not place the menu-bar item; Dock access restored. Right-click the character to open the menu.")
       }, 1_000)
       this.trayVisibilityTimer.unref()
@@ -262,9 +262,18 @@ export class AppController {
     })
   }
 
+  private restoreResidentAccess(): void {
+    this.dockFallbackRestored = true
+    if (process.platform === "darwin") app.setActivationPolicy("regular")
+    const window = this.settingsWindow.open()
+    window.setSkipTaskbar(false)
+    this.warn("메뉴바·트레이를 표시하지 못해 설정 창에서 접근할 수 있도록 복구했습니다.")
+  }
+  activate(): void { this.showPet(); if (this.dockFallbackRestored) this.restoreResidentAccess() }
   showPet(): void {
     if (this.quitting) return
     this.onDisplaysChanged()
+    if (this.pet.window?.isMinimized()) this.pet.window.restore()
     this.updateSettings({ visible: true })
   }
 

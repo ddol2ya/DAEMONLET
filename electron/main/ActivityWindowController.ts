@@ -13,7 +13,7 @@ export class ActivityWindowController {
     }
     const win = new BrowserWindow({
       width: 850, height: 800, minWidth: 640, minHeight: 560,
-      title: appText("Daemonlet 작업 목록"), show: false, backgroundColor: "#f7f8fa",
+      title: appText("Daemonlet 작업 목록"), show: false, skipTaskbar: true, backgroundColor: "#f7f8fa",
       webPreferences: { additionalArguments: languageArguments(), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, preload: this.preloadPath },
     })
     bindWindowLanguage(win, "Daemonlet 작업 목록"); this.window = win
