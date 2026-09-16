@@ -1,3 +1,4 @@
+import { applicationInputAllowed } from "./updates/OperationGate"
 import type { BrowserWindow, Session, WebContents } from "electron"
 
 export type WindowRole = "pet" | "lab" | "settings" | "activity" | "activity-bubble" | "speech-bubble"
@@ -24,7 +25,9 @@ export function isTrustedSender(
   window: BrowserWindow | null,
   role: WindowRole,
   devServerUrl?: string,
+  duringShutdown = false,
 ): boolean {
+  if (!duringShutdown && !applicationInputAllowed()) return false
   return Boolean(window && !window.isDestroyed() && event.sender.id === window.webContents.id && event.senderFrame
     && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === expectedRendererUrl(role, devServerUrl))
 }

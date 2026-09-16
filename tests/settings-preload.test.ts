@@ -7,10 +7,13 @@ vi.mock("electron", () => ({ contextBridge: { exposeInMainWorld: mocks.expose },
 describe("Settings preload", () => {
   it("exposes a frozen narrow API without shell, filesystem, protocol, raw invoke or Electron events", async () => {
     await import("../electron/preload/settings-preload")
-    expect(mocks.expose.mock.calls.map(([name]) => name).sort()).toEqual(["appLanguage", "settingsDesktop"])
+    expect(mocks.expose.mock.calls.map(([name]) => name).sort()).toEqual(["appLanguage", "settingsDesktop", "updateDesktop"])
     const [name, api] = mocks.expose.mock.calls.find(([name]) => name === "settingsDesktop")! as [string, SettingsDesktopApi]
     expect(name).toBe("settingsDesktop")
     expect(Object.isFrozen(api)).toBe(true)
+    const updateApi = mocks.expose.mock.calls.find(([name]) => name === "updateDesktop")![1]
+    expect(Object.isFrozen(updateApi)).toBe(true)
+    expect(Object.keys(updateApi).sort()).toEqual(["act", "onChanged", "onOpen", "snapshot"])
     expect(Object.isFrozen(api.characters)).toBe(true)
     expect(Object.keys(api.characters).sort()).toEqual(["list", "select", "onChanged", "onProgress", "chooseImport", "commitImport", "cancelImport", "remove", "rollback"].sort())
     expect(Object.keys(api).sort()).toEqual(["characters", "getStatus", "refreshStatus", "prepareConnection", "chooseCodexExecutable", "chooseCodexHome", "planHooks", "applyHookPlan", "discardHookPlan", "runHostSelfTest", "reportHookReview", "startLiveObservation", "stopLiveObservation", "reportDesktopStopAttempt", "dismissOnboarding", "getSettings", "updateSettings", "resetPetPosition", "setBubblePlacement", "restartAdapter", "exportDiagnostics", "onStatusChanged", "onSettingsChanged"].sort())

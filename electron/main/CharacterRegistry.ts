@@ -104,6 +104,7 @@ export class CharacterRegistry {
       ...(previous ? { previousVersion: previous.manifest.version } : {}), ...(m.profile ? { profile: m.profile } : {}), ...(m.unsupportedReactions ? { unsupportedReactions: m.unsupportedReactions } : {}),
     }
   }
+  readyForUpdate(): boolean { return !this.busy && !this.pending }
   snapshot(): CharacterSnapshot {
     const external = this.index.entries.filter(e => !this.builtin.has(e.id)).map(e => {
       const pack = this.verified.get(this.key(e.id, e.current)), previous = e.previous ? this.inventories.get(this.key(e.id, e.previous)) : undefined

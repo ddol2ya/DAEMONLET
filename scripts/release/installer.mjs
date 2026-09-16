@@ -11,15 +11,23 @@ import { checkCandidate } from './check.mjs'
 import {readAsarIdentity} from './artifact-source.mjs'
 import { checkExternalNotices } from './check-notices.mjs'
 
-const { values } = parseArgs({ options: { app: { type: 'string' }, output: { type: 'string' } } })
+const { values } = parseArgs({ options: { app: { type: 'string' }, output: { type: 'string' }, publisher: { type: 'string' }, 'certificate-sha1': { type: 'string' } } })
 if (!values.app || !values.output) throw new Error('Usage: npm run release:installer -- --app <verified Windows app folder> --output <new build project>')
 const root = resolve(import.meta.dirname, '../..'), app = resolve(values.app), output = resolve(values.output)
 const checks = await checkCandidate(join(app, 'resources/app.asar'))
 await checkExternalNotices(join(app, 'resources/licenses'))
 await mkdir(output) // Existing build projects are never overwritten.
 await cp(join(root, 'electron/assets/appIcon.ico'), join(output, 'appIcon.ico'))
+if (Boolean(values.publisher) !== Boolean(values["certificate-sha1"]) || values["certificate-sha1"] && !/^[A-Fa-f0-9]{40}$/.test(values["certificate-sha1"])) throw Error("Both publisher and certificate SHA1 are required for a signed installer")
 const staged = join(output, 'runtime')
 await cp(app, staged, { recursive: true })
+const updateConfig = { provider: "github", owner: "ddol2ya", repo: "DAEMONLET", private: false, updaterCacheDirName: "daemonlet-for-codex-updater", ...(values.publisher ? { publisherName: [values.publisher] } : {}) }
+if (values.publisher) {
+  if (process.platform !== "win32") throw Error("Verify signed installer input on Windows")
+  const { verifySignature } = await import("electron-updater/out/windowsExecutableCodeSignatureVerifier.js")
+  if (await verifySignature([values.publisher], join(staged, APP_NAME + ".exe"), console)) throw Error("Prepackaged application must already be signed by the configured publisher")
+}
+await writeFile(join(staged, "resources/app-update.yml"), JSON.stringify(updateConfig) + "\n")
 // The packaged application must already use the test identity. Renaming only
 // the EXE leaves userData and the single-instance lock shared with the regular app.
 await stat(join(staged, `${APP_NAME}.exe`))
@@ -42,13 +50,24 @@ if (files.some(f => /(^|\/)(skills|scripts|node_modules|docs|outputs|workflows|_
 const appPackage = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
 const identity = await readAsarIdentity(join(staged, 'resources/app.asar'))
 await writeFile(join(output, 'payload.json'), JSON.stringify({ source: identity.source, appVersion: identity.appVersion, checks, files }, null, 2) + '\n')
-await writeFile(join(output, 'package.json'), JSON.stringify({ name: 'daemonlet-test-installer-build', version: identity.appVersion, description: 'Daemonlet Windows test installer build tools', private: true, license: 'MIT', author: 'Daemonlet contributors', scripts: { build: 'node build.mjs' }, devDependencies: { 'electron-builder': appPackage.devDependencies['electron-builder'] } }, null, 2) + '\n')
-await writeFile(join(output, 'installer.nsh'), '!macro customInstallMode\n  StrCpy $isForceCurrentInstall "1"\n!macroend\n')
+await writeFile(join(output, 'package.json'), JSON.stringify({ name: 'daemonlet-test-installer-build', version: identity.appVersion, description: 'Daemonlet Windows test installer build tools', private: true, license: 'MIT', author: 'Daemonlet contributors', scripts: { build: 'node build.mjs' }, devDependencies: { 'electron-builder': appPackage.devDependencies['electron-builder'], 'electron-updater': appPackage.dependencies['electron-updater'] } }, null, 2) + '\n')
+await writeFile(join(output, 'installer.nsh'), `!macro customInstallMode
+  StrCpy $isForceCurrentInstall "1"
+!macroend
+!macro customInstall
+  FileOpen $0 "$INSTDIR\\daemonlet-install.json" w
+  FileWrite $0 '{"appId":"${BUNDLE_ID}","kind":"nsis","scope":"currentUser"}'
+  FileClose $0
+!macroend
+!macro customUnInstall
+  Delete "$INSTDIR\\daemonlet-install.json"
+!macroend
+`)
 await writeFile(join(output, 'electron-builder.json'), JSON.stringify({
   appId: BUNDLE_ID, productName: APP_NAME,
   executableName: APP_NAME, electronVersion: appPackage.devDependencies.electron,
-  publish: null, npmRebuild: false, directories: { output: 'artifacts', buildResources: '.' },
-  win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: "appIcon.ico", signAndEditExecutable: false },
+  publish: null, forceCodeSigning: Boolean(values.publisher), npmRebuild: false, directories: { output: 'artifacts', buildResources: '.' },
+  win: { target: [{ target: 'nsis', arch: ['x64'] }], icon: "appIcon.ico", signAndEditExecutable: false, ...(values.publisher ? { signtoolOptions: { publisherName: values.publisher, certificateSha1: values["certificate-sha1"], signingHashAlgorithms: ["sha256"] } } : {}) },
   nsis: { artifactName: `Daemonlet-for-Codex-${identity.appVersion}-windows-x64-Setup.exe`,
     installerIcon: "appIcon.ico", uninstallerIcon: "appIcon.ico",
     oneClick: false, perMachine: false, allowElevation: false, allowToChangeInstallationDirectory: true,

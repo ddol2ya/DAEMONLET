@@ -1,3 +1,4 @@
+import { applicationInputAllowed } from "./updates/OperationGate"
 import { clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from "electron"
 import { SIDE_CHAT_IPC, validateChatRequest, type ChatAction } from "../shared/side-chat-contract"
 import { chatError, type SideChatService } from "./side-chat/SideChatService"
@@ -32,7 +33,7 @@ export class SideChatIpcController {
           this.sendPending = true
           try {
             if (!this.setup || await this.setup.confirmSend(request)) {
-              if (request.epoch !== this.service.snapshot().epoch) throw Error("STALE_REQUEST")
+              if (!applicationInputAllowed() || request.epoch !== this.service.snapshot().epoch) throw Error("STALE_REQUEST")
               await this.service.send(request.text!, { requestId: request.requestId, draftRevision: request.draftRevision! })
             }
           } finally { this.sendPending = false }
@@ -47,7 +48,7 @@ export class SideChatIpcController {
           if (!range || Object.keys(range).sort().join() !== "endLine,startLine" || !Number.isSafeInteger(range.startLine) || !Number.isSafeInteger(range.endLine) || range.startLine < 1 || range.endLine < range.startLine || range.endLine - range.startLine >= 400) throw Error("READ_LIMIT")
           const reader = await this.service.projectReader()
           const selection = await dialog.showOpenDialog(this.window.window!, { title: this.service.snapshot().language === "ko" ? "프로젝트 텍스트 파일 선택" : "Select a project text file", defaultPath: reader.root, properties: ["openFile", "dontAddToRecent"] })
-          if (!selection.canceled && selection.filePaths.length === 1) await this.service.attachFile(selection.filePaths[0], range.startLine, range.endLine, request.epoch)
+          if (applicationInputAllowed() && !selection.canceled && selection.filePaths.length === 1) await this.service.attachFile(selection.filePaths[0], range.startLine, range.endLine, request.epoch)
         }
         else if (action === "detach") this.service.detachFiles()
         else if (action === "remove-attachment") { if (!/^\d{1,2}$/.test(request.text!)) throw Error("INVALID_REQUEST"); this.service.removeAttachment(Number(request.text)) }

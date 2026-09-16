@@ -31,11 +31,13 @@ export async function writeLicenseBundle(directory, modulePaths) {
   const inventory = []
   for (const [path, pkg] of [...packages].sort(([a], [b]) => a.localeCompare(b))) {
     const notices = (await readdir(path)).filter(name => /^(licen[sc]e|copying|notice|copyright)([._-]|$)/i.test(name))
-    if (!notices.length) throw new Error(`Missing license text for bundled ${pkg.name}@${pkg.version}`)
+    const supplemental = pkg.name === "lazy-val" && pkg.version === "1.0.5" && pkg.license === "MIT" ? "distribution/licenses/lazy-val-1.0.5-NOTICE.txt" : null
+    if (!notices.length && !supplemental) throw new Error(`Missing license text for bundled ${pkg.name}@${pkg.version}`)
     const folder = `${pkg.name.replaceAll('/', '__')}@${pkg.version}`
     await mkdir(join(directory, folder), { recursive: true })
     for (const name of notices) await copyFile(join(path, name), join(directory, folder, name))
-    const noticeHashes = Object.fromEntries(await Promise.all(notices.map(async name => [`${folder}/${name}`, digest(await readFile(join(path, name)))])))
+    if (supplemental && !notices.length) { const name = "NOTICE.txt"; await copyFile(join(root, supplemental), join(directory, folder, name)); notices.push(name) }
+    const noticeHashes = Object.fromEntries(await Promise.all(notices.map(async name => [`${folder}/${name}`, digest(await readFile(join(directory, folder, name)))])))
     inventory.push({ name: pkg.name, version: pkg.version, license: pkg.license ?? 'UNDECLARED', notices: notices.map(name => `${folder}/${name}`), noticeHashes })
   }
   for (const [name, source] of Object.entries(requiredNotices)) await copyFile(join(root, source), join(directory, name))

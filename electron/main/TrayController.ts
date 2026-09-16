@@ -44,6 +44,8 @@ export type TrayActions = {
   updateSettings(patch: Partial<DesktopSettingsV1>): void
   openMotionLab(): void
   openSettings(): void
+  checkUpdates?(): void
+  inputLocked?(): boolean
   reloadPet(): void
   restartAdapter(): void
   diagnostics(): SanitizedAdapterDiagnostics
@@ -52,6 +54,7 @@ export type TrayActions = {
 
 export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatus, actions: TrayActions): MenuItemConstructorOptions[] {
   const t = createTranslator(settings.language)
+  if (actions.inputLocked?.()) return [{ label: t("업데이트 적용을 준비하고 있어요…"), enabled: false }]
   const adapterLabel = adapter.state === "READY" ? "READY (Owned)" : adapter.state
   return [
     { label: settings.visible ? t("캐릭터 숨기기") : t("캐릭터 표시"), click: actions.toggleVisible },
@@ -114,6 +117,7 @@ export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatu
       { label: "English", type: "radio", checked: settings.language === "en", click: () => actions.updateSettings({ language: "en" }) },
     ] },
     { label: t("설정…"), click: actions.openSettings },
+    ...(actions.checkUpdates ? [{ label: t("업데이트 확인…"), click: actions.checkUpdates }] : []),
     { label: t("모션 실험실 열기"), click: actions.openMotionLab },
     { label: t("캐릭터 새로고침"), click: actions.reloadPet },
     { type: "separator" },

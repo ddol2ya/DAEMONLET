@@ -28,11 +28,9 @@ if (!app.requestSingleInstanceLock()) {
   app.on("second-instance", () => controller?.activate())
   app.on("window-all-closed", () => { /* The tray owns application lifetime. */ })
   app.on("before-quit", (event) => {
-    if (!controller) return
+    if (!controller || controller.canExit) return
     event.preventDefault()
-    const active = controller
-    controller = null
-    void active.quit()
+    void controller.quit()
   })
   void app.whenReady().then(async () => {
     if (app.isPackaged && process.platform === "darwin") app.setActivationPolicy("accessory")

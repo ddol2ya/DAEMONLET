@@ -1,3 +1,4 @@
+import { UpdatesPage } from "./UpdatesPage"
 import { useT } from "../i18n/useLanguage"
 import { useEffect, useState, type KeyboardEvent } from "react"
 import type { PublicSetupStatus, SettingsDesktopApi } from "../../electron/shared/codex-integration-contract"
@@ -8,7 +9,7 @@ import { DiagnosticsPage } from "./DiagnosticsPage"
 import { reasonText } from "./labels"
 
 export type SettingsPageProps = { api: SettingsDesktopApi; status: PublicSetupStatus; run: <T>(label: string, task: () => Promise<T>) => Promise<T | undefined>; busy: string | null }
-const tabs = [{ id: "connection", label: "Codex 연결", glyph: "◎" }, { id: "appearance", label: "캐릭터·표시", glyph: "◇" }, { id: "diagnostics", label: "진단", glyph: "≡" }] as const
+const tabs = [{ id: "connection", label: "Codex 연결", glyph: "◎" }, { id: "appearance", label: "캐릭터·표시", glyph: "◇" }, { id: "updates", label: "업데이트", glyph: "↓" }, { id: "diagnostics", label: "진단", glyph: "≡" }] as const
 
 export function SettingsApp() {
   const t = useT()
@@ -19,6 +20,7 @@ export function SettingsApp() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => { window.scrollTo(0, 0) }, [tab])
+  useEffect(() => window.updateDesktop?.onOpen(() => setTab("updates")), [])
 
   useEffect(() => {
     if (!api) return
@@ -66,6 +68,7 @@ export function SettingsApp() {
         : !status || !settings ? <div className="empty-state" role="status">{t("설정 불러오는 중…")}</div>
         : tab === "connection" ? <ConnectionPage api={api} status={status} run={run} busy={busy} />
         : tab === "appearance" ? <AppearancePage api={api} status={status} run={run} busy={busy} settings={settings} />
+        : tab === "updates" ? <UpdatesPage api={api} status={status} run={run} busy={busy} settings={settings} />
         : <DiagnosticsPage api={api} status={status} run={run} busy={busy} />}
       <div className="operation-status" role="status" aria-live="polite">{busy ? `${t(busy)}…` : ""}</div>
     </main>
