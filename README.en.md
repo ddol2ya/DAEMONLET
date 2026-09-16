@@ -153,3 +153,7 @@ Choose **Ask the character** in the existing task card to ask and read replies i
 The **official CLI 0.154.0 / macOS Apple Silicon / gpt-5.6-luna** path creates a separate temporary child in the parent's Codex Home. It explains successfully completed context and user-selected project excerpts and proposes changes for copying. File changes, commands, builds/tests, external services and parent controls are blocked. Expand, copy and hide reuse the original response without another model request.
 
 These changes are a review candidate, not a claim about the existing public v0.7.1 download. Actual Windows native, other OS/CLI, Keychain and candidate signing results are reported separately in the PR. See [setup, recovery and compatibility](docs/side-chat.md). App chat/drafts stay in memory; normal Codex storage, logs and authentication processing can occur.
+
+### App updates (0.7.2 development candidate)
+
+Use the menu or Settings → Updates. Automatic checks default to OFF; downloading and restarting require user actions. Existing public 0.7.1 installations need one manual upgrade first. See [supported installations, signing requirements and verification](docs/app-updates.md).

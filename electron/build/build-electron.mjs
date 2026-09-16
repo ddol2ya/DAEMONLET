@@ -57,6 +57,8 @@ await writeFile(resolve(outdir, "versions.json"), `${JSON.stringify({ electron: 
 // setup:smoke uses optimized output too, but its test-only app is never a production candidate.
 await writeFile(resolve(outdir, "build-mode.json"), `${JSON.stringify({ schemaVersion: 1, production: production && !setupSmoke, setupSmoke })}\n`)
 
+await writeFile(resolve(outdir, "app-update.yml"), JSON.stringify({ provider: "github", owner: "ddol2ya", repo: "DAEMONLET", private: false, updaterCacheDirName: "daemonlet-for-codex-updater" }) + "\n")
+
 await import("./build-dictation.mjs")
 await import("./build-hook-host.mjs")
 await import("../../scripts/release/stage-notices.mjs")

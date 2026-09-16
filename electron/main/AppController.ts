@@ -1,4 +1,9 @@
 declare const __APP_QA__: boolean
+import { RELEASE_ROOT } from "./updates/ReleasePolicy"
+import { UpdateService } from "./updates/UpdateService"
+import { UpdateIpcController } from "./updates/UpdateIpcController"
+import { createOfficialUpdateEngine, detectUpdatePlatform } from "./updates/OfficialUpdater"
+import { setApplicationInputLocked, applicationInputAllowed } from "./updates/OperationGate"
 import { SideChatService } from "./side-chat/SideChatService"
 import { CodexSideChatBackend } from "./side-chat/SideChatBackend"
 import type { ChatParent } from "./side-chat/SideChatBackend"
@@ -13,7 +18,7 @@ import { SideChatEntryController } from "./side-chat/SideChatEntryController"
 import { SideChatIpcController } from "./SideChatIpcController"
 import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
 import type { StartupWindow } from "./StartupWindow"
-import { app, dialog, ipcMain, powerMonitor, screen, session, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron"
+import { app, dialog, ipcMain, powerMonitor, screen, session, shell, net, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron"
 import { join, resolve } from "node:path"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
@@ -108,13 +113,20 @@ export class AppController {
   private readonly warnings: string[] = []
   private saveTimer: ReturnType<typeof setTimeout> | null = null
   private trayVisibilityTimer: ReturnType<typeof setTimeout> | null = null
+  private readonly updates: UpdateService
+  private readonly updateIpc: UpdateIpcController
+  private exitReady = false
+  private quitPromise: Promise<void> | null = null
+  private updatePreparing = false
+  private osEnding = false
+  get canExit(): boolean { return this.exitReady }
   private quitting = false
   private trayCreated = false
   private dockFallbackRestored = false
   private smokeFinishing = false
   private readonly smokeReadyCharacters = new Set<string>()
 
-  constructor(private readonly dirname: string, private readonly characters: CharacterRegistry, private readonly setupSmoke?: SetupSmokeContext, private readonly startup?: StartupWindow) {
+  constructor(private readonly dirname: string, private readonly characters: CharacterRegistry, private readonly setupSmoke?: SetupSmokeContext, private readonly startup?: StartupWindow, updateSmoke?: Partial<ConstructorParameters<typeof UpdateService>[0]>) {
     this.adapterConfig = createDesktopAdapterRuntimeConfig()
     this.protocol = new ProtocolBridge(this.adapterConfig.protocolEndpoint)
     const preload = (name: string) => join(dirname, `${name}-preload.cjs`)
@@ -177,6 +189,23 @@ export class AppController {
         this.settingsPoll = null
       },
     })
+    this.updates = new UpdateService({
+      version: app.getVersion(), dataRoot: app.getPath("userData"), platform: () => detectUpdatePlatform(this.settings?.allowUnsignedWindowsUpdates), engine: () => createOfficialUpdateEngine(() => this.settings?.allowUnsignedWindowsUpdates ?? false),
+      setUnsignedWindowsPolicy: enabled => this.setUnsignedWindowsPolicy(enabled),
+      autoCheck: () => this.settings?.updateAutoCheck ?? false,
+      confirmInstall: () => this.confirmUpdateRestart(), prepareShutdown: () => this.prepareUpdateExit(),
+      handoff: () => { if (this.osEnding) throw Error("OS_SHUTDOWN"); this.exitReady = true },
+      recoverFailure: () => this.recoverUpdateFailure(),
+      openExternal: url => shell.openExternal(url),
+      fetchLatest: async etag => {
+        const response = await net.fetch(RELEASE_ROOT + "/latest", { headers: { Accept: "application/json", ...(etag ? { "If-None-Match": etag } : {}) }, signal: AbortSignal.timeout(15_000) })
+        const info = response.status === 200 ? await response.json() as { tag_name?: string; draft?: boolean; prerelease?: boolean } : null
+        if (info?.draft || info?.prerelease) throw Error("INVALID_VERSION")
+        return { status: response.status, etag: response.headers.get("etag") ?? undefined, tag: info?.tag_name }
+      },
+      ...(__APP_QA__ ? updateSmoke : {}),
+    })
+    this.updateIpc = new UpdateIpcController(this.updates, this.settingsWindow, this.devServerUrl)
     this.settingsIpc = new SettingsIpcController({
       window: this.settingsWindow, integration: this.integration, devServerUrl: this.devServerUrl,
       getSettings: () => this.settings, updateSettings: (patch) => this.updateSettings(patch),
@@ -201,6 +230,8 @@ export class AppController {
     denyAllPermissions(session.defaultSession)
     this.registerIpc()
     this.settingsIpc.register()
+    this.updateIpc.register()
+    const updateRecovery = await this.updates.start()
     this.characterIpc.register()
     this.sideChatIpc.register()
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
@@ -255,7 +286,11 @@ export class AppController {
     screen.on("display-removed", this.onDisplaysChanged)
     screen.on("display-metrics-changed", this.onDisplaysChanged)
     powerMonitor.on("resume", this.onResume)
+    powerMonitor.on("shutdown", this.onSystemShutdown)
+    app.once("will-quit", this.onFinalQuit)
+    this.pet.window?.on("query-session-end", this.onSystemShutdown)
     if (await this.integration.start()) this.settingsWindow.open()
+    if (updateRecovery) this.updateIpc.open()
     if (__SETUP_SMOKE__ && this.setupSmoke) void this.setupSmoke.run({
       settings: this.settingsWindow, integration: this.integration, pet: this.pet, adapter: this.adapter,
       getDesktopSettings: () => structuredClone(this.settings), quit: () => this.quit(),
@@ -271,18 +306,98 @@ export class AppController {
   }
   activate(): void { this.showPet(); if (this.dockFallbackRestored) this.restoreResidentAccess() }
   showPet(): void {
-    if (this.quitting) return
+    if (this.quitting || this.updatePreparing) return
     this.onDisplaysChanged()
     if (this.pet.window?.isMinimized()) this.pet.window.restore()
     this.updateSettings({ visible: true })
   }
 
+  private onSystemShutdown = () => { this.osEnding = true; this.updates.systemShutdown() }
+  private onFinalQuit = () => { this.updates.dispose(); powerMonitor.removeListener("shutdown", this.onSystemShutdown) }
+
+  private async recoverUpdateFailure(): Promise<void> {
+    if (this.osEnding) return
+    if (!this.quitting) {
+      this.updatePreparing = false; setApplicationInputLocked(false); this.rebuildTray()
+      this.updateIpc.open()
+      return
+    }
+    // Some controllers/IPC may already be destroyed. Block a concurrent native
+    // quit while showing a real OS notice; never pretend the old UI was restored.
+    this.exitReady = false
+    try {
+      await dialog.showMessageBox({ type: "error", title: appText("업데이트를 완료하지 못했습니다"),
+        message: appText("앱을 안전하게 종료합니다."),
+        detail: appText("앱을 다시 열면 업데이트 설정에서 다시 확인하거나 수동으로 설치할 수 있습니다. 자동으로 재시도하지 않습니다.") + (process.platform === "darwin" ? "\n" + appText("승인 후 Mac이 업데이트를 준비하면 다음 앱 종료 때 적용될 수 있습니다.") : ""),
+        buttons: [appText("종료")], defaultId: 0, cancelId: 0 })
+    } finally {
+      this.onFinalQuit()
+      this.exitReady = true
+      // Only this already-cleaned-up application exits. No relaunch, parent
+      // control, or process-name termination. Pending metadata survives for boot.
+      app.exit(1)
+    }
+  }
+
+  private async setUnsignedWindowsPolicy(enabled: boolean): Promise<boolean> {
+    if (process.platform !== "win32" || this.quitting || this.updatePreparing) return false
+    if (enabled && !this.settings.allowUnsignedWindowsUpdates) {
+      const answer = await dialog.showMessageBox(this.settingsWindow.window!, { type: "warning", title: appText("서명 없는 Windows 업데이트 허용"),
+        message: appText("발행자 서명을 확인하지 않은 설치 파일을 실행하도록 허용할까요?"),
+        detail: appText("공식 GitHub 출처·HTTPS·버전·파일 해시는 확인하지만 발행자의 신원은 보증하지 않습니다. 배포 계정이 침해되면 악성 설치 파일이 실행될 수 있습니다. 다운로드와 설치·재시작은 계속 직접 승인해야 합니다. Windows 보안 설정은 바꾸지 않습니다."),
+        buttons: [appText("취소"), appText("이 기기에서 허용")], defaultId: 0, cancelId: 0 })
+      if (answer.response !== 1 || this.quitting || this.updatePreparing) return false
+    }
+    const previous = this.settings.allowUnsignedWindowsUpdates
+    this.settings.allowUnsignedWindowsUpdates = enabled
+    try { await this.store.save(this.savedSettings()) } catch (error) { this.settings.allowUnsignedWindowsUpdates = previous; throw error }
+    this.settingsIpc.broadcastSettings(this.settings)
+    return true
+  }
+
+  private async confirmUpdateRestart(): Promise<boolean> {
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    const chat = this.sideChat.snapshot()
+    const running = chat.phase === "answering" || chat.phase === "preparing"
+    const answer = await dialog.showMessageBox({ type: "question", title: appText("업데이트 및 재시작"),
+      message: appText(running ? "자식 응답을 중단하고 업데이트할까요?" : "업데이트를 적용하고 다시 시작할까요?"),
+      detail: appText("임시 대화·초안·첨부는 재시작하면 사라집니다. 설정·캐릭터팩·위치는 보존됩니다. 부모 Codex 작업은 계속 실행됩니다.") + (process.platform === "darwin" ? "\n" + appText("승인 후 Mac이 업데이트를 준비하면 다음 앱 종료 때 적용될 수 있습니다.") : ""),
+      buttons: [appText("취소"), appText(running ? "자식 중단 및 재시작" : "업데이트 및 재시작")], defaultId: 0, cancelId: 0 })
+    if (answer.response !== 1) return false
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    this.updatePreparing = true; setApplicationInputLocked(true); this.rebuildTray()
+    return true
+  }
+
+  private async prepareUpdateExit(): Promise<void> {
+    if (this.osEnding) throw Error("OS_SHUTDOWN")
+    if ((!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error("PACK_BUSY")
+    this.placementOpening?.abort(); this.activityBubble.cancelPlacement(); this.petDrag.cancel()
+    if (this.saveTimer) clearTimeout(this.saveTimer); this.saveTimer = null
+    try { await this.store.save(this.savedSettings()) } catch { throw Error("SAVE_FAILED") }
+    await this.sideChat.stop()
+    this.dictation.cancel()
+    // Fail before destroying windows if owned resource cleanup cannot complete.
+    await this.adapter.stop(true)
+    if (this.osEnding) throw Error("OS_SHUTDOWN")
+    await this.cleanupForExit(true)
+  }
+
   async quit(): Promise<void> {
+    if (this.updatePreparing && !this.osEnding) return
+    this.quitPromise ??= this.cleanupForExit().then(() => { this.exitReady = true; app.quit() })
+    await this.quitPromise
+  }
+
+  private async cleanupForExit(forUpdate = false): Promise<void> {
     if (this.quitting) return
     this.placementOpening?.abort()
     this.activityBubble.cancelPlacement()
     this.petDrag.cancel()
     this.quitting = true
+    setApplicationInputLocked(true)
+    if (forUpdate) this.updates.stopBackgroundChecks()
+    else this.updates.dispose()
     this.chatEntry.cancel()
     this.startup?.close()
     if (this.saveTimer) clearTimeout(this.saveTimer)
@@ -300,6 +415,7 @@ export class AppController {
     this.bubbleIpc.dispose()
     this.taskControlIpc.dispose()
     this.settingsIpc.dispose()
+    this.updateIpc.dispose()
     this.characterIpc.dispose()
     for (const waiter of this.readyWaiters) waiter.finish(new Error("PACK_CANCELLED"))
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe()
@@ -315,7 +431,7 @@ export class AppController {
     screen.removeListener("display-removed", this.onDisplaysChanged)
     screen.removeListener("display-metrics-changed", this.onDisplaysChanged)
     powerMonitor.removeListener("resume", this.onResume)
-    app.exit(0)
+    if (!forUpdate) powerMonitor.removeListener("shutdown", this.onSystemShutdown)
   }
 
   private registerIpc(): void {
@@ -379,6 +495,7 @@ export class AppController {
   }
 
   private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+    if (!applicationInputAllowed()) return structuredClone(this.settings)
     if (patch.visible === false || patch.characterId !== undefined) { this.placementOpening?.abort(); this.activityBubble.cancelPlacement() }
     if (patch.visible === false || patch.scale !== undefined || patch.characterId !== undefined) this.petDrag.cancel()
     if (patch.visible === false || patch.sideChatEnabled === false) { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }
@@ -534,6 +651,8 @@ export class AppController {
 
   private trayActions(): TrayActions {
     return {
+      inputLocked: () => this.updatePreparing || this.quitting,
+      checkUpdates: () => { this.updateIpc.open(); void this.updates.act({ action: "check" }) },
       activity: () => this.activity.snapshot(),
       openSideChat: () => { void this.openSideChat() },
       openTaskControl: () => { this.updateSettings({ visible: true, taskBubblesEnabled: true }); this.activityBubble.setView("control", false) },

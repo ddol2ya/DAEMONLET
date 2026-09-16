@@ -194,3 +194,5 @@ select { padding: 8px 30px 8px 11px; border: 1px solid #dfe4d9; border-radius: 7
 .loading-spinner { justify-self: center; display: inline-block; width: 28px; height: 28px; border: 3px solid #dce4dd; border-top-color: #286857; border-radius: 50%; animation: loading-spin .9s linear infinite; }
 @keyframes loading-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
+
+.update-progress { display: block; width: 100%; margin: 16px 0; accent-color: var(--accent, #365d4f); }

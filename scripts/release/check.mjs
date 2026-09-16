@@ -25,8 +25,10 @@ export async function checkCandidate(asar) {
   const graph = json('dist-electron/bundle-inputs.json')
   if (graph.production !== true || !Array.isArray(graph.inputs) || !graph.inputs.includes('electron/main/side-chat/SideChatBackend.ts')
     || graph.inputs.some(path => typeof path !== 'string' || /(?:Smoke|fixture|tests\/|scripts\/side-chat|runtime-patches)/i.test(path))) throw new Error('Unverified production input graph')
+  const update = json('dist-electron/app-update.yml')
+  if (JSON.stringify(update) !== JSON.stringify({ provider: 'github', owner: 'ddol2ya', repo: 'DAEMONLET', private: false, updaterCacheDirName: 'daemonlet-for-codex-updater' }) || !graph.inputs.includes('electron/main/updates/OfficialUpdater.ts')) throw Error('Unverified updater configuration')
   const main = extract('dist-electron/main.cjs').toString('utf8')
-  if (['fresh-approval-four-submissions', 'user-authorized-six-requests', 'private-official-answers', 'DAEMONLET_CHAT_SMOKE', 'readOnlySource', 'SOURCE_RUNTIME_UNSUPPORTED'].some(marker => main.includes(marker))) throw new Error('Side chat QA or custom code shipped')
+  if (['fresh-approval-four-submissions', 'user-authorized-six-requests', 'private-official-answers', 'DAEMONLET_CHAT_SMOKE', 'readOnlySource', 'SOURCE_RUNTIME_UNSUPPORTED', 'UPDATE_SMOKE_ONLY', 'update-smoke.json', 'approve-install'].some(marker => main.includes(marker))) throw new Error('Side chat QA or custom code shipped')
   for (const required of ['dist/activity-bubble.html', 'dist-electron/activity-preload.cjs', 'dist/characters/gpichan/persona.json']) if (!files.includes(required)) throw new Error('Missing side chat runtime asset: ' + required)
   if (files.includes('dist/side-chat.html') || files.includes('dist-electron/side-chat-preload.cjs')) throw new Error('Standalone chat surface shipped')
   const needed = await runtimeAssetPaths(resolve(root, 'public/characters'))
@@ -52,7 +54,7 @@ export async function checkCandidate(asar) {
     // Build inventory and package files must match; removal of an inventory entry is not a bypass.
     if (!extract(`${prefix}/inventory.json`).equals(await readFile(resolve(root, prefix, 'inventory.json')))) throw Error('License inventory differs from build')
     for (const pkg of json(`${prefix}/inventory.json`)) {
-      if (!['MIT', 'BSD-2-Clause', 'BSD-3-Clause', '(MIT AND Zlib)'].includes(pkg.license)) throw new Error(`Review license for ${pkg.name}: ${pkg.license}`)
+      if (!['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', '(MIT AND Zlib)'].includes(pkg.license) && !(pkg.name === 'sax' && pkg.version === '1.6.1' && pkg.license === 'BlueOak-1.0.0')) throw new Error(`Review license for ${pkg.name}: ${pkg.license}`)
       if (!pkg.notices.length) throw Error(`Missing dependency notices: ${pkg.name}`)
       for (const notice of pkg.notices) {
         if (!/^[\w@.+-]+\/[\w.-]+$/.test(notice)) throw Error('Invalid notice path')

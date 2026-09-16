@@ -1,3 +1,4 @@
+import { applicationInputAllowed } from "./updates/OperationGate"
 import { createTranslator } from "../shared/translations"
 import { appText, appLanguage } from "./AppLanguage"
 import { dialog, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron"
@@ -45,7 +46,7 @@ export class CharacterIpcController {
     this.bind(CHARACTER_IPC.choose, 0, true, owner => this.nativeDialog(async () => {
       const picked = await dialog.showOpenDialog(o.settings.window!, { title: appText("캐릭터 추가"), filters: [{ name: appText("캐릭터 팩"), extensions: ["petchar", "zip"] }], properties: ["openFile"] })
       if (picked.canceled || !picked.filePaths[0]) return null
-      if (o.settings.currentOwner() !== owner) throw new Error("PACK_TRANSACTION")
+      if (!applicationInputAllowed() || o.settings.currentOwner() !== owner) throw new Error("PACK_TRANSACTION")
       return o.registry.prepareImport(picked.filePaths[0], owner, value => {
         if (o.settings.currentOwner() === owner) o.settings.send(CHARACTER_IPC.progress, value)
       })
@@ -63,7 +64,7 @@ export class CharacterIpcController {
         detail: mode === "remove" ? createTranslator(appLanguage())`${entry.version} 버전과 설치된 이전 버전을 제거합니다. 선택 중이면 기본 제공 캐릭터로 전환합니다.` : createTranslator(appLanguage())`${entry.version} → ${entry.previousVersion} 버전으로 복원합니다.`,
         buttons: [appText("취소"), mode === "remove" ? appText("제거") : appText("복원")], defaultId: 0, cancelId: 0 })
       if (result.response !== 1) return false
-      if (o.settings.currentOwner() !== owner) throw new Error("PACK_TRANSACTION")
+      if (!applicationInputAllowed() || o.settings.currentOwner() !== owner) throw new Error("PACK_TRANSACTION")
       if (mode === "remove") {
         if (o.selected() === target.id) await o.select({ id: "gpichan", revision: "builtin" })
         await o.registry.remove(target)

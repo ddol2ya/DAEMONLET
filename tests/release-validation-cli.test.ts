@@ -172,3 +172,36 @@ describe.each(['unit', 'build'])('%s execution rechecks its source', {timeout: 1
     expect(f.cli('verify', '--record', 'outputs/validation.json', '--required', kind).status).not.toBe(0)
   })
 })
+
+
+describe('updater metadata from packaged provenance', () => {
+  it('uses the real ZIP source schema and emits review-only metadata', async () => {
+    const {createUpdateMetadata} = await import('../scripts/release/update-metadata.mjs')
+    const f = await repository(), file = 'Daemonlet-for-Codex-0.7.0-macOS-arm64.zip'
+    const path = await asar(f.root, 'metadata')
+    await zip(f.root, file, [['Daemonlet for Codex.app/Contents/Resources/app.asar', await readFile(path)]])
+    const result = await createUpdateMetadata({artifact: join(f.root, 'outputs', file), output: join(f.root, 'outputs/feed'), platform: 'darwin', minimumSystemVersion: '22.0.0', manifest: undefined, packagingResult: undefined, review: true})
+    expect(result).toMatchObject({version: '0.7.0', published: false, verification: 'REVIEW_ONLY_NOT_DISTRIBUTABLE'})
+    expect(JSON.parse(await readFile(result.metadata, 'utf8')).daemonlet.reviewOnly).toBe(true)
+  })
+  it('rejects a packaged dirty source even in review mode', async () => {
+    const {createUpdateMetadata} = await import('../scripts/release/update-metadata.mjs')
+    const f = await repository(), file = 'Daemonlet-for-Codex-0.7.0-macOS-arm64.zip'
+    const path = await asar(f.root, 'dirty-metadata', {...A, workingTreeHasChanges: true})
+    await zip(f.root, file, [['Daemonlet for Codex.app/Contents/Resources/app.asar', await readFile(path)]])
+    await expect(createUpdateMetadata({artifact: join(f.root, 'outputs', file), output: join(f.root, 'outputs/feed'), platform: 'darwin', minimumSystemVersion: '22.0.0', manifest: undefined, packagingResult: undefined, review: true})).rejects.toThrow('Clean stable source identity')
+  })
+  it('binds Windows metadata to the EXE hash and explicit unsigned policy', async () => {
+    const {createUpdateMetadata} = await import('../scripts/release/update-metadata.mjs')
+    const f = await repository(), output = join(f.root, 'outputs'), name = 'Daemonlet-for-Codex-0.7.0-windows-x64-Setup.exe'
+    await writeFile(join(output, name), 'MZ synthetic metadata fixture')
+    const file = await fileIdentity(output, name), receipt = join(output, 'installer-build-result.json')
+    await writeFile(receipt, JSON.stringify({schemaVersion: 1, kind: 'windows-installer-build', source: A, appVersion: '0.7.0', files: [file], runtimeUnchanged: true, signing: 'unsigned'}))
+    const input = {artifact: join(output, name), output: join(output, 'feed'), platform: 'win32', minimumSystemVersion: '10.0.19045', manifest: undefined, packagingResult: receipt}
+    if (process.platform === 'win32') await expect(createUpdateMetadata(input)).rejects.toThrow('explicit --allow-unsigned-windows')
+    const result = await createUpdateMetadata({...input, allowUnsignedWindows: true, review: process.platform !== 'win32'})
+    expect(JSON.parse(await readFile(result.metadata, 'utf8')).daemonlet.publisherVerified).toBe(false)
+    await writeFile(join(output, name), 'MZ changed metadata fixture')
+    await expect(createUpdateMetadata({...input, review: true})).rejects.toThrow('No hash-matched installer')
+  })
+})

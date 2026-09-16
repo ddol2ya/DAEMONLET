@@ -22,6 +22,10 @@ The model repositories have their own terms; plugin or upstream code licensing d
 - `yauzl` 3.4.0 — MIT. Bounded sequential ZIP reading in the character-pack validation worker; complete license is included in the application.
 - `yazl` 3.3.1 — MIT. Creator CLI ZIP export; no code from imported packs is executed.
 - React and React DOM — MIT.
+- `electron-updater` 6.8.9 — MIT, Electron Builder contributors. Official GitHub provider, Squirrel.Mac and NSIS adapters; paired with builder-util-runtime 9.7.0 and electron-builder 26.15.3. Full transitive notices are collected from the production graph.
+- `lazy-val` 1.0.5 declares MIT but its npm tarball and source repository omit a license file. The supplemental notice records that provenance and reproduces the declared MIT terms; it is included in the hashed runtime inventory.
+- `sax` 1.6.1 — Blue Oak Model License 1.0.0; the complete upstream `LICENSE.md` is included.
+- `semver` 7.7.3 — ISC. Stable version comparison for update selection.
 - `@electron/fuses` 2.1.3 — MIT, copyright 2020 Electron Maintainers. Used only to read the packaged runtime's fuse wire; no fuse changes are performed.
 - `smol-toml` 1.8.0 — BSD-3-Clause, copyright Squirrel Chat et al. Parses read-only setup configuration.
 - `stream-json` 3.6.0 and `stream-chain` 4.2.5 — BSD-3-Clause, copyright Eugene Lazutkin. Stream and discard historical conversation bodies before assembling bounded desktop status metadata. Complete licenses are included in the application.

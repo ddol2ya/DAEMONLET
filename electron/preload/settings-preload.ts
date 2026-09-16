@@ -41,3 +41,7 @@ const api: SettingsDesktopApi = {
   onSettingsChanged: (listener) => subscription(SETUP_IPC.settingsChanged, listener),
 }
 contextBridge.exposeInMainWorld("settingsDesktop", Object.freeze(api))
+
+import { UPDATE_IPC, type UpdateDesktopApi } from "../shared/update-contract"
+const updates: UpdateDesktopApi = { onOpen: listener => subscription(UPDATE_IPC.open, listener), snapshot: () => ipcRenderer.invoke(UPDATE_IPC.snapshot), act: value => ipcRenderer.invoke(UPDATE_IPC.action, value), onChanged: listener => subscription(UPDATE_IPC.changed, listener) }
+contextBridge.exposeInMainWorld("updateDesktop", Object.freeze(updates))
