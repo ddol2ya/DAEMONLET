@@ -6,6 +6,8 @@ import { connectVerifiedSideChat } from "./side-chat/SideChatPolicy"
 import { SideChatPreferences } from "./side-chat/SideChatPreferences"
 import { SideChatSetupController } from "./side-chat/SideChatSetupController"
 import { PersonaResolver } from "./side-chat/PersonaResolver"
+import { WindowDragController } from "./WindowDragController"
+import { validWindowDragRequest } from "../shared/window-drag"
 import { SideChatEntryController } from "./side-chat/SideChatEntryController"
 import { SideChatIpcController } from "./SideChatIpcController"
 import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
@@ -62,6 +64,11 @@ export class AppController {
     revealPet: async signal => { if (this.quitting) return false; this.showPet(); return this.pet.reveal(signal) },
     focus: () => this.activityBubble.focusConversation(),
     refreshParents: query => this.refreshChatParents(query), check: () => this.sideChatSetup.check(),
+  })
+  private readonly petDrag = new WindowDragController({
+    window: () => this.pet.window, cursor: () => screen.getCursorScreenPoint(), startCursor: () => this.pet.takeDragStart(),
+    workArea: point => screen.getDisplayNearestPoint(point).workArea, allowed: () => !this.quitting && this.settings.visible,
+    lock: active => this.pet.setDragging(active), finish: (bounds, committed) => { if (committed) this.captureBounds(bounds) },
   })
   private sideChatPage = { offset: 0, query: "", generation: 0 }
   private readonly sideChatIpc: SideChatIpcController
@@ -261,6 +268,7 @@ export class AppController {
 
   async quit(): Promise<void> {
     if (this.quitting) return
+    this.petDrag.cancel()
     this.quitting = true
     this.chatEntry.cancel()
     this.startup?.close()
@@ -311,6 +319,7 @@ export class AppController {
       return this.updateSettings(patch)
     })
     ipcMain.handle(IPC.layoutSet, (event, enabled: unknown) => { requirePet(event); if (typeof enabled !== "boolean") throw new Error("invalid layout state"); this.setLayoutMode(enabled) })
+    ipcMain.handle(IPC.windowDrag, (event, value: unknown, ...extra) => { requirePet(event); if (extra.length || !validWindowDragRequest(value)) throw Error("invalid drag request"); return this.petDrag.request(value) })
     ipcMain.handle(IPC.resetPosition, (event) => { requirePet(event); this.resetPosition() })
     ipcMain.handle(IPC.mousePassthrough, (event, ignore: unknown) => { requirePet(event); if (typeof ignore !== "boolean") throw new Error("invalid passthrough state"); this.pet.setMousePassthrough(ignore) })
     ipcMain.on(IPC.interactionLock, (event, locked: unknown) => { if (trustedPet(event) && typeof locked === "boolean") this.pet.setInteractionLocked(locked) })
@@ -351,11 +360,13 @@ export class AppController {
   }
 
   private setLayoutMode(enabled: boolean): void {
+    this.petDrag.cancel()
     this.activityBubble.setLayoutMode(enabled)
     this.pet.setLayoutMode(enabled)
   }
 
   private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+    if (patch.visible === false || patch.scale !== undefined || patch.characterId !== undefined) this.petDrag.cancel()
     if (patch.visible === false || patch.sideChatEnabled === false) { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }
     if (patch.characterId !== undefined) {
       if (!this.characters.isAvailable(patch.characterId)) throw new Error("PACK_UNAVAILABLE")
@@ -388,6 +399,7 @@ export class AppController {
   }
 
   private captureBounds(bounds: Rectangle): void {
+    if (this.petDrag.active) return
     const display = screen.getDisplayMatching(bounds)
     this.settings.bounds = { ...bounds, displayId: display.id }
     this.persistSoon()
@@ -399,12 +411,14 @@ export class AppController {
   }
 
   private resetPosition(): void {
+    this.petDrag.cancel()
     this.settings.bounds = this.recover({ ...this.settings.bounds, x: Number.MAX_SAFE_INTEGER, y: Number.MAX_SAFE_INTEGER, displayId: null })
     this.pet.setBounds(this.settings.bounds)
     this.updateSettings({ visible: true })
   }
 
   private readonly onDisplaysChanged = () => {
+    this.petDrag.cancel()
     const recovered = this.recover(this.pet.window?.getBounds() ? { ...this.pet.window.getBounds(), displayId: this.settings.bounds.displayId } : this.settings.bounds)
     this.settings.bounds = recovered
     this.pet.setBounds(recovered)
@@ -458,6 +472,7 @@ export class AppController {
     this.sideChat.setPreparation({ hasMoreParents: catalog.hasMore, parentQuery: page.query })
   }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
+    this.petDrag.cancel()
     await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
     if (this.lastReady?.id === selection.id && this.lastReady.revision === selection.revision && this.settings.characterId === selection.id) { this.updateSettings({ characterId: selection.id }); return }
     await new Promise<void>((resolveReady, reject) => {

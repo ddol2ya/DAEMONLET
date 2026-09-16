@@ -26,6 +26,8 @@ export class PetWindowController {
   private clickThrough = true
   private desiredVisible = true
   private effectivePassthrough = false
+  private dragging = false
+  private dragStart: { x: number; y: number; at: number } | null = null
   private revealWaiters = new Set<(ready: boolean) => void>()
 
   constructor(private readonly options: PetWindowOptions) {}
@@ -77,6 +79,12 @@ export class PetWindowController {
       if (mainFrame) this.failSafe(`Pet load failed (${code} ${description}): ${url}`)
     })
     win.webContents.on("context-menu", () => this.options.onContextMenu?.(win))
+    win.webContents.on("before-mouse-event", (_event, input) => {
+      if (input.type !== "mouseDown") return
+      const modifiers = input.modifiers ?? []
+      this.dragStart = input.button === "left" && modifiers.includes("alt") && !modifiers.some(m => ["control", "ctrl", "meta", "command", "cmd"].includes(m))
+        ? { ...screen.getCursorScreenPoint(), at: Date.now() } : null
+    })
     if ((typeof __APP_QA__ === "undefined" || __APP_QA__) && process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {
         process.stderr.write(`[pet:${details.level}] ${details.message}\n`)
@@ -139,6 +147,15 @@ export class PetWindowController {
     this.interactionLocked = locked
     this.applyMousePolicy()
   }
+  setDragging(value: boolean) {
+    this.dragging = value
+    this.applyMousePolicy()
+    if (!value) this.send(IPC.dragCancelled, true)
+  }
+  takeDragStart() {
+    const point = this.dragStart; this.dragStart = null
+    return point && Date.now() - point.at < 1000 && this.ready && !this.layoutMode && this.desiredVisible ? { x: point.x, y: point.y } : null
+  }
 
   setLayoutMode(enabled: boolean): void {
     this.layoutMode = enabled
@@ -188,7 +205,7 @@ export class PetWindowController {
   private applyMousePolicy(): void {
     const win = this.window
     if (!win || win.isDestroyed()) return
-    const ignore = this.ready && this.clickThrough && this.requestedPassthrough && !this.interactionLocked && !this.layoutMode
+    const ignore = this.ready && this.clickThrough && this.requestedPassthrough && !this.interactionLocked && !this.layoutMode && !this.dragging
     this.effectivePassthrough = ignore
     win.setIgnoreMouseEvents(ignore, { forward: true })
   }

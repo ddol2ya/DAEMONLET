@@ -3,12 +3,15 @@ import type { DesktopSettingsPatch, DesktopSettingsV1 } from "./desktop-settings
 import type { HookEventReceipt } from "../../adapter/codex/hooks/HookEvents"
 import type { CharacterReadApi, CharacterSelection } from "./character-pack-contract"
 import type { BubblePresentationApi } from "./bubble-presentation"
+import type { WindowDragRequest, WindowDragReply } from "./window-drag"
 
 export const IPC = {
   settingsGet: "desktop.settings.get",
   settingsPatch: "desktop.settings.patch",
   layoutSet: "desktop.layout.set",
   resetPosition: "desktop.window.reset-position",
+  windowDrag: "desktop.window.drag",
+  dragCancelled: "desktop.window.drag-cancelled",
   mousePassthrough: "desktop.mouse-passthrough.set",
   interactionLock: "desktop.interaction-lock.set",
   petReady: "desktop.pet.ready",
@@ -69,6 +72,9 @@ export interface MotionLabDesktopApi {
 }
 
 export interface PetDesktopApi {
+  platform: string
+  dragWindow(request: WindowDragRequest): Promise<WindowDragReply>
+  onDragCancelled(listener: () => void): () => void
   bubble: BubblePresentationApi
   characters: CharacterReadApi
   reportCharacterLoadFailure(selection: CharacterSelection): void
