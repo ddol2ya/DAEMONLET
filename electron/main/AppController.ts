@@ -358,10 +358,11 @@ export class AppController {
     if (patch.characterId !== undefined && patch.characterId !== this.settings.characterId) {
       this.activityBubble.presentation.begin(); this.sideChat.beginCharacterApply(); this.personaGeneration++
     }
-    const previousScale = this.settings.scale
+    const previousScale = this.settings.scale, previousChatEnabled = this.settings.sideChatEnabled
     Object.assign(this.settings, patch)
     if (patch.language !== undefined) setAppLanguage(this.settings.language)
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
+    if (previousChatEnabled !== this.settings.sideChatEnabled) this.sideChatSetup.invalidate()
     if ((patch.language !== undefined || patch.sideChatEnabled === true) && this.lastReady) void this.refreshPersona(this.lastReady)
     if (patch.scale !== undefined && patch.scale !== previousScale) {
       const size = windowSizeForScale(patch.scale)

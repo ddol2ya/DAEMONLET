@@ -9,7 +9,7 @@ import type { ChatRequest } from "../../shared/side-chat-contract"
 
 export class SideChatSetupController {
   private generation = 0
-  private pending: Promise<void> | null = null
+  private pending: { generation: number; selection: string; promise: Promise<void> } | null = null
   private detected: string | null = null
   constructor(private readonly service: SideChatService, private readonly preferences: SideChatPreferences,
     private readonly selection: () => { codexHome: string | null; executablePath: string | null },
@@ -28,24 +28,37 @@ export class SideChatSetupController {
   invalidate() { this.generation++; this.detected = null; this.service.connectionChanged(); this.service.setPreparation({ readiness: { phase: "unchecked", code: null, checkedAt: null } }) }
   /** Account/catalog metadata only: never fork, resume, turn/start or send text. */
   check(): Promise<void> {
-    if (this.pending) return this.pending
     if (!this.service.snapshot().enabled) { this.publishPreferences(); return Promise.resolve() }
-    const generation = this.generation
+    const options = this.options(), selection = JSON.stringify(options), generation = this.generation
+    const previous = this.pending
+    if (previous?.generation === generation && previous.selection === selection) return previous.promise
+    const job = { generation, selection, promise: Promise.resolve() }
+    this.pending = job
     this.service.setPreparation({ readiness: { phase: "checking", code: null, checkedAt: null } })
+    const current = () => this.pending === job && generation === this.generation && this.service.snapshot().enabled && job.selection === JSON.stringify(this.options())
     const run = async () => {
+      // Serialize cleanup, but superseded queued selections never open a connection.
+      await previous?.promise.catch(() => {})
       let connection: Awaited<ReturnType<typeof connectVerifiedSideChat>> | null = null
       try {
-        const options = this.options(), runtime = await inspectSideChatRuntime(options.executable)
+        if (!current()) return
+        const runtime = await inspectSideChatRuntime(options.executable)
+        if (!current()) return
         connection = await connectVerifiedSideChat({ ...options, executable: runtime.executable })
-        if (generation !== this.generation) return
+        if (!current()) return
         this.detected = runtime.executable
+        job.selection = JSON.stringify(this.options())
         this.service.setConnectionMode("official-same-home")
         this.service.setPreparation({ readiness: { phase: "ready", code: null, version: runtime.runtime.version, model: SIDE_CHAT_MODEL.id, checkedAt: Date.now() } })
       } catch (error) {
-        if (generation === this.generation) this.service.setPreparation({ readiness: { phase: "blocked", code: chatError(error), checkedAt: Date.now() } })
-      } finally { await connection?.stop(); this.pending = null }
+        if (current()) this.service.setPreparation({ readiness: { phase: "blocked", code: chatError(error), checkedAt: Date.now() } })
+      } finally {
+        try { await connection?.stop() }
+        catch { if (current()) this.service.setPreparation({ readiness: { phase: "blocked", code: "SESSION_LOST", checkedAt: Date.now() } }) }
+        finally { if (this.pending === job) this.pending = null }
+      }
     }
-    return this.pending = run()
+    return job.promise = run()
   }
   async pickCli(discover = false) {
     let executable: string
@@ -58,7 +71,7 @@ export class SideChatSetupController {
     // Explicit side-chat action only. Shared task-control/Hook selection survives.
     await this.preferences.save({ executable }); this.invalidate(); await this.check()
   }
-  async enable() { this.enableSetting(); this.publishPreferences(); await this.check() }
+  async enable() { this.invalidate(); this.enableSetting(); this.publishPreferences(); await this.check() }
   async dismissNotice() { await this.preferences.save({ offNoticeSeen: true }); this.publishPreferences() }
   async help() { await shell.openExternal("https://developers.openai.com/codex/cli") }
   async confirmSend(request: ChatRequest): Promise<boolean> {
