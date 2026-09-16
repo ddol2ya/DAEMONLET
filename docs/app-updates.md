@@ -55,11 +55,11 @@ For the explicitly opted-in Windows unsigned path, metadata generation additiona
 
 The output is latest-mac.yml or latest.yml in the official parser's format, containing the final file's version, path, size and SHA-512 plus product/target metadata. The minimum OS field uses the kernel version convention of updater 6.8.9, not the marketing macOS version. Review-only metadata is available with --review and is explicitly rejected by production selection. Metadata generation does not publish a release.
 
-Before an approved public release, prepare every supported platform's final signed assets and metadata in a draft, verify names/digests and version identity, then expose the complete stable release. Do not expose a partial stable feed. Public hosting/redirect behavior needs its own validation; localhost success is not evidence for it.
+Before an approved public release, prepare every supported platform's final assets and metadata under its documented signing or explicit unsigned policy in a draft, verify names/digests and version identity, then expose the complete stable release. Do not expose a partial stable feed. Public hosting/redirect behavior needs its own validation; localhost success is not evidence for it.
 
 ## Isolated integration testing
 
-scripts/update-smoke.mjs builds two signed **QA applications**, with the real AppController and official updater adapter, into a new private directory. It serves a localhost-only feed and uses a separate profile, cache and ports. The standalone UpdateSmokeEntry is never imported by production main.ts. Its explicit test consent substitutes for the native production dialog and is recorded as such.
+scripts/update-smoke.mjs builds two **QA applications** (signed on Mac, explicitly opted-in unsigned NSIS on Windows), with the real AppController and official updater adapter, into a new private directory. It serves a localhost-only feed and uses a separate profile, cache and ports. The standalone UpdateSmokeEntry is never imported by production main.ts. Its explicit test consent substitutes for the native production dialog and is recorded as such.
 
 The driver can import an existing pack without changing its source file, check download-only without native staging, quit and relaunch N, then write an authorized install marker to apply N+1. It records running versions, settings, pack revisions and a hash of the CLI/consent preferences. These applications are not distributable candidates. A separately built clean production candidate must pass the normal ASAR/signature checks.
 

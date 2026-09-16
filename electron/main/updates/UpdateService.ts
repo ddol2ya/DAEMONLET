@@ -72,10 +72,12 @@ export class UpdateService {
     this.publish({ phase: "checking", candidateId: undefined, version: undefined, reason: undefined, progress: undefined })
     try {
       const platform = await this.options.platform()
+      if (generation !== this.generation || this.disposed) return
       if (platform.kind === "unsupported") { this.publish({ phase: "blocked", reason: platform.reason }); return }
       // Conditional public metadata request is a rate-limit/cache gate, never a second asset selector.
       if (this.options.fetchLatest) {
         const result = await this.options.fetchLatest(this.etag)
+        if (generation !== this.generation || this.disposed) return
         if (result.status === 403 || result.status === 429) throw Error("RATE_LIMITED")
         if (result.status !== 200 && result.status !== 304) throw Error("NETWORK")
         this.etag = result.etag ?? this.etag; this.cachedTag = result.tag ?? this.cachedTag
@@ -114,17 +116,23 @@ export class UpdateService {
     this.publish({ phase: "preparing", reason: undefined })
     try {
       // No input, child, draft or window is touched before explicit native consent.
-      if (!await this.options.confirmInstall()) { this.publish({ phase: "downloaded" }); return }
+      const confirmed = await this.options.confirmInstall()
       if (this.disposed) return
+      if (!confirmed) { this.publish({ phase: "downloaded" }); return }
       const platform = await this.options.platform()
+      if (this.disposed) return
       if (!platform.automatic) throw Error("INVALID_SIGNATURE")
       await this.engine!.verify(this.candidate!)
+      if (this.disposed) return
       await this.engine!.prepare()
+      if (this.disposed) return
+      // Owned cleanup disposes this service; the application handoff independently
+      // checks OS shutdown after cleanup and before native installer launch.
       await this.options.prepareShutdown()
       this.publish({ phase: "handoff" })
       this.options.handoff()
       this.engine!.install()
-    } catch (error) { this.options.resume(); this.publish({ phase: "error", reason: this.reason(error) }) }
+    } catch (error) { if (!this.disposed) { this.options.resume(); this.publish({ phase: "error", reason: this.reason(error) }) } }
   }
   dispose() { this.disposed = true; this.generation++; this.download?.abort(); if (this.timer) clearInterval(this.timer); this.timer = null }
 }
