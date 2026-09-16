@@ -174,3 +174,11 @@ describe("narrow activity IPC", () => {
    expect(await f.invoke(ACTIVITY_IPC.openChat, [{ ...target, revision: target.revision + 1 }], f.bubbleSender)).toMatchObject({ ok: false, code: "STALE_TARGET" })
    expect(f.openChat).toHaveBeenCalledTimes(1)
  })
+
+it("opens the explicit parent picker for an unmapped current task without opening or acknowledging a parent", async () => {
+  const f = fixture(), entry = f.service.snapshot().entries[0], target = { activityId: entry.activityId, revision: entry.revision }
+  vi.spyOn(f.service, "conversationKey").mockReturnValue(null)
+  expect(await f.invoke(ACTIVITY_IPC.openChat, [target], f.bubbleSender)).toEqual({ ok: true, value: null })
+  expect(f.openChat).toHaveBeenCalledExactlyOnceWith(undefined, target.activityId)
+  expect(f.openConversation).not.toHaveBeenCalled(); expect(f.launcher.open).not.toHaveBeenCalled(); expect(f.service.acknowledge).not.toHaveBeenCalled()
+})

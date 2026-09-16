@@ -429,8 +429,7 @@ export class AppController {
   private async openSideChat(key?: string, activityId?: string) {
     const generation = ++this.chatOpenGeneration
     const target = key ? this.adapter.conversationTarget(key) : null
-    if (key && !target) { this.sideChat.clearParent(); this.sideChat.setMode("compact"); throw Error("NO_PARENT") }
-    if (target && target.threadId !== this.sideChat.parentThreadId()) this.sideChat.clearParent()
+    if (activityId && !target || target && target.threadId !== this.sideChat.parentThreadId()) this.sideChat.clearParent()
     this.sideChat.setMode("compact")
     const epoch = this.sideChat.snapshot().epoch
     await this.refreshChatParents(target?.threadId)

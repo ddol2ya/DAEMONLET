@@ -76,9 +76,13 @@ export class ActivityIpcController {
       if (target === null) { await this.openChat(); return { ok: true, value: null } }
       const request = validateActivityAck({ targets: [target] })
       if (!request) return { ok: false, code: "INVALID_REQUEST" }
+      const selected = request.targets[0]
+      const entry = this.activity.snapshot().entries.find(item => item.activityId === selected.activityId)
+      if (!entry || entry.revision !== selected.revision) return { ok: false, code: "STALE_TARGET" }
       const key = this.activity.conversationKey(request.targets[0])
-      if (!key) return { ok: false, code: "STALE_TARGET" }
-      await this.openChat(key, request.targets[0].activityId)
+      // Unmapped tasks open the same surface with an explicit parent picker.
+      // They never inherit the previously selected task or create a new thread.
+      await this.openChat(key ?? undefined, selected.activityId)
       return { ok: true, value: null }
     }, true)
     bind(ACTIVITY_IPC.setCollapsed, 1, ([value]) => typeof value === "boolean" && this.bubble
