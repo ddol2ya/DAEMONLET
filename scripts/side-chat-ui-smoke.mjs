@@ -1,4 +1,5 @@
 import { build } from 'esbuild'
+import { createWriteStream } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, readdir, symlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -16,7 +17,10 @@ try {
   await build({ entryPoints: [join(root, 'tests/smoke/side-chat-electron.ts')], outfile: main, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent', plugins: [{ name: 'qa-preparation-metadata', setup(bundler) { bundler.onResolve({ filter: /SideChatPolicy$/ }, () => ({ path: join(root, 'tests/smoke/side-chat-setup-policy.ts') })) } }] })
   const env = { ...process.env, DAEMONLET_CHAT_SMOKE_ROOT: root, DAEMONLET_CHAT_SMOKE_FIXTURE_DIST: fixtureDist, DAEMONLET_CHAT_SMOKE_OUTPUT: output, DAEMONLET_CHAT_SMOKE_USER: join(stage, 'user') }; delete env.ELECTRON_RUN_AS_NODE
   await new Promise((resolve, reject) => {
-    const child = spawn(electron, [main], { env, stdio: 'ignore' })
+    const log = createWriteStream(join(output, 'electron.log'))
+    const child = spawn(electron, [main], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+    child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false })
+    child.once('exit', () => log.end())
     const timer = setTimeout(() => { child.kill('SIGTERM'); reject(Error('UI smoke timeout')) }, 90000)
     child.once('error', e => { clearTimeout(timer); reject(e) }); child.once('exit', code => { clearTimeout(timer); code === 0 ? resolve() : reject(Error('UI smoke failed; see result.json')) })
   })

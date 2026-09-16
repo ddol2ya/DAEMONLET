@@ -26,14 +26,17 @@ registerAppScheme()
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const assert = (condition: unknown, label: string) => { if (!condition) throw Error(label) }
 async function main() {
-await app.whenReady()
+await app.whenReady(); console.log("UI fixture: app ready")
 let calls = 0, opens = 0, closes = 0
 let openGate: (() => Promise<void>) | null = null, sendError: string | null = null
 const sentTexts: string[] = []
 installAppProtocol(process.env.DAEMONLET_CHAT_SMOKE_FIXTURE_DIST!)
 const settings = defaultDesktopSettings(); settings.bounds = { x: 850, y: 250, width: 360, height: 360, displayId: null }
-const petController = new PetWindowController({ preloadPath: join(root, "dist-electron/pet-preload.cjs"), onBoundsChanged: () => {}, onWarning: () => {}, onCloseRequested: () => {} })
+const petController = new PetWindowController({ preloadPath: join(root, "dist-electron/pet-preload.cjs"), onBoundsChanged: () => {}, onWarning: message => console.error("UI fixture Pet warning:", message), onCloseRequested: () => {} })
 const pet = petController.create(settings)
+console.log("UI fixture: Pet created")
+pet.webContents.on("did-finish-load", () => console.log("UI fixture: Pet loaded"))
+pet.webContents.on("did-fail-load", (_event, code, reason) => console.error("UI fixture: Pet load failed", code, reason))
 const placementStore = new WindowBoundsStore(process.env.DAEMONLET_CHAT_SMOKE_USER!)
 let placementSave = Promise.resolve()
 const bubbles = new ActivityBubbleWindowController(join(root, "dist-electron/activity-preload.cjs"), undefined, undefined, undefined, placement => { settings.bubblePlacement = placement; bubbles.applySettings(settings); placementSave = placementStore.save(settings) })
@@ -45,7 +48,14 @@ const activity = { ...store.view(), revision: 1, storage: "saved" as const, hist
 ipcMain.handle(ACTIVITY_IPC.get, () => ({ ok: true, value: activity }))
 ipcMain.handle(TASK_CONTROL_IPC.getView, () => ({ ok: true, value: { view: "activity", collapsed: false } }))
 bubbles.update(activity)
-await pet.loadURL("pet://app/pet.html"); petController.reportReady()
+// create() starts the only load; readiness follows the fixture DOM, not a second navigation.
+let fixtureReady = false
+for (let n = 0; n < 100; n++) {
+  if (await pet.webContents.executeJavaScript("document.readyState !== 'loading' && Boolean(document.querySelector('main'))").catch(() => false)) { fixtureReady = true; break }
+  await wait(40)
+}
+assert(fixtureReady, "Pet fixture DOM ready")
+petController.reportReady()
 let answer: ChatResponse = { text: "듣고 있습니다. 무엇이 궁금하십니까?", preview: "", expression: "neutral" }
 const service = new SideChatService(() => {
   let opened = false
