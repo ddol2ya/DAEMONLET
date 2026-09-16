@@ -62,6 +62,11 @@ void (async () => {
   const cacheBase = mac ? join(homedir(), "Library", "Caches") : process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local")
   const Updater = mac ? MacUpdater : NsisUpdater
   const updater = new Updater({ provider: "generic", url: feed.href })
+  if (handoffCase) {
+    const providerConfig = join(config.output, "provider.yml")
+    await writeFile(providerConfig, JSON.stringify({ provider: "generic", url: feed.href, updaterCacheDirName: config.cacheName }))
+    updater.updateConfigPath = providerConfig
+  }
   const unsignedAllowed = () => Boolean((controller as unknown as { settings?: { allowUnsignedWindowsUpdates?: boolean } } | null)?.settings?.allowUnsignedWindowsUpdates)
   const engine = new OfficialUpdateEngine(updater, join(cacheBase, config.cacheName), unsignedAllowed)
   // Failure injection is confined to this excluded QA entry. Real controller
