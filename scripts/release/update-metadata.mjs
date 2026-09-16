@@ -18,7 +18,7 @@ export async function createUpdateMetadata({ artifact, output, platform, minimum
   const root = resolve(artifact, '..'), file = basename(artifact)
   const record = await initializeValidation({ root, artifacts: [{ file, kind: platform === 'darwin' ? 'macosFinalZip' : 'windowsInstallerExe' }], packagingResults: packagingResult ? [resolve(packagingResult)] : [] })
   const version = record.appVersion
-  if (!valid(version) || prerelease(version) || record.source.dirty) throw Error('Clean stable source identity required; never replace an already released version')
+  if (!valid(version) || prerelease(version) || record.workingTreeHasChanges) throw Error('Clean stable source identity required; never replace an already released version')
   const expected = 'Daemonlet-for-Codex-' + version + (platform === 'darwin' ? '-macOS-arm64.zip' : '-windows-x64-Setup.exe')
   if (file !== expected) throw Error('Unexpected update asset name')
   let publisherVerified = platform === 'darwin'
