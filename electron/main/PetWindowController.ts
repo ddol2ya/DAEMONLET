@@ -1,3 +1,4 @@
+import { NativeDragStart } from "./NativeDragStart"
 import { bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow, screen, type Rectangle } from "electron"
 import { join } from "node:path"
@@ -27,7 +28,7 @@ export class PetWindowController {
   private desiredVisible = true
   private effectivePassthrough = false
   private dragging = false
-  private dragStart: { x: number; y: number; at: number } | null = null
+  private dragStart = new NativeDragStart()
   private revealWaiters = new Set<(ready: boolean) => void>()
 
   constructor(private readonly options: PetWindowOptions) {}
@@ -83,8 +84,7 @@ export class PetWindowController {
     win.webContents.on("before-mouse-event", (_event, input) => {
       if (input.type !== "mouseDown") return
       const modifiers = input.modifiers ?? []
-      this.dragStart = input.button === "left" && modifiers.includes("alt") && !modifiers.some(m => ["control", "ctrl", "meta", "command", "cmd"].includes(m))
-        ? { ...screen.getCursorScreenPoint(), at: Date.now() } : null
+      this.dragStart.record(win.getBounds(), input, input.button === "left" && modifiers.includes("alt") && !modifiers.some(m => ["control", "ctrl", "meta", "command", "cmd", ...(process.platform === "win32" ? ["right", "altgr"] : [])].includes(m)))
     })
     if ((typeof __APP_QA__ === "undefined" || __APP_QA__) && process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {
@@ -154,8 +154,8 @@ export class PetWindowController {
     if (!value) this.send(IPC.dragCancelled, true)
   }
   takeDragStart() {
-    const point = this.dragStart; this.dragStart = null
-    return point && Date.now() - point.at < 1000 && this.ready && !this.layoutMode && this.desiredVisible ? { x: point.x, y: point.y } : null
+    const point = this.dragStart.take()
+    return point && this.ready && !this.layoutMode && this.desiredVisible ? { x: point.x, y: point.y } : null
   }
 
   setLayoutMode(enabled: boolean): void {

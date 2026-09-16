@@ -55,11 +55,14 @@ describe("native activity window arbitration", () => {
     const conversation = JSON.stringify(service.snapshot()), originalBounds = { ...f.win.bounds }
     f.c.beginPlacement(); const revision = f.c.placementSnapshot().revision
     expect(f.c.window).toBe(f.win); expect(f.win.bounds).not.toEqual(originalBounds)
-    Object.assign(cursor, { x: 300, y: 300 })
+    const dragBounds = { ...f.win.bounds }
+    f.win.webContents.emit("before-mouse-event", {}, { type: "mouseDown", button: "left", x: 20, y: 20 })
+    // The real pointer has already reached its final position before renderer IPC begins.
+    Object.assign(cursor, { x: dragBounds.x + 170, y: dragBounds.y + 130 })
     const begin = f.c.placementAction({ action: "drag", revision, drag: { action: "begin" } })
     if (!begin.ok || !begin.drag?.id) throw Error("drag did not begin")
-    Object.assign(cursor, { x: 450, y: 410 })
     f.c.placementAction({ action: "drag", revision, drag: { action: "end", id: begin.drag.id } })
+    expect(f.win.bounds).toMatchObject({ x: dragBounds.x + 150, y: dragBounds.y + 110 })
     expect(saved).not.toHaveBeenCalled()
     f.c.placementAction({ action: "cancel", revision }); expect(f.win.bounds).toEqual(originalBounds)
     f.c.beginPlacement(); const next = f.c.placementSnapshot().revision

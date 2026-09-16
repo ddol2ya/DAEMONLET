@@ -1,3 +1,4 @@
+import { NativeDragStart } from "./NativeDragStart"
 import { appText, bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow, screen } from "electron"
 import type { EventEmitter } from "node:events"
@@ -34,8 +35,9 @@ export class ActivityBubbleWindowController {
   private placementDraft: BubblePlacement | null = null
   private placementRevision = 0
   private focusPlacement = false
+  private readonly placementStart = new NativeDragStart()
   private readonly placementDrag = new WindowDragController({
-    window: () => this.window, cursor: () => screen.getCursorScreenPoint(),
+    window: () => this.window, cursor: () => screen.getCursorScreenPoint(), startCursor: () => this.placementStart.take(),
     workArea: point => screen.getDisplayNearestPoint(point).workArea, allowed: () => Boolean(this.placementDraft),
     lock: active => { if (active) this.window?.setIgnoreMouseEvents(false) },
     finish: (bounds, committed) => { if (committed && this.placementDraft && this.pet && !this.pet.isDestroyed()) this.placementDraft = relativeBubblePlacement(this.pet.getBounds(), bounds); this.sync() },
@@ -184,7 +186,7 @@ export class ActivityBubbleWindowController {
       // even when the DOM down event has not been dispatched yet.
       this.send(BUBBLE_IPC.interaction, true)
     }
-    win.webContents.on("before-mouse-event", (_event, input) => { if (input.type === "mouseDown") beforeDispatch() })
+    win.webContents.on("before-mouse-event", (_event, input) => { if (input.type === "mouseDown") { this.placementStart.record(win.getBounds(), input, input.button === "left" && Boolean(this.placementDraft)); beforeDispatch() } })
     win.webContents.on("before-input-event", (_event, input) => { if (input.type === "keyDown" && ["Enter", " "].includes(input.key)) beforeDispatch() })
     win.on("hide", release)
     win.webContents.on("render-process-gone", release)
