@@ -19,7 +19,7 @@ export interface UpdateEngine {
   prepare(): Promise<void>
   install(): void
 }
-export async function detectUpdatePlatform(): Promise<UpdatePlatform> {
+export async function detectUpdatePlatform(allowUnsignedWindows = false): Promise<UpdatePlatform> {
   const target: UpdatePlatform = { platform: process.platform, arch: process.arch, osVersion: release(), kind: "unsupported", automatic: false, reason: "UNSUPPORTED_INSTALL" }
   if (!app.isPackaged) return { ...target, reason: "DEVELOPMENT_BUILD" }
   if (process.platform === "darwin" && process.arch === "arm64") {
@@ -40,6 +40,10 @@ export async function detectUpdatePlatform(): Promise<UpdatePlatform> {
       if (marker.appId !== BUNDLE_ID || marker.scope !== "currentUser" || marker.kind !== "nsis") return target
       target.kind = "nsis"
       const config = JSON.parse(await readFile(join(process.resourcesPath, "app-update.yml"), "utf8"))
+      if (config.publisherName === undefined && allowUnsignedWindows) {
+        await access(dirname(process.execPath), constants.W_OK)
+        return { ...target, automatic: true, reason: "UNVERIFIED_PUBLISHER" }
+      }
       if (!Array.isArray(config.publisherName) || !config.publisherName.length || config.publisherName.some((x: unknown) => typeof x !== "string" || !x)) throw Error("WINDOWS_PUBLISHER_REQUIRED")
       // Use the updater's standard Authenticode verifier, never a permissive override.
       const verifier = new NsisUpdater(UPDATE_REPOSITORY)
@@ -53,13 +57,13 @@ export async function detectUpdatePlatform(): Promise<UpdatePlatform> {
   return target
 }
 /** Only the official provider is constructed here. QA constructs its engine in a separate entry point. */
-export function createOfficialUpdateEngine(): UpdateEngine {
+export function createOfficialUpdateEngine(allowUnsignedWindows: () => boolean = () => false): UpdateEngine {
   const updater = process.platform === "darwin" ? new MacUpdater(UPDATE_REPOSITORY) : new NsisUpdater(UPDATE_REPOSITORY)
-  return new OfficialUpdateEngine(updater, join(process.platform === "win32" ? process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local") : join(homedir(), "Library", "Caches"), "daemonlet-for-codex-updater"))
+  return new OfficialUpdateEngine(updater, join(process.platform === "win32" ? process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local") : join(homedir(), "Library", "Caches"), "daemonlet-for-codex-updater"), allowUnsignedWindows)
 }
 export class OfficialUpdateEngine implements UpdateEngine {
   private file: string | null = null
-  constructor(private readonly updater: AppUpdater, private readonly cacheRoot: string) {
+  constructor(private readonly updater: AppUpdater, private readonly cacheRoot: string, private readonly allowUnsignedWindows: () => boolean = () => false) {
     updater.autoDownload = false
     updater.autoInstallOnAppQuit = false
     updater.autoRunAppAfterInstall = true
@@ -102,7 +106,9 @@ export class OfficialUpdateEngine implements UpdateEngine {
     if (hash.digest("base64") !== candidate.sha512) throw Error("INVALID_DIGEST")
     if (process.platform === "win32") {
       const config = JSON.parse(await readFile(join(process.resourcesPath, "app-update.yml"), "utf8"))
-      if (!config.publisherName?.length || await (this.updater as NsisUpdater).verifyUpdateCodeSignature(config.publisherName, file)) throw Error("INVALID_SIGNATURE")
+      if (config.publisherName === undefined) {
+        if (!this.allowUnsignedWindows()) throw Error("INVALID_SIGNATURE")
+      } else if (!Array.isArray(config.publisherName) || !config.publisherName.length || await (this.updater as NsisUpdater).verifyUpdateCodeSignature(config.publisherName, file)) throw Error("INVALID_SIGNATURE")
     }
     // Squirrel.Mac verifies the app's designated signing requirement before staging.
     // Download does not stage: autoInstallOnAppQuit is false in fixed 6.8.9.
@@ -118,5 +124,8 @@ export class OfficialUpdateEngine implements UpdateEngine {
       try { autoUpdater.checkForUpdates() } catch (error) { failed(error as Error) }
     })
   }
-  install(): void { this.updater.quitAndInstall(false, true) }
+  install(): void {
+    if (process.platform === "win32") process.env.DAEMONLET_OWNED_UPDATE_PID = String(process.pid)
+    this.updater.quitAndInstall(process.platform === "win32", true)
+  }
 }

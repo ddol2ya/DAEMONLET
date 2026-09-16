@@ -32,6 +32,7 @@ export type DesktopSettingsV1 = {
   adapterAutoStart: boolean
   speechBubblesEnabled: boolean
   updateAutoCheck: boolean
+  allowUnsignedWindowsUpdates: boolean
   sideChatEnabled: boolean
   taskBubblesEnabled: boolean
   bubblePlacement: BubblePlacement
@@ -69,6 +70,7 @@ export function defaultDesktopSettings(): DesktopSettingsV1 {
     taskBubblesEnabled: true,
     sideChatEnabled: true,
     updateAutoCheck: false,
+    allowUnsignedWindowsUpdates: false,
     bubblePlacement: automaticBubblePlacement(),
   }
 }
@@ -117,6 +119,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
     taskBubblesEnabled: bool(input.taskBubblesEnabled, defaults.taskBubblesEnabled),
     sideChatEnabled: bool(input.sideChatEnabled, defaults.sideChatEnabled),
     updateAutoCheck: bool(input.updateAutoCheck, false),
+    allowUnsignedWindowsUpdates: bool(input.allowUnsignedWindowsUpdates, false),
     bubblePlacement: parseBubblePlacement(input.bubblePlacement) ?? automaticBubblePlacement(),
   }
   const migrated = input.schemaVersion !== DESKTOP_SETTINGS_SCHEMA_VERSION || JSON.stringify(input) !== JSON.stringify(normalized)

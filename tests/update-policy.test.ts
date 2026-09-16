@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest"
 import { validateRelease, type UpdatePlatform } from "../electron/main/updates/ReleasePolicy"
 import { parseUpdateAction } from "../electron/shared/update-contract"
 import { BUNDLE_ID } from "../electron/shared/app-identity.mjs"
-import { normalizeDesktopSettings } from "../electron/shared/desktop-settings"
+import { normalizeDesktopSettings, validateDesktopSettingsPatch } from "../electron/shared/desktop-settings"
 const platform: UpdatePlatform = { platform: "darwin", arch: "arm64", osVersion: "26.0.0", kind: "mac", automatic: true }
 export const releaseInfo = (version = "0.10.0") => { const file = { url: "Daemonlet-for-Codex-" + version + "-macOS-arm64.zip", size: 1234567, sha512: Buffer.alloc(64, 7).toString("base64") }; return { version, tag: "v" + version, path: file.url, sha512: file.sha512, files: [file], minimumSystemVersion: "22.0.0", daemonlet: { appId: BUNDLE_ID, platform: "darwin", arch: "arm64", installType: "mac" } } }
 describe("update release boundary", () => {
@@ -17,6 +17,9 @@ describe("update release boundary", () => {
     const result = normalizeDesktopSettings({ characterId: "toki", sideChatEnabled: false, updateAutoCheck: false, language: "en", scale: 0.8, bubblePlacement: { schemaVersion: 1, mode: "relative", offsetX: -99, offsetY: 72, pivotX: 1, pivotY: 0 } }, () => true).value
     expect(result).toMatchObject({ characterId: "toki", sideChatEnabled: false, updateAutoCheck: false, language: "en", scale: 0.8, bubblePlacement: { mode: "relative", offsetX: -99 } })
     expect(normalizeDesktopSettings({ language: "en" }).value.updateAutoCheck).toBe(false)
+    expect(normalizeDesktopSettings({ language: "en" }).value.allowUnsignedWindowsUpdates).toBe(false)
+    expect(validateDesktopSettingsPatch({ allowUnsignedWindowsUpdates: true })).toBeNull()
+    expect(normalizeDesktopSettings({ allowUnsignedWindowsUpdates: true }).value.allowUnsignedWindowsUpdates).toBe(true)
   })
   it("only accepts capability IDs, never URLs, paths or commands", () => {
     expect(parseUpdateAction({ action: "check" })).toEqual({ action: "check" })

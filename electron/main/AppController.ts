@@ -1,4 +1,5 @@
 declare const __APP_QA__: boolean
+import { RELEASE_ROOT } from "./updates/ReleasePolicy"
 import { UpdateService } from "./updates/UpdateService"
 import { UpdateIpcController } from "./updates/UpdateIpcController"
 import { createOfficialUpdateEngine, detectUpdatePlatform } from "./updates/OfficialUpdater"
@@ -189,14 +190,15 @@ export class AppController {
       },
     })
     this.updates = new UpdateService({
-      version: app.getVersion(), dataRoot: app.getPath("userData"), platform: detectUpdatePlatform, engine: createOfficialUpdateEngine,
+      version: app.getVersion(), dataRoot: app.getPath("userData"), platform: () => detectUpdatePlatform(this.settings?.allowUnsignedWindowsUpdates), engine: () => createOfficialUpdateEngine(() => this.settings?.allowUnsignedWindowsUpdates ?? false),
+      setUnsignedWindowsPolicy: enabled => this.setUnsignedWindowsPolicy(enabled),
       autoCheck: () => this.settings?.updateAutoCheck ?? false,
       confirmInstall: () => this.confirmUpdateRestart(), prepareShutdown: () => this.prepareUpdateExit(),
       handoff: () => { if (this.osEnding) throw Error("OS_SHUTDOWN"); this.exitReady = true },
       resume: () => { this.updatePreparing = false; setApplicationInputLocked(false); this.rebuildTray() },
       openExternal: url => shell.openExternal(url),
       fetchLatest: async etag => {
-        const response = await net.fetch("https://api.github.com/repos/ddol2ya/DAEMONLET/releases/latest", { headers: { Accept: "application/vnd.github+json", ...(etag ? { "If-None-Match": etag } : {}) }, signal: AbortSignal.timeout(15_000) })
+        const response = await net.fetch(RELEASE_ROOT + "/latest", { headers: { Accept: "application/json", ...(etag ? { "If-None-Match": etag } : {}) }, signal: AbortSignal.timeout(15_000) })
         const info = response.status === 200 ? await response.json() as { tag_name?: string; draft?: boolean; prerelease?: boolean } : null
         if (info?.draft || info?.prerelease) throw Error("INVALID_VERSION")
         return { status: response.status, etag: response.headers.get("etag") ?? undefined, tag: info?.tag_name }
@@ -309,6 +311,22 @@ export class AppController {
   }
 
   private onSystemShutdown = () => { this.osEnding = true; this.updates.dispose() }
+
+  private async setUnsignedWindowsPolicy(enabled: boolean): Promise<boolean> {
+    if (process.platform !== "win32" || this.quitting || this.updatePreparing) return false
+    if (enabled && !this.settings.allowUnsignedWindowsUpdates) {
+      const answer = await dialog.showMessageBox(this.settingsWindow.window!, { type: "warning", title: appText("서명 없는 Windows 업데이트 허용"),
+        message: appText("발행자 서명을 확인하지 않은 설치 파일을 실행하도록 허용할까요?"),
+        detail: appText("공식 GitHub 출처·HTTPS·버전·파일 해시는 확인하지만 발행자의 신원은 보증하지 않습니다. 배포 계정이 침해되면 악성 설치 파일이 실행될 수 있습니다. 다운로드와 설치·재시작은 계속 직접 승인해야 합니다. Windows 보안 설정은 바꾸지 않습니다."),
+        buttons: [appText("취소"), appText("이 기기에서 허용")], defaultId: 0, cancelId: 0 })
+      if (answer.response !== 1 || this.quitting || this.updatePreparing) return false
+    }
+    const previous = this.settings.allowUnsignedWindowsUpdates
+    this.settings.allowUnsignedWindowsUpdates = enabled
+    try { await this.store.save(this.savedSettings()) } catch (error) { this.settings.allowUnsignedWindowsUpdates = previous; throw error }
+    this.settingsIpc.broadcastSettings(this.settings)
+    return true
+  }
 
   private async confirmUpdateRestart(): Promise<boolean> {
     if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")

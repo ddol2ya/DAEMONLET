@@ -1,0 +1,15 @@
+import { beforeEach, afterEach, expect, it, vi } from "vitest"
+import { BUNDLE_ID } from "../electron/shared/app-identity.mjs"
+const mocks = vi.hoisted(() => ({ config: {} as Record<string, unknown>, installed: true, verify: vi.fn(async () => null as string | null) }))
+vi.mock("electron", () => ({ app: { isPackaged: true }, autoUpdater: {} }))
+vi.mock("electron-updater", () => ({ MacUpdater: class {}, NsisUpdater: class { verifyUpdateCodeSignature = mocks.verify } }))
+vi.mock("node:fs/promises", () => ({ readFile: async (path: string) => { if (String(path).endsWith("daemonlet-install.json")) { if (!mocks.installed) throw Object.assign(Error("missing"), { code: "ENOENT" }); return JSON.stringify({ appId: BUNDLE_ID, kind: "nsis", scope: "currentUser" }) }; return JSON.stringify(mocks.config) }, access: async () => {}, stat: vi.fn(), statfs: vi.fn(), mkdir: vi.fn(), realpath: vi.fn(), lstat: vi.fn() }))
+import { detectUpdatePlatform } from "../electron/main/updates/OfficialUpdater"
+const originalProcess = process
+beforeEach(() => { mocks.config = {}; mocks.installed = true; mocks.verify.mockReset().mockResolvedValue(null); vi.stubGlobal("process", new Proxy(originalProcess, { get: (target, key) => key === "platform" ? "win32" : key === "arch" ? "x64" : key === "resourcesPath" ? "/review/resources" : key === "execPath" ? "/review/Daemonlet.exe" : Reflect.get(target, key) })) })
+afterEach(() => vi.unstubAllGlobals())
+it("blocks missing publisher by default, permits only explicit opt-in and labels it unverified", async () => { expect(await detectUpdatePlatform()).toMatchObject({ kind: "nsis", automatic: false, reason: "WINDOWS_PUBLISHER_REQUIRED" }); expect(await detectUpdatePlatform(true)).toMatchObject({ kind: "nsis", automatic: true, reason: "UNVERIFIED_PUBLISHER" }); expect(mocks.verify).not.toHaveBeenCalled() })
+it("never downgrades a configured publisher requirement after opt-in", async () => { mocks.config = { publisherName: ["Expected Publisher"] }; mocks.verify.mockResolvedValue("wrong publisher"); expect(await detectUpdatePlatform(true)).toMatchObject({ automatic: false, reason: "WINDOWS_PUBLISHER_REQUIRED" }); expect(mocks.verify).toHaveBeenCalledWith(["Expected Publisher"], "/review/Daemonlet.exe") })
+it("retains normal signed verification", async () => { mocks.config = { publisherName: ["Expected Publisher"] }; expect(await detectUpdatePlatform(false)).toMatchObject({ automatic: true, reason: undefined }); expect(mocks.verify).toHaveBeenCalledOnce() })
+it.each([[], [""], "Publisher"])("does not treat malformed publisher configuration as unsigned consent", async publisherName => { mocks.config = { publisherName }; expect((await detectUpdatePlatform(true)).automatic).toBe(false) })
+it("does not convert portable ZIP installs to NSIS even with consent", async () => { mocks.installed = false; expect(await detectUpdatePlatform(true)).toMatchObject({ kind: "portable", automatic: false, reason: "PORTABLE_MANUAL" }); expect(mocks.verify).not.toHaveBeenCalled() })

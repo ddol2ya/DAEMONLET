@@ -6,7 +6,7 @@ import type { UpdateAction, UpdateSnapshot } from "../../shared/update-contract"
 import { RELEASE_ROOT, validateRelease, type UpdatePlatform, type VerifiedRelease } from "./ReleasePolicy"
 import type { UpdateEngine } from "./OfficialUpdater"
 const DAY = 24 * 60 * 60 * 1000
-const publicErrors = new Set(["INVALID_METADATA", "INVALID_VERSION", "WRONG_PACKAGE", "UNSUPPORTED_OS", "INVALID_DIGEST", "INVALID_SIZE", "INVALID_SIGNATURE", "INVALID_DOWNLOAD", "PACK_BUSY", "SAVE_FAILED", "OS_SHUTDOWN"])
+const publicErrors = new Set(["INVALID_METADATA", "INVALID_VERSION", "WRONG_PACKAGE", "UNSUPPORTED_OS", "INVALID_DIGEST", "INVALID_SIZE", "INVALID_SIGNATURE", "INVALID_DOWNLOAD", "PACK_BUSY", "SAVE_FAILED", "OS_SHUTDOWN", "NETWORK", "RATE_LIMITED"])
 export class UpdateService {
   private state: UpdateSnapshot
   private listeners = new Set<(value: UpdateSnapshot) => void>()
@@ -20,8 +20,10 @@ export class UpdateService {
   private etag: string | undefined
   private cachedTag: string | undefined
   private lastManual = 0
+  private policyBusy = false
   constructor(private readonly options: {
     version: string; platform: () => Promise<UpdatePlatform>; engine: () => UpdateEngine; dataRoot: string;
+    setUnsignedWindowsPolicy?: (enabled: boolean) => Promise<boolean>;
     autoCheck: () => boolean; confirmInstall: () => Promise<boolean>;
     prepareShutdown: () => Promise<void>; handoff: () => void; resume: () => void;
     openExternal: (url: string) => Promise<void>;
@@ -44,8 +46,14 @@ export class UpdateService {
     void this.check(true)
   }
   async act(action: UpdateAction): Promise<UpdateSnapshot> {
-    if (this.disposed) return this.snapshot()
-    if (action.action === "check") await this.check(false)
+    if (this.disposed || this.policyBusy) return this.snapshot()
+    if (action.action === "setUnsignedWindowsPolicy") {
+      if (["preparing", "handoff"].includes(this.state.phase) || !this.options.setUnsignedWindowsPolicy) return this.snapshot()
+      this.policyBusy = true
+      try { if (await this.options.setUnsignedWindowsPolicy(action.enabled)) { this.generation++; this.download?.abort(); this.candidate = null; this.engine = null; this.publish({ phase: "idle", reason: undefined, candidateId: undefined, version: undefined, progress: undefined }) } }
+      finally { this.policyBusy = false }
+    }
+    else if (action.action === "check") await this.check(false)
     else if (action.action === "openRelease") await this.options.openExternal(this.candidate?.releaseUrl ?? RELEASE_ROOT + "/latest")
     else if (action.action === "cancelDownload") { if (this.download) { this.generation++; this.download.abort(); this.publish({ phase: "available", progress: undefined }) } }
     else if ("candidateId" in action && action.candidateId === this.state.candidateId && this.candidate) {
@@ -68,6 +76,7 @@ export class UpdateService {
       // Conditional public metadata request is a rate-limit/cache gate, never a second asset selector.
       if (this.options.fetchLatest) {
         const result = await this.options.fetchLatest(this.etag)
+        if (result.status === 403 || result.status === 429) throw Error("RATE_LIMITED")
         if (result.status !== 200 && result.status !== 304) throw Error("NETWORK")
         this.etag = result.etag ?? this.etag; this.cachedTag = result.tag ?? this.cachedTag
         const latest = this.cachedTag?.replace(/^v/, "")

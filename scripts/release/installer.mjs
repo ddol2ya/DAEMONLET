@@ -51,7 +51,7 @@ const appPackage = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')
 const identity = await readAsarIdentity(join(staged, 'resources/app.asar'))
 await writeFile(join(output, 'payload.json'), JSON.stringify({ source: identity.source, appVersion: identity.appVersion, checks, files }, null, 2) + '\n')
 await writeFile(join(output, 'package.json'), JSON.stringify({ name: 'daemonlet-test-installer-build', version: identity.appVersion, description: 'Daemonlet Windows test installer build tools', private: true, license: 'MIT', author: 'Daemonlet contributors', scripts: { build: 'node build.mjs' }, devDependencies: { 'electron-builder': appPackage.devDependencies['electron-builder'], 'electron-updater': appPackage.dependencies['electron-updater'] } }, null, 2) + '\n')
-await writeFile(join(output, 'installer.nsh'), `!macro customInstallMode
+await writeFile(join(output, 'installer.nsh'), (await readFile(join(root, 'scripts/release/nsis-no-force-close.nsh'), 'utf8')) + `\n!macro customInstallMode
   StrCpy $isForceCurrentInstall "1"
 !macroend
 !macro customInstall
