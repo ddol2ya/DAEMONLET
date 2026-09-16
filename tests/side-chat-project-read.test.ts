@@ -59,6 +59,11 @@ describe("explicit project excerpts without a shell", () => {
     await service.attachFile(join(f.project, "code.ts"), 1, 2, epoch)
     expect(JSON.stringify(service.snapshot())).not.toContain("second")
     expect(service.snapshot().attachments?.[0]).toMatchObject({ path: "code.ts", startLine: 1, endLine: 2 })
+    const attached = service.snapshot().attachments
+    service.setDraft("kept draft")
+    service.chooseThread("parent", "new-activity-row")
+    expect(service.snapshot()).toMatchObject({ epoch, draft: "kept draft", attachments: attached })
+    expect(send).not.toHaveBeenCalled()
     await service.send("explain")
     expect(send.mock.calls[0][0]).toContain("1: first"); expect(service.snapshot().attachments).toEqual([])
     service.reset()

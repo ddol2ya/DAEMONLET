@@ -6,6 +6,7 @@ import { connectVerifiedSideChat } from "./side-chat/SideChatPolicy"
 import { SideChatPreferences } from "./side-chat/SideChatPreferences"
 import { SideChatSetupController } from "./side-chat/SideChatSetupController"
 import { PersonaResolver } from "./side-chat/PersonaResolver"
+import { SideChatEntryController } from "./side-chat/SideChatEntryController"
 import { SideChatIpcController } from "./SideChatIpcController"
 import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
 import type { StartupWindow } from "./StartupWindow"
@@ -57,6 +58,11 @@ export class AppController {
   }, id => this.adapter.excludeSideChat(id)))
   private readonly sideChatSetup: SideChatSetupController = new SideChatSetupController(this.sideChat, new SideChatPreferences(app.getPath("userData")),
     () => this.integration.sideChatSelection(), () => this.activityBubble.window, () => this.updateSettings({ sideChatEnabled: true }))
+  private readonly chatEntry = new SideChatEntryController(this.sideChat, {
+    revealPet: async signal => { if (this.quitting) return false; this.showPet(); return this.pet.reveal(signal) },
+    focus: () => this.activityBubble.focusConversation(),
+    refreshParents: query => this.refreshChatParents(query), check: () => this.sideChatSetup.check(),
+  })
   private sideChatPage = { offset: 0, query: "", generation: 0 }
   private readonly sideChatIpc: SideChatIpcController
   private readonly personaResolver: PersonaResolver
@@ -108,9 +114,9 @@ export class AppController {
     this.activityTitles = new ActivityConversationTitles(() => readDesktopThreadCatalog(process.env.CODEX_HOME ?? join(homedir(), ".codex")), titles => this.activity.setConversationTitles(titles))
     this.activityWindow = new ActivityWindowController(preload("activity"), this.devServerUrl)
     this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"), undefined, process.platform, appLanguage)
-    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => this.sideChat.setMode("hidden"))
+    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => { this.chatEntry.cancel(); this.sideChat.setMode("hidden") })
     this.personaResolver = new PersonaResolver((selection, path) => this.characters.readPersonaAsset(selection, path))
-    this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more))
+    this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more), () => this.chatEntry.cancel())
     this.subscriptions.push(this.sideChat.subscribe(() => this.activityBubble.updateChat(this.sideChat.snapshot())))
     this.bubbleIpc = new BubblePresentationIpcController(this.activityBubble, this.devServerUrl)
     this.taskControlIpc = new TaskControlIpcController(this.activityBubble, this.taskControl, this.dictation, this.devServerUrl, Date.now, this.threadLauncher)
@@ -248,12 +254,15 @@ export class AppController {
   }
 
   showPet(): void {
+    if (this.quitting) return
+    this.onDisplaysChanged()
     this.updateSettings({ visible: true })
   }
 
   async quit(): Promise<void> {
     if (this.quitting) return
     this.quitting = true
+    this.chatEntry.cancel()
     this.startup?.close()
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = null
@@ -347,6 +356,7 @@ export class AppController {
   }
 
   private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+    if (patch.visible === false || patch.sideChatEnabled === false) { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }
     if (patch.characterId !== undefined) {
       if (!this.characters.isAvailable(patch.characterId)) throw new Error("PACK_UNAVAILABLE")
       this.unavailableSelection = null
@@ -425,17 +435,9 @@ export class AppController {
       if (generation === this.personaGeneration && this.lastReady?.id === binding.id && this.lastReady.revision === binding.revision) this.sideChat.applyPersona(binding)
     } catch { if (generation === this.personaGeneration) this.sideChat.personaFailed() }
   }
-  private chatOpenGeneration = 0
   private async openSideChat(key?: string, activityId?: string) {
-    const generation = ++this.chatOpenGeneration
     const target = key ? this.adapter.conversationTarget(key) : null
-    if (activityId && !target || target && target.threadId !== this.sideChat.parentThreadId()) this.sideChat.clearParent()
-    this.sideChat.setMode("compact")
-    const epoch = this.sideChat.snapshot().epoch
-    await this.refreshChatParents(target?.threadId)
-    if (generation !== this.chatOpenGeneration || epoch !== this.sideChat.snapshot().epoch) return
-    if (target && this.settings.sideChatEnabled) this.sideChat.chooseThread(target.threadId, activityId)
-    await this.sideChatSetup.check()
+    await this.chatEntry.open(target ? { threadId: target.threadId, activityId } : undefined, Boolean(activityId))
   }
   private async refreshChatParents(query?: string, more = false) {
     if (!this.settings.sideChatEnabled || this.quitting) return

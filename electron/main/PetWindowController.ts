@@ -26,6 +26,7 @@ export class PetWindowController {
   private clickThrough = true
   private desiredVisible = true
   private effectivePassthrough = false
+  private revealWaiters = new Set<(ready: boolean) => void>()
 
   constructor(private readonly options: PetWindowOptions) {}
 
@@ -99,6 +100,7 @@ export class PetWindowController {
     void win.loadURL(expectedRendererUrl("pet", this.options.devServerUrl)).catch((error) => this.failSafe(`Pet navigation failed: ${String(error)}`))
     this.readyTimer = setTimeout(() => {
       if (!this.ready && !win.isDestroyed()) {
+        for (const finish of [...this.revealWaiters]) finish(false)
         this.options.onWarning("Pet renderer did not report ready within 15 seconds")
         if (this.desiredVisible) win.showInactive()
       }
@@ -111,6 +113,21 @@ export class PetWindowController {
     if (this.readyTimer) clearTimeout(this.readyTimer)
     this.readyTimer = null
     if (this.desiredVisible && this.window && !this.window.isDestroyed()) this.window.showInactive()
+    for (const finish of [...this.revealWaiters]) finish(true)
+  }
+
+  async reveal(signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted || !this.desiredVisible || !this.window || this.window.isDestroyed()) return false
+    if (!this.ready) {
+      const ready = await new Promise<boolean>(resolve => {
+        const abort = () => finish(false)
+        const finish = (ready: boolean) => { this.revealWaiters.delete(finish); signal.removeEventListener("abort", abort); resolve(ready) }
+        this.revealWaiters.add(finish); signal.addEventListener("abort", abort, { once: true })
+      })
+      if (!ready || signal.aborted || !this.desiredVisible) return false
+    }
+    this.show()
+    return Boolean(this.window && !this.window.isDestroyed() && this.window.isVisible())
   }
 
   setMousePassthrough(ignore: boolean): void {
@@ -136,6 +153,7 @@ export class PetWindowController {
     if (!win || win.isDestroyed()) return
     this.clickThrough = settings.clickThrough
     this.desiredVisible = settings.visible
+    if (!settings.visible) for (const finish of [...this.revealWaiters]) finish(false)
     win.setAlwaysOnTop(settings.alwaysOnTop, "floating")
     if (process.platform === "darwin") win.setVisibleOnAllWorkspaces(settings.showOnAllWorkspaces, { visibleOnFullScreen: settings.showOverFullScreen })
     if (win.isVisible() !== settings.visible) settings.visible ? win.showInactive() : win.hide()
@@ -144,7 +162,7 @@ export class PetWindowController {
   }
 
   setBounds(bounds: Rectangle): void { this.window?.setBounds(bounds, false) }
-  show(): void { if (this.window && !this.window.isDestroyed()) { this.window.showInactive(); this.window.moveTop() } }
+  show(): void { if (this.window && !this.window.isDestroyed()) { if (this.window.isMinimized()) this.window.restore(); this.window.showInactive(); this.window.moveTop() } }
   hide(): void { this.window?.hide() }
   reload(): void { this.crashReloaded = false; this.failSafe("Pet reload requested"); this.window?.webContents.reload() }
   send(channel: string, value: unknown): void { if (this.window && !this.window.isDestroyed()) this.window.webContents.send(channel, value) }
@@ -153,6 +171,7 @@ export class PetWindowController {
   }
 
   destroy(): void {
+    for (const finish of [...this.revealWaiters]) finish(false)
     this.stopPointerBoundaryCheck()
     if (this.readyTimer) clearTimeout(this.readyTimer)
     this.readyTimer = null
@@ -175,6 +194,7 @@ export class PetWindowController {
   }
 
   private failSafe(message: string): void {
+    for (const finish of [...this.revealWaiters]) finish(false)
     this.ready = false
     this.requestedPassthrough = false
     this.effectivePassthrough = false

@@ -22,6 +22,9 @@ class FakeBrowserWindow extends EventEmitter {
   readonly setBounds = vi.fn()
   readonly destroy = vi.fn()
   visible = false
+  minimized = false
+  isMinimized() { return this.minimized }
+  readonly restore = vi.fn(() => { this.minimized = false })
   isDestroyed() { return false }
   isVisible() { return this.visible }
   getBounds() { return { x: 0, y: 0, width: 460, height: 460 } }
@@ -32,6 +35,32 @@ const cursor = vi.hoisted(() => ({ x: 200, y: 200 }))
 vi.mock("electron", () => ({ BrowserWindow: FakeBrowserWindow, screen: { getCursorScreenPoint: () => cursor } }))
 
 describe("PetWindowController visibility", () => {
+  it("waits for actual renderer readiness, restores minimized Pet and cancels pending reveal on hide", async () => {
+    const { PetWindowController } = await import("../electron/main/PetWindowController")
+    const controller = new PetWindowController({ preloadPath: "/preload.cjs", onBoundsChanged: vi.fn(), onWarning: vi.fn(), onCloseRequested: vi.fn() })
+    const settings = defaultDesktopSettings(), window = controller.create(settings) as unknown as FakeBrowserWindow
+    try {
+      const signal = new AbortController(), opening = controller.reveal(signal.signal)
+      window.minimized = true
+      expect(window.moveTop).not.toHaveBeenCalled()
+      controller.reportReady()
+      expect(await opening).toBe(true); expect(window.restore).toHaveBeenCalledOnce()
+      controller.reload()
+      const pending = controller.reveal(new AbortController().signal)
+      controller.applySettings({ ...settings, visible: false })
+      expect(await pending).toBe(false)
+      controller.reportReady(); expect(window.isVisible()).toBe(false)
+    } finally { controller.destroy() }
+  })
+  it("aborts a reveal before readiness without displaying later", async () => {
+    const { PetWindowController } = await import("../electron/main/PetWindowController")
+    const controller = new PetWindowController({ preloadPath: "/preload.cjs", onBoundsChanged: vi.fn(), onWarning: vi.fn(), onCloseRequested: vi.fn() })
+    const window = controller.create(defaultDesktopSettings()) as unknown as FakeBrowserWindow
+    const signal = new AbortController(), pending = controller.reveal(signal.signal)
+    signal.abort(); expect(await pending).toBe(false)
+    controller.reportReady(); expect(window.moveTop).not.toHaveBeenCalled()
+    controller.destroy()
+  })
   it.runIf(process.platform === "win32")("releases gaze outside the native window when DOM leave is missing, preserving drags and cleaning up", async () => {
     vi.useFakeTimers()
     const { PetWindowController } = await import("../electron/main/PetWindowController")

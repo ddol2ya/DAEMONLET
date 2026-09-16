@@ -101,7 +101,14 @@ export class SideChatService {
     this.state.task = { state: "unknown", checkedAt: null }; this.publish()
   }
   chooseThread(threadId: string, activityId?: string) {
-    if (this.parent?.threadId === threadId && (!activityId || this.parent.activityId === activityId)) return
+    if (this.parent?.threadId === threadId) {
+      if (activityId && this.parent.activityId !== activityId) {
+        this.parent.activityId = activityId
+        if (this.state.parent) this.state.parent.activityId = activityId
+        this.publish()
+      }
+      return
+    }
     const candidate = [...this.candidates].find(([, parent]) => parent.threadId === threadId)
     if (!candidate) throw Error("NO_PARENT")
     if (activityId) this.candidates.set(candidate[0], { ...candidate[1], activityId })

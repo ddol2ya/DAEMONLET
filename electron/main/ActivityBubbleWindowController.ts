@@ -31,6 +31,7 @@ export class ActivityBubbleWindowController {
   readonly presentation = new BubblePresentationCoordinator(() => this.sync())
   readonly speech: SpeechBubbleWindowController
   get petWindow(): BrowserWindow | null { return this.pet }
+  focusConversation(): void { if (this.chat && this.chat.mode !== "hidden") { this.focusChat = true; this.sync() } }
   constructor(private readonly preloadPath: string, private readonly devServerUrl?: string, private readonly onHidden: () => void = () => {}, private readonly hideChat: () => void = () => {}) {
     this.speech = new SpeechBubbleWindowController(join(dirname(preloadPath), "speech-preload.cjs"), devServerUrl)
   }
@@ -59,6 +60,7 @@ export class ActivityBubbleWindowController {
     const wasOpen = this.chat !== null && this.chat.mode !== "hidden"
     this.chat = snapshot
     const open = snapshot.mode !== "hidden"
+    if (!open) this.focusChat = false
     if (open && !wasOpen) {
       this.onHidden(); this.view = "activity"; this.collapsed = false; this.focusChat = true
       this.send(TASK_CONTROL_IPC.viewChanged, this.getView())
@@ -146,7 +148,7 @@ export class ActivityBubbleWindowController {
     this.applyWindowSettings()
     secureWebContents(win.webContents, "activity-bubble", this.devServerUrl)
     win.once("ready-to-show", () => { this.ready = true; this.sync() })
-    win.once("closed", () => { if (this.window === win) { this.window = null; this.ready = false; if (this.view === "control") this.view = "activity" } this.onHidden(); release() })
+    win.once("closed", () => { if (this.window === win) { this.window = null; this.ready = false; this.focusChat = false; if (this.view === "control") this.view = "activity" } this.hideChat(); this.onHidden(); release() })
     win.webContents.on("did-finish-load", () => {
       if (this.snapshot) this.send(ACTIVITY_IPC.changed, this.snapshot)
       if (this.chat) this.send(SIDE_CHAT_IPC.changed, this.chat)
