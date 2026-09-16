@@ -6,16 +6,16 @@ import { tmpdir } from "node:os"
 import { parseArgs } from "node:util"
 import { stringify } from "smol-toml"
 import { createHash } from "node:crypto"
-import { CHAT_MODEL_CATALOG, CHAT_LAUNCH_CONSTRAINTS, launchIsolatedChatProcess, writeChatModelCatalog } from "../../electron/main/side-chat/SideChatLaunchProfile"
+import { FIXTURE_MODEL_CATALOG, FIXTURE_CONSTRAINTS, launchFixtureParent, writeFixtureCatalog } from "./fixture-process"
 import { CodexSideChatBackend, type ChatConnection } from "../../electron/main/side-chat/SideChatBackend"
 import { compilePersona } from "../../electron/main/side-chat/PersonaCompiler"
 import { neutralPersona } from "../../electron/shared/character-persona"
-import { launchOfficialSameHomeProcess } from "../../electron/main/side-chat/OfficialSameHomeLaunchProfile"
+import { launchOfficialFixture } from "./fixture-process"
 import { inspectSideChatRuntime } from "../../electron/main/side-chat/SideChatPolicy"
-const { values } = parseArgs({ options: { officialSameHome: { type: "boolean", default: false }, tool: { type: "string" }, codex: { type: "string" }, output: { type: "string" } } })
+const { values } = parseArgs({ options: { tool: { type: "string" }, codex: { type: "string" }, output: { type: "string" } } })
 if (!values.codex || !values.output) throw Error("--codex and --output required")
-if (values.officialSameHome && (await inspectSideChatRuntime(values.codex)).runtime.kind !== "official") throw Error("Official runtime required")
-const tools = ["apply_patch", "view_image", "exec_command", "request_user_input", ...(values.officialSameHome ? ["python", "node", "build", "test", "network", "functions.exec", "js_repl", "web_search", "forbidden_parent_tool"] : [])]
+await inspectSideChatRuntime(values.codex)
+const tools = ["apply_patch", "view_image", "exec_command", "request_user_input", "python", "node", "build", "test", "network", "functions.exec", "js_repl", "web_search", "forbidden_parent_tool"]
 if (values.tool && !tools.some(name => name === values.tool)) throw Error("Unknown --tool; no controls executed")
 const report: any = { kind: "real-cli-tool-positive-negative-controls", realAccountCalls: 0, executableSha256: createHash("sha256").update(await readFile(values.codex)).digest("hex"), trials: [] }
 function pngFixture() {
@@ -67,18 +67,18 @@ for (const name of tools.filter(name => !values.tool || values.tool === name)) f
     emit("response.completed", { response: { id, status: "completed", output: [item], usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } }); res.end()
   })
   const connect = async () => {
-    const c = values.officialSameHome && restricted && armed
-      ? await launchOfficialSameHomeProcess({ executable: values.codex!, root: join(root, "official-process"), codexHome: state, osHome: join(root, "home"), disabledMcpServers: [], modelProvider: "fixture" })
-      : await launchIsolatedChatProcess({ executable: values.codex!, root, execution: { model: "gpt-5.6-luna", noEnvironment: restricted, instructions: "collaboration-mode" } })
+    const c = restricted && armed
+      ? await launchOfficialFixture({ executable: values.codex!, root: join(root, "official-process"), codexHome: state, osHome: join(root, "home"), disabledMcpServers: [] })
+      : await launchFixtureParent({ executable: values.codex!, root, execution: { model: "gpt-5.6-luna", noEnvironment: restricted, instructions: "collaboration-mode" } })
     connections.push(c); c.client.onNotification((method, params) => events.push({ method, params })); c.client.onServerRequest(r => { serverCalls++; if (!c.execution?.mode) void c.client.rejectServerRequest(r.id) }); return c
   }
   let backend: CodexSideChatBackend | null = null
   try {
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
     const port = (server.address() as { port: number }).port
-    const constraints = restricted ? CHAT_LAUNCH_CONSTRAINTS : { ...CHAT_LAUNCH_CONSTRAINTS, sandbox_mode: "workspace-write", features: { ...CHAT_LAUNCH_CONSTRAINTS.features, shell_tool: true, view_image: true }, tools: { experimental_request_user_input: { enabled: true }, update_plan: { enabled: false } } }
-    const catalog = values.officialSameHome && restricted ? null : await writeChatModelCatalog(root)
-    if (!restricted && catalog) await writeFile(catalog, JSON.stringify({ models: [{ ...CHAT_MODEL_CATALOG.models[0], shell_type: "unified_exec", apply_patch_tool_type: "freeform", input_modalities: ["text", "image"] }] }))
+    const constraints = restricted ? FIXTURE_CONSTRAINTS : { ...FIXTURE_CONSTRAINTS, sandbox_mode: "workspace-write", features: { ...FIXTURE_CONSTRAINTS.features, shell_tool: true, view_image: true }, tools: { experimental_request_user_input: { enabled: true }, update_plan: { enabled: false } } }
+    const catalog = restricted ? null : await writeFixtureCatalog(root)
+    if (!restricted && catalog) await writeFile(catalog, JSON.stringify({ models: [{ ...FIXTURE_MODEL_CATALOG.models[0], shell_type: "unified_exec", apply_patch_tool_type: "freeform", input_modalities: ["text", "image"] }] }))
     await writeFile(join(state, "config.toml"), stringify({ ...constraints, ...(catalog ? { model_catalog_json: catalog } : {}), model: "gpt-5.6-luna", model_provider: "fixture", model_providers: { fixture: { name: "OpenAI", base_url: `http://127.0.0.1:${port}/v1`, wire_api: "responses", requires_openai_auth: false } } }))
     const seed = await connect(); await seed.client.initialize({ name: "daemonlet_tool_fixture", title: "Tool fixture", version: "1" }, "side-chat")
     const { thread } = await seed.client.request("thread/start", { cwd, approvalPolicy: "never", sandbox: restricted ? "read-only" : "workspace-write", historyMode: "paginated", ...(name === "forbidden_parent_tool" ? { dynamicTools: [{ name, description: "Forbidden inherited client tool", inputSchema: { type: "object", properties: {} } }] } : {}) }) as any

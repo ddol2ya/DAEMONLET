@@ -1,14 +1,13 @@
 import { randomUUID } from "node:crypto"
 import { realpath } from "node:fs/promises"
-import { SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatSubmission, type ChatError, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
+import { CHAT_ERRORS, CHAT_PREPARATION_ERRORS, SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatSubmission, type ChatError, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
 import type { AppLanguage } from "../../shared/app-language"
 import type { PersonaBinding } from "./PersonaResolver"
 import type { ChatParent, ChatSessionClosed, SideChatBackend } from "./SideChatBackend"
 import { ProjectReadService, PROJECT_READ_LIMITS, type ProjectExcerpt } from "./ProjectReadService"
 
-import { SOURCE_ERRORS } from "../../../adapter/codex/app-server/SourceError"
 
-const errors = new Set<ChatError>([...SOURCE_ERRORS,"TURN_FAILED", "CHAT_MODEL_UNAVAILABLE", "CHAT_PROFILE_MISSING", "CHAT_RUNTIME_MISSING", "CHAT_RUNTIME_UNSUPPORTED", "CHAT_AUTH_REQUIRED", "CHAT_MANAGED_POLICY", "CHAT_EXECUTION_POLICY", "PARENT_UNSUPPORTED", "PARENT_CAPABILITIES", "CHAT_DISABLED", "CHAT_POLICY_UNENFORCEABLE", "NO_PARENT", "BUSY", "STALE_REQUEST", "INVALID_REQUEST", "INPUT_LIMIT", "HISTORY_LIMIT", "RESPONSE_INVALID", "RESPONSE_LIMIT", "REFUSED", "STOPPED", "SESSION_LOST", "OUTCOME_UNKNOWN", "PACK_PERSONA", "REQUEST_LIMITED"])
+const errors = new Set<ChatError>([...CHAT_ERRORS, ...CHAT_PREPARATION_ERRORS])
 export function chatError(error: unknown): ChatError { const code = error instanceof Error ? error.message as ChatError : "SESSION_LOST"; return errors.has(code) ? code : "SESSION_LOST" }
 errors.add("READ_ACCESS_DENIED"); errors.add("READ_LIMIT")
 
@@ -28,6 +27,7 @@ export class SideChatService {
   private readScope: Promise<ProjectReadService> | null = null
   constructor(private readonly createBackend: (parent: ChatParent) => SideChatBackend) {}
   snapshot(): SideChatSnapshot { return structuredClone(this.state) }
+  setPreparation(value: Pick<SideChatSnapshot, "readiness" | "consentRequired" | "offNotice" | "hasMoreParents" | "parentQuery">) { Object.assign(this.state, value); this.publish() }
   setConnectionMode(mode: SideChatSnapshot["connectionMode"]) {
     if (this.state.connectionMode !== mode) { this.resetConversation(null); this.state.connectionMode = mode }
     this.publish()
@@ -59,6 +59,11 @@ export class SideChatService {
     this.publish()
   }
   detachFiles() { this.excerpts = []; this.state.attachments = []; this.publish() }
+  removeAttachment(index: number) {
+    if (this.state.applying || ["answering", "preparing"].includes(this.state.phase)) throw Error("BUSY")
+    if (!Number.isSafeInteger(index) || index < 0 || index >= this.excerpts.length) throw Error("INVALID_REQUEST")
+    this.excerpts.splice(index, 1); this.state.attachments = this.excerpts.map(({ text: _, ...metadata }) => metadata); this.publish()
+  }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private publish() { for (const listener of this.listeners) listener() }
   configure(enabled: boolean, language: AppLanguage) {
@@ -83,7 +88,7 @@ export class SideChatService {
   setCandidates(parents: ChatParent[], preferredThreadId?: string) {
     const previous = this.candidates
     this.candidates = new Map(parents.slice(0, 64).map(parent => [([...previous].find(([, p]) => p.threadId === parent.threadId)?.[0] ?? randomUUID()), { ...parent }]))
-    this.state.candidates = [...this.candidates].map(([handle, p]) => ({ handle, title: p.title, ...(p.source ? { source: p.source } : {}) }))
+    this.state.candidates = [...this.candidates].map(([handle, p]) => ({ handle, title: p.title }))
     if (!this.parent && preferredThreadId) { const candidate = [...this.candidates].find(([, p]) => p.threadId === preferredThreadId); if (candidate) this.chooseParent(candidate[0]) }
     this.publish()
   }
@@ -97,7 +102,7 @@ export class SideChatService {
     if (!parent) throw new Error("NO_PARENT")
     this.resetConversation("parent"); this.state.task = { state: "unknown", checkedAt: null }; this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null }; this.publish()
   }
-  setMode(mode: SideChatSnapshot["mode"]) { if (mode !== "hidden" && !this.state.enabled) throw new Error("CHAT_DISABLED"); this.state.mode = mode; this.publish() }
+  setMode(mode: SideChatSnapshot["mode"]) { this.state.mode = mode; this.publish() }
   setDraft(text: string, revision = this.state.draftRevision + 1) {
     if (!this.state.enabled) throw new Error("CHAT_DISABLED")
     if (!validChatInput(text, true)) throw new Error("INPUT_LIMIT")

@@ -1,7 +1,6 @@
 import { EventEmitter, once } from "node:events"
 import type { Readable, Writable } from "node:stream"
 
-import { safeSourceError } from "./SourceError"
 
 type JsonObject = Record<string, unknown>
 
@@ -94,7 +93,7 @@ export class AppServerJsonlClient {
       if (!pending) return
       clearTimeout(pending.timer)
       this.pending.delete(message.id)
-      if (Object.hasOwn(message, "error")) pending.reject(new Error(pending.method === "thread/fork" ? safeSourceError((message.error as JsonObject)?.message) ?? "app-server request failed" : "app-server request failed"))
+      if (Object.hasOwn(message, "error")) pending.reject(new Error("app-server request failed"))
       else pending.resolve(message.result)
       return
     }

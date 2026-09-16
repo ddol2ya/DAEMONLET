@@ -13,7 +13,7 @@ function deferred<T = any>() {
 }
 const flush = async () => { for (let n = 0; n < 8; n++) await Promise.resolve() }
 function fixture(manual = false, official = false) {
-  const cwd = official ? process.cwd() : "/synthetic"
+  const cwd = process.cwd()
   let turnSequence = 0
   const starts: ReturnType<typeof deferred>[] = [], interrupts: ReturnType<typeof deferred>[] = []
   let notification: (method: string, params: unknown) => void = () => {}, closed = () => {}, request: (v: Record<string, unknown>) => void = () => {}

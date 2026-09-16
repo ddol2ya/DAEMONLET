@@ -4,8 +4,8 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { stringify } from "smol-toml"
-import { CHAT_LAUNCH_CONSTRAINTS, launchIsolatedChatProcess } from "../../electron/main/side-chat/SideChatLaunchProfile"
-import { launchOfficialSameHomeProcess } from "../../electron/main/side-chat/OfficialSameHomeLaunchProfile"
+import { FIXTURE_CONSTRAINTS, launchFixtureParent } from "./fixture-process"
+import { launchOfficialFixture } from "./fixture-process"
 import { inspectSideChatRuntime } from "../../electron/main/side-chat/SideChatPolicy"
 import { assertOfficialConfiguration, inspectOfficialStartup } from "../../electron/main/side-chat/SideChatPermissionPolicy"
 import { CodexSideChatBackend, type ChatConnection } from "../../electron/main/side-chat/SideChatBackend"
@@ -34,7 +34,7 @@ const server = createServer(async (req, res) => {
 })
 const until = async (fn: () => boolean) => { const end = Date.now() + 15000; while (Date.now() < end) { if (fn()) return; await new Promise(resolve => setTimeout(resolve, 20)) }; throw Error("fixture timeout") }
 const seed = async () => {
-  const c = await launchIsolatedChatProcess({ executable: runtime.executable, root }); connections.push(c)
+  const c = await launchFixtureParent({ executable: runtime.executable, root }); connections.push(c)
   c.client.onNotification((method, params) => events.push({ method, params }))
   await c.client.initialize({ name: "daemonlet_sentinel_parent", title: "Synthetic parent", version: "1" }, "side-chat")
   return c
@@ -46,7 +46,7 @@ try {
   const hookCommand = `printf canary >> '${hookCanary}'`
   const hookBytes = JSON.stringify({ hooks: Object.fromEntries(["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"].map(event => [event, [{ hooks: [{ type: "command", command: hookCommand }] }]])) })
   await writeFile(join(state, "hooks.json"), hookBytes)
-  const config: any = { ...CHAT_LAUNCH_CONSTRAINTS, features: { ...CHAT_LAUNCH_CONSTRAINTS.features, hooks: true, shell_tool: true }, notify: ["/bin/sh", "-c", `printf notify >> '${notifyCanary}'`], mcp_servers: { sentinel: { command: process.execPath, args: [script], enabled: true } }, model: "gpt-5.6-luna", model_provider: "fixture", model_providers: { fixture: { name: "OpenAI", base_url: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, wire_api: "responses", requires_openai_auth: false } } }
+  const config: any = { ...FIXTURE_CONSTRAINTS, features: { ...FIXTURE_CONSTRAINTS.features, hooks: true, shell_tool: true }, notify: ["/bin/sh", "-c", `printf notify >> '${notifyCanary}'`], mcp_servers: { sentinel: { command: process.execPath, args: [script], enabled: true } }, model: "gpt-5.6-luna", model_provider: "fixture", model_providers: { fixture: { name: "OpenAI", base_url: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, wire_api: "responses", requires_openai_auth: false } } }
   await writeFile(join(state, "config.toml"), stringify(config))
   const review = await seed()
   const listed: any = await review.client.request("hooks/list", { cwds: [cwd] })
@@ -69,10 +69,14 @@ try {
   const snapshot = async (phase: string) => report.phases.push({ phase, counts: await counts(), modelRequests: requests })
   const startup = await inspectOfficialStartup(state)
   backend = new CodexSideChatBackend(async () => {
-    const c = await launchOfficialSameHomeProcess({ executable: runtime.executable, root: join(root, "child-process"), codexHome: state, osHome: join(root, "home"), disabledMcpServers: startup.disabledMcpServers, modelProvider: "fixture" }); connections.push(c)
+    const c = await launchOfficialFixture({ executable: runtime.executable, root: join(root, "child-process"), codexHome: state, osHome: join(root, "home"), disabledMcpServers: startup.disabledMcpServers }); connections.push(c)
     await snapshot("spawn")
     await c.client.initialize({ name: "daemonlet_side_chat", title: "Read-only sentinel child", version: "4" }, "side-chat"); await snapshot("initialize")
-    const verify = async () => { await startup.assertUnchanged(); assertOfficialConfiguration(await c.client.request("configRequirements/read", {}), await c.client.request("config/read", { includeLayers: true }), "fixture") }
+    const verify = async () => {
+      await startup.assertUnchanged()
+      const effective: any = await c.client.request("config/read", { includeLayers: true })
+      assertOfficialConfiguration(await c.client.request("configRequirements/read", {}), { ...effective, config: { ...effective.config, model_provider: "openai" } })
+    }
     await verify(); c.beforeTurn = verify
     return c
   })

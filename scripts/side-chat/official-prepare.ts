@@ -17,9 +17,10 @@ const report: any = { kind: "existing-selected-parent-official-preparation", run
 let connection: ChatConnection | null = null, backend: CodexSideChatBackend | null = null
 try {
   connection = await connectVerifiedSideChat({ executable: runtime.executable, codexHome: values.home })
+  report.accountBinding = connection.authentication
   const client = connection.client, request = client.request.bind(client)
   client.request = async (method, params, timeout) => {
-    if (!["configRequirements/read", "config/read", "account/read", "thread/read", "thread/turns/list", "thread/fork"].includes(method)) throw Error("Preparation forbids model/control calls")
+    if (!["configRequirements/read", "config/read", "account/read", "account/rateLimits/read", "model/list", "thread/read", "thread/turns/list", "thread/fork"].includes(method)) throw Error("Preparation forbids model/control calls")
     report.calls[method] = (report.calls[method] ?? 0) + 1
     return request(method, params, timeout)
   }

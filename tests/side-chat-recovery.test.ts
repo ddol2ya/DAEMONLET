@@ -5,6 +5,12 @@ import { CodexSideChatBackend, type ChatConnection } from "../electron/main/side
 import { compilePersona } from "../electron/main/side-chat/PersonaCompiler"
 import { neutralPersona } from "../electron/shared/character-persona"
 import type { AppServerJsonlClient } from "../adapter/codex/app-server/AppServerJsonlClient"
+// These tests control RPC timing. Real filesystem authority is covered by the
+// official-parent and ProjectReadService suites; do not race a synthetic reply
+// against an unrelated filesystem callback here.
+vi.mock("node:fs/promises", async importOriginal => ({
+  ...await importOriginal<typeof import("node:fs/promises")>(), realpath: async (value: string) => value,
+}))
 const tick = () => new Promise(resolve => setImmediate(resolve))
 const services: SideChatService[] = []
 afterEach(async () => { await Promise.all(services.splice(0).map(service => service.dispose())) })
@@ -19,12 +25,14 @@ function fixture() {
       onServerRequest: (fn: typeof serverRequest) => { serverRequest = fn; return () => {} }, onClose: (fn: () => void) => { closed = fn; return () => {} },
       rejectServerRequest: vi.fn(async () => {}), respondToServerRequest: vi.fn(async () => {}),
       request: vi.fn(async (method: string, params: any) => {
+        if (method === "thread/read") return { thread: { id: "parent", ephemeral: false, cwd: process.cwd(), updatedAt: 1 } }
+        if (method === "thread/turns/list") return { data: [{ id: "base", status: "completed", completedAt: 1 }] }
         if (method === "thread/fork") return { thread: { id, ephemeral: true } }
         if (method === "turn/start") { const id = `turn-${++turn}`; notify("turn/started", { threadId: params.threadId, turn: { id } }); return { turn: { id } } }
         return {}
       }),
     }
-    const connection: ChatConnection = { client: client as unknown as AppServerJsonlClient, stop, parentContext: async () => ({ path: "/synthetic", lastTurnId: "base", contextAt: 123 }), refreshAuth: async () => { throw Error("CHAT_AUTH_REQUIRED") } }
+    const connection: ChatConnection = { client: client as unknown as AppServerJsonlClient, stop }
     const backend = new CodexSideChatBackend(async () => { if (!authenticated) throw Error("CHAT_AUTH_REQUIRED"); return connection })
     const lifetime = vi.spyOn(backend, "onSessionClosed")
     const emit = (method: string, item: unknown) => notify(method, { threadId: id, turnId: `turn-${turn}`, item })
@@ -33,12 +41,12 @@ function fixture() {
       emit("item/started", item); emit("item/completed", item)
       notify("turn/completed", { threadId: id, turn: { id: `turn-${turn}`, status: "completed", items: [] } })
     }
-    return { backend, client, connection, lifetime, stop, emit, final, disconnect: () => closed(), requestRefresh: () => serverRequest({ id: 42, method: "account/chatgptAuthTokens/refresh" }) }
+    return { backend, client, connection, lifetime, stop, emit, final, disconnect: () => closed(), requestRefresh: () => notify("account/updated", {}) }
   }
   const factory = vi.fn(() => { const next = instance(); instances.push(next); return next.backend })
   const service = new SideChatService(factory); services.push(service)
   service.configure(true, "ko"); service.applyPersona({ id: "gpichan", revision: "builtin", label: "지피쨩", compiled: compilePersona("지피쨩", neutralPersona(), "ko") })
-  service.setCandidates([{ threadId: "parent", title: "Synthetic", cwd: "/synthetic" }], "parent")
+  service.setCandidates([{ threadId: "parent", title: "Synthetic", cwd: process.cwd() }], "parent")
   return { service, factory, instances, auth: (value: boolean) => { authenticated = value } }
 }
 describe("closed child recovery through the production service/backend/collector", () => {
@@ -60,7 +68,7 @@ describe("closed child recovery through the production service/backend/collector
   })
   it.each(["auth", "count", "bytes", "malformed"])("invalidates a closed child after %s without accepting or consuming the next draft", async failure => {
     const f = fixture(), first = f.service.send("첫 질문"); await tick(); const old = f.instances[0]
-    const code = failure === "auth" ? "CHAT_AUTH_REQUIRED" : failure === "malformed" ? "RESPONSE_INVALID" : "RESPONSE_LIMIT"
+    const code = failure === "auth" ? "CHAT_ACCOUNT_CHANGED" : failure === "malformed" ? "RESPONSE_INVALID" : "RESPONSE_LIMIT"
     if (failure === "auth") old.requestRefresh()
     else if (failure === "count") for (let n = 0; n < 65; n++) old.emit("item/started", { id: String(n), type: "agentMessage" })
     else { old.emit("item/started", { id: "bad", type: "agentMessage" }); old.emit("item/completed", { id: "bad", type: "agentMessage", text: failure === "bytes" ? "x".repeat(65536 * 6 + 1) : 123 }) }
@@ -116,11 +124,12 @@ describe("closed child recovery through the production service/backend/collector
     expect(old.client.request.mock.calls.filter(([m]) => m === "turn/start")).toHaveLength(1)
   })
   it("ignores delayed auth failure after explicit reset and a new child starts", async () => {
-    const f = fixture(), first = f.service.send("first"); await tick(); const old = f.instances[0]
+    const f = fixture(), first = f.service.send("first"); await tick(); const old = f.instances[0]; old.final(); await first
     let fail!: (error: Error) => void
-    old.connection.refreshAuth = () => new Promise((_yes, no) => { fail = no })
-    old.requestRefresh(); f.service.reset(); await first
+    old.connection.beforeTurn = () => new Promise((_yes, no) => { fail = no })
+    const preparing = f.service.send("old draft"); await tick(); f.service.reset()
     const next = f.service.send("new child"); await tick(); fail(Error("CHAT_AUTH_REQUIRED")); await tick()
+    await preparing
     expect(f.service.snapshot()).toMatchObject({ phase: "answering", error: null, requiresNewConversation: false })
     expect(f.instances[1].stop).not.toHaveBeenCalled(); f.instances[1].final(); await next
   })

@@ -1,13 +1,13 @@
-import { spawn } from "node:child_process"
 import { mkdir, realpath } from "node:fs/promises"
 import { join } from "node:path"
-import { AppServerJsonlClient } from "../../../adapter/codex/app-server/AppServerJsonlClient"
+import { startChatProcess } from "./ChatProcess"
+import { SIDE_CHAT_MODEL } from "./SideChatModelPolicy"
 import type { ChatConnection } from "./SideChatBackend"
 
 /** Pinned official 0.154.0 controls, applied before initialize. No user config
  * writes, external auth-token injection, custom catalog, or alternate home. */
 export const OFFICIAL_CHAT_OVERRIDES: Record<string, unknown> = {
-  model: "gpt-5.6-luna", model_provider: "openai", model_reasoning_effort: "low",
+  model: SIDE_CHAT_MODEL.id, model_provider: "openai", model_reasoning_effort: SIDE_CHAT_MODEL.effort,
   approval_policy: "never", sandbox_mode: "read-only", default_permissions: ":read-only",
   web_search: "disabled", notify: [], "history.persistence": "none",
   "features.shell_tool": false, "features.shell_snapshot": false,
@@ -32,38 +32,20 @@ export type OfficialLaunchOptions = {
   executable: string; codexHome: string; osHome: string; root: string
   /** Trusted Main preflight additions, never renderer/model/pack arguments. */
   disabledMcpServers: string[]
-  /** Lower-level fixture DI only. Production admission always uses openai. */
-  modelProvider?: "fixture"
 }
 export async function launchOfficialSameHomeProcess(options: OfficialLaunchOptions): Promise<ChatConnection> {
   const cwd = join(options.root, "work"), temp = join(options.root, "tmp")
   await mkdir(cwd, { recursive: true, mode: 0o700 }); await mkdir(temp, { recursive: true, mode: 0o700 })
   const codexHome = await realpath(options.codexHome), osHome = await realpath(options.osHome)
-  const overrides: Record<string, unknown> = { ...OFFICIAL_CHAT_OVERRIDES, ...(options.modelProvider ? { model_provider: options.modelProvider } : {}) }
+  const overrides: Record<string, unknown> = { ...OFFICIAL_CHAT_OVERRIDES }
   for (const name of options.disabledMcpServers) {
     if (!/^[a-zA-Z0-9_-]{1,100}$/.test(name)) throw Error("CHAT_EXECUTION_POLICY")
     overrides[`mcp_servers.${name}.enabled`] = false
   }
   const args = Object.entries(overrides).flatMap(([key, value]) => ["-c", `${key}=${JSON.stringify(value)}`])
-  const processHandle = spawn(options.executable, [...args, "app-server", "--listen", "stdio://"], {
-    cwd, stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
-    env: { HOME: osHome, USERPROFILE: osHome, CODEX_HOME: codexHome,
-      PATH: "/usr/bin:/bin:/usr/sbin:/sbin", TMPDIR: temp, TMP: temp, TEMP: temp },
+  const process = startChatProcess(options.executable, [...args, "app-server", "--listen", "stdio://"], cwd, {
+    HOME: osHome, USERPROFILE: osHome, CODEX_HOME: codexHome,
+    PATH: "/usr/bin:/bin:/usr/sbin:/sbin", TMPDIR: temp, TMP: temp, TEMP: temp,
   })
-  processHandle.stderr.resume()
-  const client = new AppServerJsonlClient({ readable: processHandle.stdout, writable: processHandle.stdin })
-  processHandle.once("error", () => client.close(new Error("SESSION_LOST")))
-  let ended = false, stopping: Promise<void> | null = null
-  processHandle.once("close", () => { ended = true; client.close(new Error("SESSION_LOST")) })
-  return {
-    execution: { mode: "official-same-home", cwd, model: "gpt-5.6-luna", instructions: "collaboration-mode", noEnvironment: true },
-    client,
-    stop: () => stopping ??= new Promise<void>(resolve => {
-      client.close()
-      if (ended || !processHandle.pid || processHandle.exitCode !== null || processHandle.signalCode !== null) { resolve(); return }
-      const timer = setTimeout(() => processHandle.kill("SIGKILL"), 2000)
-      processHandle.once("close", () => { clearTimeout(timer); resolve() })
-      processHandle.kill("SIGTERM")
-    }),
-  }
+  return { ...process, execution: { mode: "official-same-home", cwd, model: SIDE_CHAT_MODEL.id, instructions: "collaboration-mode", noEnvironment: true } }
 }

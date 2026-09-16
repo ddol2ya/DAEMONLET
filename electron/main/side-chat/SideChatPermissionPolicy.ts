@@ -16,9 +16,13 @@ export async function inspectOfficialStartup(codexHome: string) {
   const home = await realpath(codexHome)
   const profiles = (await readdir(home)).filter(name => name.endsWith(".config.toml"))
   if (profiles.length > 32) throw Error("CHAT_EXECUTION_POLICY")
-  const paths = ["/etc/codex/config.toml", "/etc/codex/managed_config.toml", join(home, "managed_config.toml"), join(home, "config.toml"), ...profiles.map(name => join(home, name))]
+  const paths = ["/etc/codex/config.toml", "/etc/codex/managed_config.toml", "/etc/codex/requirements.toml", join(home, "managed_config.toml"), join(home, "config.toml"), ...profiles.map(name => join(home, name))]
   const fingerprints = new Map<string, string>(), servers = new Set<string>()
   const inspect = (config: any) => {
+    // Codex can log out a mismatched account while applying forced-login rules.
+    // Do not start such a profile until an audited non-mutating admission exists.
+    if (config.forced_login_method != null || config.forced_chatgpt_workspace_id != null) throw Error("CHAT_MANAGED_POLICY")
+    if (config.model_providers?.openai != null) throw Error("CHAT_EXECUTION_POLICY")
     if (unsafeEndpoint(config.openai_base_url, "https://api.openai.com/v1") || unsafeEndpoint(config.chatgpt_base_url, "https://chatgpt.com/backend-api") || config.model_catalog_json || config.model_instructions_file) throw Error("CHAT_EXECUTION_POLICY")
     for (const name of Object.keys(config.mcp_servers ?? {})) {
       if (!/^[a-zA-Z0-9_-]{1,100}$/.test(name) || servers.size >= 128) throw Error("CHAT_EXECUTION_POLICY")
@@ -36,7 +40,7 @@ export async function inspectOfficialStartup(codexHome: string) {
   }
   for (const path of paths) {
     const value = await fingerprint(path)
-    if (path.endsWith("/managed_config.toml") && value.hash !== "absent") throw Error("CHAT_MANAGED_POLICY")
+    if ((path.endsWith("/managed_config.toml") || path.endsWith("/requirements.toml")) && value.hash !== "absent") throw Error("CHAT_MANAGED_POLICY")
     fingerprints.set(path, value.hash); inspect(value.config)
   }
   return {
@@ -49,21 +53,21 @@ export async function inspectOfficialStartup(codexHome: string) {
 }
 
 /** Native effective values, including CLI layer gates omitted from typed tools.
- * This is separate from the legacy isolated-home admission; its rules remain. */
-export function assertOfficialConfiguration(requirements: any, effective: any, provider = "openai") {
+ * All execution gates must match the reviewed official profile. */
+export function assertOfficialConfiguration(requirements: any, effective: any) {
   if (requirements?.requirements !== null) throw Error("CHAT_MANAGED_POLICY")
   const config = effective?.config
   if (!config || !Array.isArray(effective.layers)) throw Error("CHAT_EXECUTION_POLICY")
-  if (config.cli_auth_credentials_store != null && config.cli_auth_credentials_store !== "file") throw Error("CHAT_AUTH_REQUIRED")
+  if (config.cli_auth_credentials_store != null && !["file", "keyring", "auto", "ephemeral"].includes(config.cli_auth_credentials_store)) throw Error("CHAT_AUTH_UNAVAILABLE")
   const active = effective.layers.filter((layer: any) => !layer.disabledReason)
   if (active.some((l: any) => !["user", "system", "sessionFlags", "packagedDefaults"].includes(l.name?.type))) throw Error("CHAT_MANAGED_POLICY")
   const flags = active.find((l: any) => l.name?.type === "sessionFlags")?.config
   const mismatches: string[] = []
   for (const [key, expected] of Object.entries(OFFICIAL_CHAT_OVERRIDES)) {
     const actual = get(config, key) ?? get(flags, key)
-    if (JSON.stringify(actual) !== JSON.stringify(key === "model_provider" ? provider : expected)) mismatches.push(key)
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) mismatches.push(key)
   }
   if (Object.values(config.mcp_servers ?? {}).some((s: any) => s.enabled !== false)) mismatches.push("mcp_servers")
-  if (config.model_catalog_json || config.model_instructions_file || unsafeEndpoint(config.openai_base_url, "https://api.openai.com/v1") || unsafeEndpoint(config.chatgpt_base_url, "https://chatgpt.com/backend-api")) mismatches.push("provider/instructions")
+  if (config.model_providers?.openai != null || config.model_catalog_json || config.model_instructions_file || unsafeEndpoint(config.openai_base_url, "https://api.openai.com/v1") || unsafeEndpoint(config.chatgpt_base_url, "https://chatgpt.com/backend-api")) mismatches.push("provider/instructions")
   if (mismatches.length) throw Object.assign(Error("CHAT_EXECUTION_POLICY"), { mismatches })
 }

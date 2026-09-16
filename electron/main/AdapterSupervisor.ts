@@ -301,7 +301,7 @@ export class AdapterSupervisor {
   }
 
   crashOwnedWorkerForSmokeTest(): boolean {
-    if (process.env.ELECTRON_SMOKE_TEST !== "1" || this.diagnostics.adapterOwnership !== "OWNED_UTILITY") return false
+    if (typeof __APP_QA__ !== "undefined" && !__APP_QA__ || process.env.ELECTRON_SMOKE_TEST !== "1" || this.diagnostics.adapterOwnership !== "OWNED_UTILITY") return false
     const pid = this.child?.pid
     if (!pid) return false
     try {

@@ -1,13 +1,12 @@
-import { SIDE_CHAT_OUTPUT_SCHEMA, type ChatResponse, type ChatSourceReadiness } from "../../shared/side-chat-contract"
-import type { ChatAuthTokens } from "./SideChatAuth"
-import type { ChatParentContext } from "./SideChatParent"
-import { validateSourceSnapshot, type ChatParentSource } from "./SideChatSource"
+import { SIDE_CHAT_OUTPUT_SCHEMA, type ChatResponse } from "../../shared/side-chat-contract"
 import { SideChatItemCollector } from "./SideChatItemCollector"
 import type { CompiledPersona } from "./PersonaCompiler"
 import type { AppServerJsonlClient } from "../../../adapter/codex/app-server/AppServerJsonlClient"
 import { resolveOfficialParent } from "./OfficialParentResolver"
+import { officialTurnError } from "./SideChatErrors"
+import { SIDE_CHAT_MODEL } from "./SideChatModelPolicy"
 
-export type ChatParent = { threadId: string; title: string; cwd: string; path?: string; sourceHome?: string; source?: ChatSourceReadiness }
+export type ChatParent = { threadId: string; title: string; cwd: string; sourceHome?: string }
 export type ForkContext = { threadId: string; lastTurnId: string; contextAt: number }
 export type ChatSessionClosed = { error: Error; hadSession: boolean }
 export interface SideChatBackend {
@@ -19,8 +18,8 @@ export interface SideChatBackend {
   stop(): Promise<void>
   close(): Promise<void>
 }
-export type ChatExecutionProfile = { mode?: "official-same-home"; cwd: string; model: string; instructions: "fork" | "collaboration-mode"; noEnvironment: boolean }
-export type ChatConnection = { beforeTurn?: () => Promise<void>; refreshAuth?: () => Promise<ChatAuthTokens>; parentContext?: (parent: ChatParent) => Promise<ChatParentSource>; execution?: ChatExecutionProfile; client: AppServerJsonlClient; stop(): Promise<void> }
+export type ChatExecutionProfile = { mode?: "official-same-home"; cwd: string; model: string; instructions: "collaboration-mode"; noEnvironment: boolean }
+export type ChatConnection = { authentication?: { storage: string; binding: "protocol" | "file" }; beforeTurn?: () => Promise<void>; execution?: ChatExecutionProfile; client: AppServerJsonlClient; stop(): Promise<void> }
 type ActiveSend = {
   deniedRequests: number
   generation: number; connection: ChatConnection; child: string; turnId: string | null
@@ -63,14 +62,6 @@ export class CodexSideChatBackend implements SideChatBackend {
     }))
     this.cleanup.push(client.onServerRequest(request => {
       if (!current()) return
-      if (request.method === "account/chatgptAuthTokens/refresh" && connection.refreshAuth) {
-        void connection.refreshAuth().then(tokens => { if (current()) return client.respondToServerRequest(request.id, tokens) }).catch(() => {
-          if (!current()) return
-          void client.rejectServerRequest(request.id).catch(() => {})
-          void this.close("CHAT_AUTH_REQUIRED")
-        })
-        return
-      }
       if (connection.execution?.mode === "official-same-home") {
         const p = object(request.params), active = this.active
         if (typeof p.threadId === "string" && (p.threadId !== this.child || !active || p.turnId !== active.turnId)) {
@@ -100,29 +91,16 @@ export class CodexSideChatBackend implements SideChatBackend {
     this.cleanup.push(client.onNotification((method, params) => { if (current()) this.notification(method, params) }))
     if (client.handshakeState !== "READY") await client.initialize({ name: "daemonlet_side_chat", title: "Daemonlet side chat", version: "1" }, "side-chat")
     if (!current()) throw new Error("SESSION_LOST")
-    let context: ChatParentSource | (Omit<ChatParentContext, "path"> & { path?: string })
-    if (connection.execution?.mode === "official-same-home") context = await resolveOfficialParent(client, parent)
-    else if (connection.parentContext) context = await connection.parentContext(parent)
-    else {
-      const metadata = object(object(await client.request("thread/read", { threadId: parent.threadId, includeTurns: false })).thread)
-      if (!current()) throw new Error("SESSION_LOST")
-      const page = object(await client.request("thread/turns/list", { threadId: parent.threadId, limit: 100, sortDirection: "desc" }))
-      if (!current()) throw new Error("SESSION_LOST")
-      const turns = Array.isArray(page.data) ? page.data : []
-      const last = turns.map(object).find(t => typeof t.id === "string" && t.status === "completed")
-      if (!last) throw new Error("NO_PARENT")
-      context = { lastTurnId: last.id, contextAt: typeof last.completedAt === "number" ? last.completedAt * 1000 : typeof metadata.updatedAt === "number" ? metadata.updatedAt * 1000 : Date.now() }
-    }
+    const context = await resolveOfficialParent(client, parent)
     if (!current()) throw new Error("SESSION_LOST")
     await connection.beforeTurn?.()
     if (!current()) throw new Error("SESSION_LOST")
     const official = connection.execution?.mode === "official-same-home"
-    const result = object(await client.request("thread/fork", { threadId: parent.threadId, ...(context.path ? { path: context.path } : {}), ...(connection.execution ? { model: connection.execution.model } : {}), ...("readOnlySource" in context ? { readOnlySource: context.readOnlySource } : { lastTurnId: context.lastTurnId }), ...(official ? { runtimeWorkspaceRoots: [] } : {}), ephemeral: true, excludeTurns: true, cwd: connection.execution?.cwd ?? parent.cwd, approvalPolicy: "never", sandbox: "read-only", developerInstructions: persona.developerInstructions }))
+    const result = object(await client.request("thread/fork", { threadId: parent.threadId, ...(connection.execution ? { model: connection.execution.model } : {}), lastTurnId: context.lastTurnId, ...(official ? { runtimeWorkspaceRoots: [] } : {}), ephemeral: true, excludeTurns: true, cwd: connection.execution?.cwd ?? parent.cwd, approvalPolicy: "never", sandbox: "read-only", developerInstructions: persona.developerInstructions }))
     const child = object(result.thread)
     if (generation !== this.generation) throw new Error("SESSION_LOST")
     if (typeof child.id !== "string" || child.id === parent.threadId || child.ephemeral !== true) throw new Error("CHAT_POLICY_UNENFORCEABLE")
     if (official && (result.approvalPolicy !== "never" || result.sandbox?.type !== "readOnly" || result.model !== connection.execution?.model)) throw Error("CHAT_POLICY_UNENFORCEABLE")
-    if ("readOnlySource" in context) context = validateSourceSnapshot(result.sourceSnapshot, context)
     this.child = child.id; await this.owned(child.id)
     if (!current()) throw new Error("SESSION_LOST")
     return { threadId: child.id, lastTurnId: context.lastTurnId, contextAt: context.contextAt }
@@ -159,8 +137,8 @@ export class CodexSideChatBackend implements SideChatBackend {
     // Notifications may finish A before its RPC response. Every continuation still owns only A.
     const execution = connection.execution
     const policy = execution ? { ...(execution.noEnvironment ? { environments: [] } : {}),
-      ...(execution.mode === "official-same-home" ? { approvalPolicy: "never", sandboxPolicy: { type: "readOnly" }, runtimeWorkspaceRoots: [], effort: "low" } : {}),
-      ...(execution.instructions === "collaboration-mode" ? { collaborationMode: { mode: "default", settings: { model: execution.model, reasoning_effort: execution.mode ? "low" : null, developer_instructions: this.persona.developerInstructions } } } : {}) } : {}
+      ...(execution.mode === "official-same-home" ? { approvalPolicy: "never", sandboxPolicy: { type: "readOnly" }, runtimeWorkspaceRoots: [], effort: SIDE_CHAT_MODEL.effort } : {}),
+      ...(execution.instructions === "collaboration-mode" ? { collaborationMode: { mode: "default", settings: { model: execution.model, reasoning_effort: execution.mode ? SIDE_CHAT_MODEL.effort : null, developer_instructions: this.persona.developerInstructions } } } : {}) } : {}
     void connection.client.request("turn/start", { ...policy, threadId: child, input: [{ type: "text", text: `${this.persona.profileInput}\n\nApp-observed parent status (not history): ${JSON.stringify(observation ?? { state: "unknown", checkedAt: null })}\n\nUser message:\n${text}`, text_elements: [] }], outputSchema: SIDE_CHAT_OUTPUT_SCHEMA }).then(value => {
       if (!this.owns(request)) return
       const turn = object(object(value).turn)
@@ -170,6 +148,9 @@ export class CodexSideChatBackend implements SideChatBackend {
     return result
   }
   private notification(method: string, value: unknown) {
+    // Native credentials stay in Codex. A credential change invalidates the child
+    // even if the visible email is unchanged (workspace/account switches).
+    if (method === "account/updated") { void this.close("CHAT_ACCOUNT_CHANGED"); return }
     const p = object(value), turn = object(p.turn), request = this.active
     if (p.threadId !== this.child) return
     if (method === "thread/closed") {
@@ -185,7 +166,12 @@ export class CodexSideChatBackend implements SideChatBackend {
     }
     if (method !== "turn/completed" || !request.turnId || turn.id !== request.turnId) return
     if (turn.status === "interrupted") { this.finish(request, new Error("STOPPED")); return }
-    if (turn.status !== "completed") { this.finish(request, new Error("TURN_FAILED")); return }
+    if (turn.status !== "completed") {
+      const code = officialTurnError(turn.error)
+      if (code === "AUTH_EXPIRED" || code === "OUTCOME_UNKNOWN") this.failAndClose(request, code)
+      else this.finish(request, new Error(code))
+      return
+    }
     try { this.finish(request, request.collector.finish(turn.items)) }
     catch (error) { this.finish(request, error instanceof Error ? error : new Error("RESPONSE_INVALID")) }
   }

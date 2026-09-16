@@ -64,7 +64,7 @@ export function defaultDesktopSettings(): DesktopSettingsV1 {
     adapterAutoStart: true,
     speechBubblesEnabled: true,
     taskBubblesEnabled: true,
-    sideChatEnabled: false,
+    sideChatEnabled: true,
   }
 }
 
@@ -110,7 +110,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
     adapterAutoStart: bool(input.adapterAutoStart, defaults.adapterAutoStart),
     speechBubblesEnabled: bool(input.speechBubblesEnabled, defaults.speechBubblesEnabled),
     taskBubblesEnabled: bool(input.taskBubblesEnabled, defaults.taskBubblesEnabled),
-    sideChatEnabled: bool(input.sideChatEnabled, false),
+    sideChatEnabled: bool(input.sideChatEnabled, defaults.sideChatEnabled),
   }
   const migrated = input.schemaVersion !== DESKTOP_SETTINGS_SCHEMA_VERSION || JSON.stringify(input) !== JSON.stringify(normalized)
   return { value: normalized, migrated, warnings }

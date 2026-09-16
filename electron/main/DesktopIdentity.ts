@@ -8,8 +8,10 @@ export function configureDesktopIdentity(app: Pick<App, "isPackaged" | "setName"
   environment: NodeJS.ProcessEnv = process.env, platform = process.platform): void {
   const name = app.isPackaged ? APP_NAME : `${APP_NAME} Dev`
   app.setName(name)
-  const userData = environment.ELECTRON_SMOKE_USER_DATA
-    ? resolve(environment.ELECTRON_SMOKE_USER_DATA)
+  const qaProfile = (typeof __APP_QA__ === "undefined" || __APP_QA__) ? environment.ELECTRON_SMOKE_USER_DATA : undefined
+  const profile = environment.DAEMONLET_DATA_HOME ?? qaProfile
+  const userData = profile
+    ? resolve(profile)
     : join(app.getPath("appData"), name)
   app.setPath("userData", userData)
   app.setPath("sessionData", userData)

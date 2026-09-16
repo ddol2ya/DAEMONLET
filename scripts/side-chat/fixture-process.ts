@@ -1,12 +1,12 @@
 import { spawn } from "node:child_process"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { AppServerJsonlClient } from "../../../adapter/codex/app-server/AppServerJsonlClient"
-import type { ChatConnection, ChatExecutionProfile } from "./SideChatBackend"
+import { AppServerJsonlClient } from "../../adapter/codex/app-server/AppServerJsonlClient"
+import type { ChatConnection, ChatExecutionProfile } from "../../electron/main/side-chat/SideChatBackend"
 
 /** Candidate constraints audited against generated schema and upstream source.
  * This definition is not a production admission. The policy factory owns admission. */
-export const CHAT_LAUNCH_CONSTRAINTS = {
+export const FIXTURE_CONSTRAINTS = {
   web_search: "disabled", approval_policy: "never", sandbox_mode: "read-only",
   history: { persistence: "none" },
   features: { shell_tool: false, view_image: false, shell_snapshot: false, hooks: false, goals: false, apps: false, plugins: false },
@@ -18,7 +18,7 @@ export const CHAT_LAUNCH_CONSTRAINTS = {
 /** App-owned capability ceiling, loaded through Codex's documented custom catalog.
  * This pins model-side capabilities and removes mutable catalog mode instructions.
  * It does not override administrator requirements or change the provider/model. */
-export const CHAT_MODEL_CATALOG = { models: [{
+export const FIXTURE_MODEL_CATALOG = { models: [{
   slug: "gpt-5.6-luna", display_name: "gpt-5.6-luna", description: "Daemonlet text-only profile",
   supported_reasoning_levels: [{ effort: "low", description: "Low" }], default_reasoning_level: "low",
   shell_type: "disabled", visibility: "list", supported_in_api: true, priority: 1,
@@ -28,16 +28,16 @@ export const CHAT_MODEL_CATALOG = { models: [{
   auto_compact_token_limit: 80000, input_modalities: ["text"],
   include_skills_usage_instructions: false, include_plugin_usage_instructions: false, include_apps_usage_instructions: false,
 }] } as const
-export async function writeChatModelCatalog(root: string): Promise<string> {
+export async function writeFixtureCatalog(root: string): Promise<string> {
   const path = join(root, "chat-models.json")
-  await writeFile(path, JSON.stringify(CHAT_MODEL_CATALOG), { mode: 0o600 })
+  await writeFile(path, JSON.stringify(FIXTURE_MODEL_CATALOG), { mode: 0o600 })
   return path
 }
 
 export type ChatLaunchOptions = { executable: string; root: string; execution?: Omit<ChatExecutionProfile, "cwd"> }
 /** Lower-level process primitive. Only trusted Main code or explicit test DI calls it.
  * No config/env flag or renderer route selects a candidate instead of the policy gate. */
-export async function launchIsolatedChatProcess(options: ChatLaunchOptions): Promise<ChatConnection> {
+export async function launchFixtureParent(options: ChatLaunchOptions): Promise<ChatConnection> {
   const home = join(options.root, "home"), codex = join(options.root, "codex"), cwd = join(options.root, "project"), temp = join(options.root, "tmp")
   for (const path of [home, codex, cwd, temp, join(home, ".config"), join(home, ".local/share")]) await mkdir(path, { recursive: true, mode: 0o700 })
   const child = spawn(options.executable, ["app-server", "--listen", "stdio://"], { cwd,
@@ -58,4 +58,21 @@ export async function launchIsolatedChatProcess(options: ChatLaunchOptions): Pro
     child.once("close", () => { clearTimeout(timer); resolve() })
     child.kill("SIGTERM")
   }) }
+}
+
+/** Account-free official regression only. This module never enters a product build. */
+export async function launchOfficialFixture(options: { executable: string; root: string; codexHome: string; osHome: string; disabledMcpServers: string[] }): Promise<ChatConnection> {
+  const { OFFICIAL_CHAT_OVERRIDES } = await import("../../electron/main/side-chat/OfficialSameHomeLaunchProfile")
+  const { startChatProcess } = await import("../../electron/main/side-chat/ChatProcess")
+  const { SIDE_CHAT_MODEL } = await import("../../electron/main/side-chat/SideChatModelPolicy")
+  const cwd = join(options.root, "work"), temp = join(options.root, "tmp")
+  await mkdir(cwd, { recursive: true }); await mkdir(temp, { recursive: true })
+  const overrides: Record<string, unknown> = { ...OFFICIAL_CHAT_OVERRIDES, model_provider: "fixture" }
+  for (const name of options.disabledMcpServers) overrides["mcp_servers." + name + ".enabled"] = false
+  const args = Object.entries(overrides).flatMap(([key, value]) => ["-c", key + "=" + JSON.stringify(value)])
+  const child = startChatProcess(options.executable, [...args, "app-server", "--listen", "stdio://"], cwd, {
+    HOME: options.osHome, USERPROFILE: options.osHome, CODEX_HOME: options.codexHome,
+    PATH: "/usr/bin:/bin:/usr/sbin:/sbin", TMPDIR: temp, TMP: temp, TEMP: temp,
+  })
+  return { ...child, execution: { mode: "official-same-home" as const, cwd, model: SIDE_CHAT_MODEL.id, instructions: "collaboration-mode" as const, noEnvironment: true } }
 }
