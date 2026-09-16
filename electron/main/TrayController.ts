@@ -40,6 +40,7 @@ export type TrayActions = {
   toggleVisible(): void
   setLayout(enabled: boolean): void
   resetPosition(): void
+  bubblePlacement?(action: "adjust" | "auto" | "reset"): void
   updateSettings(patch: Partial<DesktopSettingsV1>): void
   openMotionLab(): void
   openSettings(): void
@@ -62,6 +63,11 @@ export function buildTrayMenu(settings: DesktopSettingsV1, adapter: AdapterStatu
     { type: "separator" },
     { label: t("캐릭터 이동·크기 조절"), click: () => actions.setLayout(true) },
     { label: t("위치 초기화"), click: actions.resetPosition },
+    ...(actions.bubblePlacement ? [{ label: t("말풍선 위치"), submenu: [
+      { label: t("자동"), type: "radio" as const, checked: settings.bubblePlacement.mode === "auto", click: () => actions.bubblePlacement!("auto") },
+      { label: t("위치 조절"), type: "radio" as const, checked: settings.bubblePlacement.mode === "relative", click: () => actions.bubblePlacement!("adjust") },
+      { label: t("위치 초기화"), click: () => actions.bubblePlacement!("reset") },
+    ] }] : []),
     {
       label: t("캐릭터"),
       submenu: [

@@ -5,6 +5,7 @@ import type { AdapterStatus } from "../../electron/shared/ipc-contract"
 import { CharacterEventProtocolClient } from "../protocol/CharacterEventProtocolClient"
 import { ProtocolTaskEventSource } from "../protocol/ProtocolTaskEventSource"
 import { CharacterSession } from "../runtime/CharacterSession"
+import { ModifierDragController } from "./ModifierDragController"
 import { AlphaHitTestController } from "./AlphaHitTestController"
 import { ElectronIpcProtocolTransport } from "./ElectronIpcProtocolTransport"
 import { LayoutOverlay } from "./LayoutOverlay"
@@ -40,6 +41,7 @@ export default function PetApp() {
     let characters: CharacterSnapshot | null = null
     let visible = false
     let inLayout = false
+    let dragging = false
     let loadFailed = false
     let loadingCharacter = false
     const session = new CharacterSession(canvas, "pet://app/characters/catalog.json")
@@ -51,7 +53,7 @@ export default function PetApp() {
     window.addEventListener("beforeunload", unloading)
     const updateAvailability = () => {
       if (disposed) { session.dialogue.setAvailable(false); return }
-      const available = visible && !inLayout && !loadFailed && !loadingCharacter && Boolean(successfulKey) && !document.hidden
+      const available = visible && !inLayout && !dragging && !loadFailed && !loadingCharacter && Boolean(successfulKey) && !document.hidden
       session.dialogue.setAvailable(available)
       setPresentation(old => old.available === available && old.epoch === loadEpoch ? old : { available, epoch: loadEpoch })
     }
@@ -65,6 +67,13 @@ export default function PetApp() {
     session.start()
     const alpha = new AlphaHitTestController(canvas, session.runtime, desktop)
     alphaRef.current = alpha
+    const drag = new ModifierDragController(canvas, {
+      platform: desktop.platform, allowed: () => !disposed && !inLayout && !loadingCharacter && !loadFailed && Boolean(successfulKey),
+      hit: (x, y) => session.runtime.sampleRenderedAlpha(x, y, { radius: 3, threshold: 0.1 }).alpha >= 0.1,
+      request: value => desktop.dragWindow(value),
+      lock: (active, point) => { if (disposed) return; dragging = active; canvas.style.cursor = active ? "grabbing" : ""; session.setInteractionEnabled(!active && !inLayout && !loadingCharacter && !loadFailed); alpha.setExternalDrag(active, point); updateAvailability() },
+    })
+    const unsubscribeDrag = desktop.onDragCancelled(drag.cancel)
     const load = async (next: DesktopSettingsV1) => {
       if (disposed) return
       currentSettings = next
@@ -79,6 +88,7 @@ export default function PetApp() {
       if (loadKey === key) return
       const epoch = ++loadEpoch
       loadKey = key
+      drag.cancel()
       loadingCharacter = true
       setLoading(true)
       loadFailed = false
@@ -93,6 +103,7 @@ export default function PetApp() {
         if (disposed || epoch !== loadEpoch) return
         successfulKey = key
         loadingCharacter = false
+        session.setInteractionEnabled(!inLayout && !dragging)
         setLoading(false)
         updateAvailability()
         alpha.reset()
@@ -103,6 +114,7 @@ export default function PetApp() {
         loadingCharacter = false
         setLoading(false)
         loadFailed = !successfulKey
+        session.setInteractionEnabled(!inLayout && !dragging && !loadFailed)
         loadKey = null
         updateAvailability()
         if (!successfulKey) setError(message)
@@ -119,6 +131,7 @@ export default function PetApp() {
     const unsubscribeCharacters = desktop.characters.onChanged(receiveCharacters)
     const unsubscribeSettings = desktop.onSettingsChanged((next) => { void load(next) })
     const unsubscribeLayout = desktop.onLayoutChanged((enabled) => {
+      drag.cancel()
       setLayout(enabled)
       inLayout = enabled
       updateAvailability()
@@ -148,6 +161,8 @@ export default function PetApp() {
       document.removeEventListener("visibilitychange", updateAvailability)
       window.removeEventListener("beforeunload", unloading)
       window.removeEventListener("resize", resize)
+      unsubscribeDrag()
+      drag.dispose()
       alpha.dispose()
       source.dispose()
       client.dispose()

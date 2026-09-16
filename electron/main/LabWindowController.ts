@@ -12,7 +12,7 @@ export class LabWindowController {
   ) {}
 
   open(): BrowserWindow {
-    if (this.window && !this.window.isDestroyed()) { this.window.show(); this.window.focus(); return this.window }
+    if (this.window && !this.window.isDestroyed()) { if (this.window.isMinimized()) this.window.restore(); this.window.show(); this.window.focus(); return this.window }
     const win = new BrowserWindow({
       width: 1280,
       title: appText("모션 실험실"),
@@ -21,7 +21,7 @@ export class LabWindowController {
       frame: true,
       transparent: false,
       backgroundColor: "#08090d",
-      skipTaskbar: false,
+      skipTaskbar: true,
       alwaysOnTop: false,
       webPreferences: { additionalArguments: languageArguments(),
         nodeIntegration: false,

@@ -65,6 +65,14 @@ export class AlphaHitTestController {
     this.releaseInteractionLock()
     this.requestPassthrough(false)
   }
+  setExternalDrag(active: boolean, point?: { x: number; y: number }): void {
+    this.releaseInteractionLock()
+    if (active) { this.locked = true; this.desktop.setInteractionLocked(true); this.requestPassthrough(false); return }
+    try {
+      this.state = { interactive: !point || this.sample(point.x, point.y).alpha >= DEFAULT_ALPHA_THRESHOLDS.enter, leaveSamples: 0 }
+      this.requestPassthrough(!this.state.interactive)
+    } catch { this.requestPassthrough(false) }
+  }
 
   dispose(): void {
     if (this.disposed) return

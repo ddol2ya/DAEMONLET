@@ -7,6 +7,7 @@ import { isComposing } from "../side-chat/presentation"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { ActivityApi, ActivityResponse, ActivitySnapshot } from "../../electron/shared/activity-contract"
 import { activityBubbleEntries } from "../../electron/shared/activity-bubble"
+import { BubblePlacementPreview } from "./BubblePlacementPreview"
 
 declare global { interface Window { activityDesktop?: ActivityApi } }
 const labels = { waiting: "입력 필요", running: "작업 중", completed: "작업 종료", failed: "작업 실패", cancelled: "작업 중단", unknown: "상태 확인 불가" }
@@ -14,6 +15,14 @@ const categories = { command: "명령 실행", "file-change": "파일 변경", t
 
 export default function ActivityBubbleApp() {
   const t = useT()
+  const [placement, setPlacement] = useState({ editing: false, revision: 0 })
+  useEffect(() => {
+    const api = window.bubblePlacementDesktop
+    if (!api) return
+    const receive = (value: typeof placement) => setPlacement(old => value.revision >= old.revision ? value : old)
+    const off = api.onChanged(receive); void api.get().then(receive)
+    return off
+  }, [])
   const [snapshot, setSnapshot] = useState<ActivitySnapshot | null>(null)
   const [chat, setChat] = useState<SideChatSnapshot | null>(null)
   const chatOpen = Boolean(chat && chat.mode !== "hidden")
@@ -84,7 +93,7 @@ export default function ActivityBubbleApp() {
   }, [])
   useLayoutEffect(() => {
     const element = main.current
-    if (!element || view !== "activity" || chatOpen) return
+    if (!element || view !== "activity" || chatOpen || placement.editing) return
     let frame: number | null = null
     const measure = () => {
       frame = null
@@ -94,7 +103,7 @@ export default function ActivityBubbleApp() {
     const observer = new ResizeObserver(() => { if (frame === null) frame = requestAnimationFrame(measure) })
     observer.observe(element); measure()
     return () => { observer.disconnect(); if (frame !== null) cancelAnimationFrame(frame) }
-  }, [view, collapsed, menuOpen, chatOpen])
+  }, [view, collapsed, menuOpen, chatOpen, placement.editing])
   useLayoutEffect(() => {
     if (!focusAfterToggle.current || view !== "activity") return
     focusAfterToggle.current = false
@@ -123,7 +132,7 @@ export default function ActivityBubbleApp() {
   }
   const release = (reason: string) => { if (releaseTimer.current) clearTimeout(releaseTimer.current); releaseTimer.current = setTimeout(() => { releaseTimer.current = null; hold(reason, false) }, 0) }
   const target = entry && { activityId: entry.activityId, revision: entry.revision }
-  return <><div className="activity-view" hidden={view !== "activity"}><main ref={main} className={`bubble-shell task-bubble ${collapsed ? "compact" : ""} ${chatOpen ? "has-chat" : ""}`} data-state={entry?.state ?? "unknown"} data-activity-id={entry?.activityId} aria-label={t("작업 말풍선")}
+  return <><BubblePlacementPreview state={placement} /><div className="activity-view" hidden={view !== "activity" || placement.editing}><main ref={main} className={`bubble-shell task-bubble ${collapsed ? "compact" : ""} ${chatOpen ? "has-chat" : ""}`} data-state={entry?.state ?? "unknown"} data-activity-id={entry?.activityId} aria-label={t("작업 말풍선")}
     onPointerDownCapture={event => {
       if (!(event.target instanceof Element)) return
       const button = event.target.closest("button, summary")
@@ -164,5 +173,5 @@ export default function ActivityBubbleApp() {
     {!chatOpen && window.daemonletSideChat && <button className="task-chat-entry" aria-label={t("캐릭터에게 물어보기")} disabled={pending || !api} onClick={() => api && void perform(() => api.openChat(target ?? null))}><span>{chat?.character.label ?? t("지피쨩")}{t("에게 물어보기")}</span><span aria-hidden="true">↵</span></button>}
     {(error || snapshot?.storage === "error") && <p className="task-error" role="alert">{t(error) || t("이력 저장 실패 · 작업 목록에서 확인해 주세요.")}</p>}</>}
   {window.daemonletSideChat && <SideChatApp api={window.daemonletSideChat} onSnapshot={setChat} />}
-  </main></div><TaskControlPanel hidden={view !== "control"} collapsed={collapsed} /></>
+  </main></div><TaskControlPanel hidden={view !== "control" || placement.editing} collapsed={collapsed} /></>
 }

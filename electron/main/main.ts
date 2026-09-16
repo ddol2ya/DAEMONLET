@@ -25,7 +25,7 @@ if (!app.requestSingleInstanceLock()) {
   const startup = new StartupWindow()
   let controller: AppController | null = null
   registerActivationHandler(app, () => controller)
-  app.on("second-instance", () => controller?.showPet())
+  app.on("second-instance", () => controller?.activate())
   app.on("window-all-closed", () => { /* The tray owns application lifetime. */ })
   app.on("before-quit", (event) => {
     if (!controller) return
@@ -35,6 +35,7 @@ if (!app.requestSingleInstanceLock()) {
     void active.quit()
   })
   void app.whenReady().then(async () => {
+    if (app.isPackaged && process.platform === "darwin") app.setActivationPolicy("accessory")
     setAppLanguage(await readSavedAppLanguage(app.getPath("userData")))
     await startup.open()
     await prepareDesktopAdapterPorts()

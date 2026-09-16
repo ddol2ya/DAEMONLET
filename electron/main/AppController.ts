@@ -6,6 +6,10 @@ import { connectVerifiedSideChat } from "./side-chat/SideChatPolicy"
 import { SideChatPreferences } from "./side-chat/SideChatPreferences"
 import { SideChatSetupController } from "./side-chat/SideChatSetupController"
 import { PersonaResolver } from "./side-chat/PersonaResolver"
+import { WindowDragController } from "./WindowDragController"
+import { automaticBubblePlacement } from "../shared/bubble-placement"
+import { validWindowDragRequest } from "../shared/window-drag"
+import { SideChatEntryController } from "./side-chat/SideChatEntryController"
 import { SideChatIpcController } from "./SideChatIpcController"
 import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
 import type { StartupWindow } from "./StartupWindow"
@@ -57,6 +61,16 @@ export class AppController {
   }, id => this.adapter.excludeSideChat(id)))
   private readonly sideChatSetup: SideChatSetupController = new SideChatSetupController(this.sideChat, new SideChatPreferences(app.getPath("userData")),
     () => this.integration.sideChatSelection(), () => this.activityBubble.window, () => this.updateSettings({ sideChatEnabled: true }))
+  private readonly chatEntry = new SideChatEntryController(this.sideChat, {
+    revealPet: async signal => { if (this.quitting) return false; this.showPet(); return this.pet.reveal(signal) },
+    focus: () => this.activityBubble.focusConversation(),
+    refreshParents: query => this.refreshChatParents(query), check: () => this.sideChatSetup.check(),
+  })
+  private readonly petDrag = new WindowDragController({
+    window: () => this.pet.window, cursor: () => screen.getCursorScreenPoint(), startCursor: () => this.pet.takeDragStart(),
+    workArea: point => screen.getDisplayNearestPoint(point).workArea, allowed: () => !this.quitting && this.settings.visible,
+    lock: active => this.pet.setDragging(active), finish: (bounds, committed) => { if (committed) this.captureBounds(bounds) },
+  })
   private sideChatPage = { offset: 0, query: "", generation: 0 }
   private readonly sideChatIpc: SideChatIpcController
   private readonly personaResolver: PersonaResolver
@@ -108,9 +122,9 @@ export class AppController {
     this.activityTitles = new ActivityConversationTitles(() => readDesktopThreadCatalog(process.env.CODEX_HOME ?? join(homedir(), ".codex")), titles => this.activity.setConversationTitles(titles))
     this.activityWindow = new ActivityWindowController(preload("activity"), this.devServerUrl)
     this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"), undefined, process.platform, appLanguage)
-    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => this.sideChat.setMode("hidden"))
+    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }, placement => this.updateSettings({ bubblePlacement: placement }))
     this.personaResolver = new PersonaResolver((selection, path) => this.characters.readPersonaAsset(selection, path))
-    this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more))
+    this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more), () => this.chatEntry.cancel())
     this.subscriptions.push(this.sideChat.subscribe(() => this.activityBubble.updateChat(this.sideChat.snapshot())))
     this.bubbleIpc = new BubblePresentationIpcController(this.activityBubble, this.devServerUrl)
     this.taskControlIpc = new TaskControlIpcController(this.activityBubble, this.taskControl, this.dictation, this.devServerUrl, Date.now, this.threadLauncher)
@@ -151,6 +165,7 @@ export class AppController {
     })
     this.settingsWindow = new SettingsWindowController({
       preloadPath: preload("settings"), devServerUrl: this.devServerUrl,
+      taskbarVisible: () => this.dockFallbackRestored,
       onOpened: (owner) => {
         this.integration.windowOpened(owner)
         if (!this.settingsPoll) this.settingsPoll = setInterval(() => { this.adapter.requestDiagnostics(); void this.integration.refresh().catch(() => {}) }, 3000)
@@ -165,6 +180,7 @@ export class AppController {
     this.settingsIpc = new SettingsIpcController({
       window: this.settingsWindow, integration: this.integration, devServerUrl: this.devServerUrl,
       getSettings: () => this.settings, updateSettings: (patch) => this.updateSettings(patch),
+      bubblePlacement: action => this.editBubblePlacement(action),
       resetPosition: () => this.resetPosition(), restartAdapter: () => this.restartAdapterSafely(),
       characterAllowed: this.characters.isAvailable,
     })
@@ -223,15 +239,14 @@ export class AppController {
     this.pet.create(this.settings)
     if (this.pet.window) this.activityBubble.attach(this.pet.window, this.settings)
     this.trayCreated = this.tray.create(this.settings, this.adapter.getStatus(), this.trayActions())
-    if (packagedMac && !this.trayCreated) app.setActivationPolicy("regular")
+    if (!this.trayCreated) this.restoreResidentAccess()
     else if (!packagedMac && app.isPackaged && this.trayCreated) app.dock?.hide()
     if (packagedMac && this.trayCreated) {
       this.trayVisibilityTimer = setTimeout(() => {
         this.trayVisibilityTimer = null
         const forceOffscreen = __APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1" && process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1"
         if (!forceOffscreen && this.tray.isVisibleOn(screen.getAllDisplays().map((display) => display.bounds))) return
-        this.dockFallbackRestored = true
-        app.setActivationPolicy("regular")
+        this.restoreResidentAccess()
         this.warn("macOS did not place the menu-bar item; Dock access restored. Right-click the character to open the menu.")
       }, 1_000)
       this.trayVisibilityTimer.unref()
@@ -247,13 +262,28 @@ export class AppController {
     })
   }
 
+  private restoreResidentAccess(): void {
+    this.dockFallbackRestored = true
+    if (process.platform === "darwin") app.setActivationPolicy("regular")
+    const window = this.settingsWindow.open()
+    window.setSkipTaskbar(false)
+    this.warn("메뉴바·트레이를 표시하지 못해 설정 창에서 접근할 수 있도록 복구했습니다.")
+  }
+  activate(): void { this.showPet(); if (this.dockFallbackRestored) this.restoreResidentAccess() }
   showPet(): void {
+    if (this.quitting) return
+    this.onDisplaysChanged()
+    if (this.pet.window?.isMinimized()) this.pet.window.restore()
     this.updateSettings({ visible: true })
   }
 
   async quit(): Promise<void> {
     if (this.quitting) return
+    this.placementOpening?.abort()
+    this.activityBubble.cancelPlacement()
+    this.petDrag.cancel()
     this.quitting = true
+    this.chatEntry.cancel()
     this.startup?.close()
     if (this.saveTimer) clearTimeout(this.saveTimer)
     this.saveTimer = null
@@ -302,6 +332,7 @@ export class AppController {
       return this.updateSettings(patch)
     })
     ipcMain.handle(IPC.layoutSet, (event, enabled: unknown) => { requirePet(event); if (typeof enabled !== "boolean") throw new Error("invalid layout state"); this.setLayoutMode(enabled) })
+    ipcMain.handle(IPC.windowDrag, (event, value: unknown, ...extra) => { requirePet(event); if (extra.length || !validWindowDragRequest(value)) throw Error("invalid drag request"); return this.petDrag.request(value) })
     ipcMain.handle(IPC.resetPosition, (event) => { requirePet(event); this.resetPosition() })
     ipcMain.handle(IPC.mousePassthrough, (event, ignore: unknown) => { requirePet(event); if (typeof ignore !== "boolean") throw new Error("invalid passthrough state"); this.pet.setMousePassthrough(ignore) })
     ipcMain.on(IPC.interactionLock, (event, locked: unknown) => { if (trustedPet(event) && typeof locked === "boolean") this.pet.setInteractionLocked(locked) })
@@ -342,11 +373,15 @@ export class AppController {
   }
 
   private setLayoutMode(enabled: boolean): void {
+    this.petDrag.cancel()
     this.activityBubble.setLayoutMode(enabled)
     this.pet.setLayoutMode(enabled)
   }
 
   private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+    if (patch.visible === false || patch.characterId !== undefined) { this.placementOpening?.abort(); this.activityBubble.cancelPlacement() }
+    if (patch.visible === false || patch.scale !== undefined || patch.characterId !== undefined) this.petDrag.cancel()
+    if (patch.visible === false || patch.sideChatEnabled === false) { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }
     if (patch.characterId !== undefined) {
       if (!this.characters.isAvailable(patch.characterId)) throw new Error("PACK_UNAVAILABLE")
       this.unavailableSelection = null
@@ -378,6 +413,7 @@ export class AppController {
   }
 
   private captureBounds(bounds: Rectangle): void {
+    if (this.petDrag.active) return
     const display = screen.getDisplayMatching(bounds)
     this.settings.bounds = { ...bounds, displayId: display.id }
     this.persistSoon()
@@ -389,12 +425,14 @@ export class AppController {
   }
 
   private resetPosition(): void {
+    this.petDrag.cancel()
     this.settings.bounds = this.recover({ ...this.settings.bounds, x: Number.MAX_SAFE_INTEGER, y: Number.MAX_SAFE_INTEGER, displayId: null })
     this.pet.setBounds(this.settings.bounds)
     this.updateSettings({ visible: true })
   }
 
   private readonly onDisplaysChanged = () => {
+    this.petDrag.cancel()
     const recovered = this.recover(this.pet.window?.getBounds() ? { ...this.pet.window.getBounds(), displayId: this.settings.bounds.displayId } : this.settings.bounds)
     this.settings.bounds = recovered
     this.pet.setBounds(recovered)
@@ -425,17 +463,20 @@ export class AppController {
       if (generation === this.personaGeneration && this.lastReady?.id === binding.id && this.lastReady.revision === binding.revision) this.sideChat.applyPersona(binding)
     } catch { if (generation === this.personaGeneration) this.sideChat.personaFailed() }
   }
-  private chatOpenGeneration = 0
   private async openSideChat(key?: string, activityId?: string) {
-    const generation = ++this.chatOpenGeneration
+    this.placementOpening?.abort(); this.activityBubble.cancelPlacement()
     const target = key ? this.adapter.conversationTarget(key) : null
-    if (activityId && !target || target && target.threadId !== this.sideChat.parentThreadId()) this.sideChat.clearParent()
-    this.sideChat.setMode("compact")
-    const epoch = this.sideChat.snapshot().epoch
-    await this.refreshChatParents(target?.threadId)
-    if (generation !== this.chatOpenGeneration || epoch !== this.sideChat.snapshot().epoch) return
-    if (target && this.settings.sideChatEnabled) this.sideChat.chooseThread(target.threadId, activityId)
-    await this.sideChatSetup.check()
+    await this.chatEntry.open(target ? { threadId: target.threadId, activityId } : undefined, Boolean(activityId))
+  }
+  private placementOpening: AbortController | null = null
+  private async editBubblePlacement(action: "adjust" | "auto" | "reset") {
+    this.placementOpening?.abort()
+    if (action !== "adjust") { this.activityBubble.cancelPlacement(); this.updateSettings({ bubblePlacement: automaticBubblePlacement() }); return }
+    this.chatEntry.cancel()
+    const opening = this.placementOpening = new AbortController()
+    this.showPet()
+    if (await this.pet.reveal(opening.signal) && !opening.signal.aborted && !this.quitting) this.activityBubble.beginPlacement()
+    if (this.placementOpening === opening) this.placementOpening = null
   }
   private async refreshChatParents(query?: string, more = false) {
     if (!this.settings.sideChatEnabled || this.quitting) return
@@ -456,6 +497,7 @@ export class AppController {
     this.sideChat.setPreparation({ hasMoreParents: catalog.hasMore, parentQuery: page.query })
   }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
+    this.petDrag.cancel()
     await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
     if (this.lastReady?.id === selection.id && this.lastReady.revision === selection.revision && this.settings.characterId === selection.id) { this.updateSettings({ characterId: selection.id }); return }
     await new Promise<void>((resolveReady, reject) => {
@@ -500,6 +542,7 @@ export class AppController {
         void this.codexApp.available().then(available => { if (!this.quitting) this.activity.setNavigation(available ? "app" : "none") })
       },
       characters: () => this.characters.snapshot().entries,
+      bubblePlacement: action => { void this.editBubblePlacement(action) },
       toggleVisible: () => this.updateSettings({ visible: !this.settings.visible }),
       setLayout: (enabled) => { if (enabled && !this.settings.visible) this.updateSettings({ visible: true }); this.setLayoutMode(enabled) },
       resetPosition: () => this.resetPosition(),

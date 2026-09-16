@@ -47,6 +47,14 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #765845; outlin
 @media (hover: hover) and (pointer: fine) { button:hover:not(:disabled), summary:hover { background: #e9dfd1; } }
 @media (prefers-reduced-motion: reduce) { button { transition: none !important; } }
 [hidden] { display: none !important; }
+.placement-preview { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 12px; font-size: 13px; }
+.placement-handle { flex-shrink: 0; display: flex; gap: 8px; align-items: center; width: 100%; padding: 7px; border-radius: 8px; background: #ede5da; cursor: grab; touch-action: none; user-select: none; }
+.placement-sample { min-height: 0; flex: 1; overflow: auto; padding: 4px; user-select: text; }
+.placement-sample p { color: var(--bubble-muted); margin: 8px 0; line-height: 1.5; }
+.placement-preview footer { display: flex; justify-content: flex-end; gap: 7px; flex-shrink: 0; }
+.placement-preview footer button { padding: 7px 14px; border-radius: 8px; background: #eee6db; }
+.placement-preview footer .placement-apply { background: #72513a; color: white; }
+.placement-preview footer button:active { transform: scale(.97); }
 .control-panel { display: flex; flex-direction: column; gap: 10px; padding: 13px 14px; }
 .control-panel.compact { display: block; }
 .control-label { color: #bcbcc2; font-size: 10px; margin-bottom: 4px; display: block; }

@@ -22,6 +22,7 @@ export class SettingsIpcController {
     getSettings: () => DesktopSettingsV1
     updateSettings: (patch: DesktopSettingsPatch) => DesktopSettingsV1
     resetPosition: () => void
+    bubblePlacement?: (action: "adjust" | "auto" | "reset") => Promise<void>
     restartAdapter: () => Promise<{ restarted: boolean }>
     characterAllowed?: (id: string) => boolean
   }) {}
@@ -91,6 +92,7 @@ export class SettingsIpcController {
       return this.options.updateSettings(patch)
     })
     this.bind(SETUP_IPC.resetPosition, 0, () => this.options.resetPosition())
+    this.bind(SETUP_IPC.bubblePlacement, 1, (_owner, [action]) => { if (!["adjust", "auto", "reset"].includes(String(action)) || !this.options.bubblePlacement) throw Error("PLAN_BLOCKED"); return this.options.bubblePlacement(action as "adjust" | "auto" | "reset") })
     this.bind(SETUP_IPC.restartAdapter, 0, () => this.nativeDialog(this.options.restartAdapter))
     this.bind(SETUP_IPC.exportDiagnostics, 0, () => this.nativeDialog(async () => {
       const report = createSetupDiagnostics(integration.getStatus())

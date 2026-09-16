@@ -1,3 +1,4 @@
+import { NativeDragStart } from "./NativeDragStart"
 import { bindWindowLanguage, languageArguments } from "./AppLanguage"
 import { BrowserWindow, screen, type Rectangle } from "electron"
 import { join } from "node:path"
@@ -26,6 +27,9 @@ export class PetWindowController {
   private clickThrough = true
   private desiredVisible = true
   private effectivePassthrough = false
+  private dragging = false
+  private dragStart = new NativeDragStart()
+  private revealWaiters = new Set<(ready: boolean) => void>()
 
   constructor(private readonly options: PetWindowOptions) {}
 
@@ -47,6 +51,7 @@ export class PetWindowController {
       skipTaskbar: true,
       alwaysOnTop: settings.alwaysOnTop,
       focusable: true,
+      acceptFirstMouse: true,
       webPreferences: { additionalArguments: languageArguments(),
         nodeIntegration: false,
         contextIsolation: true,
@@ -76,6 +81,11 @@ export class PetWindowController {
       if (mainFrame) this.failSafe(`Pet load failed (${code} ${description}): ${url}`)
     })
     win.webContents.on("context-menu", () => this.options.onContextMenu?.(win))
+    win.webContents.on("before-mouse-event", (_event, input) => {
+      if (input.type !== "mouseDown") return
+      const modifiers = input.modifiers ?? []
+      this.dragStart.record(win.getBounds(), input, input.button === "left" && modifiers.includes("alt") && !modifiers.some(m => ["control", "ctrl", "meta", "command", "cmd", ...(process.platform === "win32" ? ["right", "altgr"] : [])].includes(m)))
+    })
     if ((typeof __APP_QA__ === "undefined" || __APP_QA__) && process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {
         process.stderr.write(`[pet:${details.level}] ${details.message}\n`)
@@ -99,6 +109,7 @@ export class PetWindowController {
     void win.loadURL(expectedRendererUrl("pet", this.options.devServerUrl)).catch((error) => this.failSafe(`Pet navigation failed: ${String(error)}`))
     this.readyTimer = setTimeout(() => {
       if (!this.ready && !win.isDestroyed()) {
+        for (const finish of [...this.revealWaiters]) finish(false)
         this.options.onWarning("Pet renderer did not report ready within 15 seconds")
         if (this.desiredVisible) win.showInactive()
       }
@@ -111,6 +122,21 @@ export class PetWindowController {
     if (this.readyTimer) clearTimeout(this.readyTimer)
     this.readyTimer = null
     if (this.desiredVisible && this.window && !this.window.isDestroyed()) this.window.showInactive()
+    for (const finish of [...this.revealWaiters]) finish(true)
+  }
+
+  async reveal(signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted || !this.desiredVisible || !this.window || this.window.isDestroyed()) return false
+    if (!this.ready) {
+      const ready = await new Promise<boolean>(resolve => {
+        const abort = () => finish(false)
+        const finish = (ready: boolean) => { this.revealWaiters.delete(finish); signal.removeEventListener("abort", abort); resolve(ready) }
+        this.revealWaiters.add(finish); signal.addEventListener("abort", abort, { once: true })
+      })
+      if (!ready || signal.aborted || !this.desiredVisible) return false
+    }
+    this.show()
+    return Boolean(this.window && !this.window.isDestroyed() && this.window.isVisible())
   }
 
   setMousePassthrough(ignore: boolean): void {
@@ -121,6 +147,15 @@ export class PetWindowController {
   setInteractionLocked(locked: boolean): void {
     this.interactionLocked = locked
     this.applyMousePolicy()
+  }
+  setDragging(value: boolean) {
+    this.dragging = value
+    this.applyMousePolicy()
+    if (!value) this.send(IPC.dragCancelled, true)
+  }
+  takeDragStart() {
+    const point = this.dragStart.take()
+    return point && this.ready && !this.layoutMode && this.desiredVisible ? { x: point.x, y: point.y } : null
   }
 
   setLayoutMode(enabled: boolean): void {
@@ -136,6 +171,7 @@ export class PetWindowController {
     if (!win || win.isDestroyed()) return
     this.clickThrough = settings.clickThrough
     this.desiredVisible = settings.visible
+    if (!settings.visible) for (const finish of [...this.revealWaiters]) finish(false)
     win.setAlwaysOnTop(settings.alwaysOnTop, "floating")
     if (process.platform === "darwin") win.setVisibleOnAllWorkspaces(settings.showOnAllWorkspaces, { visibleOnFullScreen: settings.showOverFullScreen })
     if (win.isVisible() !== settings.visible) settings.visible ? win.showInactive() : win.hide()
@@ -144,7 +180,7 @@ export class PetWindowController {
   }
 
   setBounds(bounds: Rectangle): void { this.window?.setBounds(bounds, false) }
-  show(): void { if (this.window && !this.window.isDestroyed()) { this.window.showInactive(); this.window.moveTop() } }
+  show(): void { if (this.window && !this.window.isDestroyed()) { if (this.window.isMinimized()) this.window.restore(); this.window.showInactive(); this.window.moveTop() } }
   hide(): void { this.window?.hide() }
   reload(): void { this.crashReloaded = false; this.failSafe("Pet reload requested"); this.window?.webContents.reload() }
   send(channel: string, value: unknown): void { if (this.window && !this.window.isDestroyed()) this.window.webContents.send(channel, value) }
@@ -153,6 +189,7 @@ export class PetWindowController {
   }
 
   destroy(): void {
+    for (const finish of [...this.revealWaiters]) finish(false)
     this.stopPointerBoundaryCheck()
     if (this.readyTimer) clearTimeout(this.readyTimer)
     this.readyTimer = null
@@ -169,12 +206,13 @@ export class PetWindowController {
   private applyMousePolicy(): void {
     const win = this.window
     if (!win || win.isDestroyed()) return
-    const ignore = this.ready && this.clickThrough && this.requestedPassthrough && !this.interactionLocked && !this.layoutMode
+    const ignore = this.ready && this.clickThrough && this.requestedPassthrough && !this.interactionLocked && !this.layoutMode && !this.dragging
     this.effectivePassthrough = ignore
     win.setIgnoreMouseEvents(ignore, { forward: true })
   }
 
   private failSafe(message: string): void {
+    for (const finish of [...this.revealWaiters]) finish(false)
     this.ready = false
     this.requestedPassthrough = false
     this.effectivePassthrough = false

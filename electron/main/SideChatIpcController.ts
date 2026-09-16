@@ -9,7 +9,7 @@ export class SideChatIpcController {
   private rate = { since: 0, count: 0 }
   private sendPending = false
   constructor(private readonly service: SideChatService, private readonly window: Pick<ActivityBubbleWindowController, "window">, private readonly devServerUrl?: string,
-    private readonly setup?: SideChatSetupController, private readonly parents?: (query?: string, more?: boolean) => Promise<void>) {}
+    private readonly setup?: SideChatSetupController, private readonly parents?: (query?: string, more?: boolean) => Promise<void>, private readonly onHide?: () => void) {}
   register() {
     const trusted = (e: IpcMainInvokeEvent) => isTrustedSender(e, this.window.window, "activity-bubble", this.devServerUrl)
     ipcMain.handle(SIDE_CHAT_IPC.get, (e, ...args) => trusted(e) && !args.length ? { ok: true, value: this.service.snapshot() } : { ok: false, code: "INVALID_REQUEST" })
@@ -64,7 +64,7 @@ export class SideChatIpcController {
           await this.parents(action === "search" ? request.text : undefined, action === "more")
         }
         else if (action === "copy") { const message = this.service.snapshot().messages.find(m => m.id === request.text); if (!message) throw new Error("INVALID_REQUEST"); clipboard.writeText(message.text) }
-        else if (action === "hide" || action === "compact" || action === "panel") this.service.setMode(action === "hide" ? "hidden" : action)
+        else if (action === "hide" || action === "compact" || action === "panel") { if (action === "hide") this.onHide?.(); this.service.setMode(action === "hide" ? "hidden" : action) }
         return { ok: true, value: this.service.snapshot() }
       } catch (error) { return { ok: false, code: chatError(error) } }
     })

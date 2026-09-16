@@ -61,6 +61,7 @@ export const SETUP_IPC = {
   settingsGet: "setup.appearance.get",
   settingsPatch: "setup.appearance.patch",
   resetPosition: "setup.appearance.reset-position",
+  bubblePlacement: "setup.appearance.bubble-placement",
   restartAdapter: "setup.adapter.restart",
   exportDiagnostics: "setup.diagnostics.export",
   statusChanged: "setup.status.changed",
@@ -70,6 +71,7 @@ export const SETUP_IPC = {
 export type SetupResponse<T> = { ok: true; value: T } | { ok: false; code: string }
 
 export interface SettingsDesktopApi {
+  setBubblePlacement(action: "adjust" | "auto" | "reset"): Promise<void>
   characters: CharacterManageApi
   getStatus(): Promise<PublicSetupStatus>
   refreshStatus(): Promise<PublicSetupStatus>

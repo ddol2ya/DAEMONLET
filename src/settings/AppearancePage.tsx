@@ -22,6 +22,14 @@ export function AppearancePage({ api, status, settings, run, busy }: SettingsPag
     <section className="section-card"><CharacterPacks api={api} run={run} busy={busy} selected={settings.characterId} />
       <div className="preference-row"><div><strong>{t("캐릭터 크기")}</strong><p>{t`현재 ${Math.round(settings.scale * 100)}%`}</p></div><label className="visually-hidden" htmlFor="character-scale">{t("캐릭터 크기")}</label><select id="character-scale" value={settings.scale} disabled={Boolean(busy)} onChange={(event) => update({ scale: Number(event.target.value) })}>{!SCALE_PRESETS.some((value) => Math.abs(value - settings.scale) < 0.001) && <option value={settings.scale}>{t`${Math.round(settings.scale * 100)}% (현재)`}</option>}{SCALE_PRESETS.map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}</select></div>
     </section>
+    <section className="section-card"><h2>{t("말풍선 위치")}</h2>
+      <p>{status.app.platform === "darwin" ? t("Option + 드래그로 캐릭터를 이동할 수 있어요.") : t("Alt + 드래그로 캐릭터를 이동할 수 있어요.")}</p>
+      <div className="preference-row"><strong>{settings.bubblePlacement.mode === "auto" ? t("자동") : t("사용자 지정")}</strong><div className="button-row">
+        <button className="button secondary small" disabled={Boolean(busy)} onClick={() => void run("말풍선 위치", () => api.setBubblePlacement("auto"))}>{t("자동")}</button>
+        <button className="button secondary small" disabled={Boolean(busy)} onClick={() => void run("말풍선 위치", () => api.setBubblePlacement("adjust"))}>{t("위치 조절")}</button>
+        <button className="button secondary small" disabled={Boolean(busy)} onClick={() => void run("말풍선 위치", () => api.setBubblePlacement("reset"))}>{t("위치 초기화")}</button>
+      </div></div>
+    </section>
     <section className="section-card"><h2>{t("데스크톱 표시")}</h2>{toggles.filter((item) => !("macOnly" in item) || status.app.platform === "darwin").map((item) => <label className="preference-row" key={item.key}><span><strong>{t(item.label)}</strong>{item.description && <span className="preference-description">{t(item.description)}</span>}</span><input className="switch" type="checkbox" role="switch" checked={settings[item.key]} disabled={Boolean(busy)} onChange={(event) => update({ [item.key]: event.target.checked })} /></label>)}<div className="preference-row"><strong>{t("캐릭터 위치 초기화")}</strong><button className="button secondary small" disabled={Boolean(busy)} onClick={() => void run("위치 초기화", () => api.resetPetPosition())}>{t("위치 초기화")}</button></div></section>
     <section className="section-card"><h2>{t("앱 시작 동작")}</h2><label className="preference-row"><span><strong>{t("Codex 연결 자동 시작")}</strong><span className="preference-description">{t("다음 앱 실행부터 적용")}</span></span><input className="switch" type="checkbox" role="switch" checked={settings.adapterAutoStart} disabled={Boolean(busy)} onChange={(event) => update({ adapterAutoStart: event.target.checked })} /></label></section>
   </>

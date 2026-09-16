@@ -23,6 +23,9 @@ const connectProtocol = async (): Promise<void> => {
 }
 
 const api: PetDesktopApi = {
+  platform: process.platform,
+  dragWindow: request => ipcRenderer.invoke(IPC.windowDrag, request),
+  onDragCancelled: listener => subscription(IPC.dragCancelled, listener),
   bubble: { begin: () => ipcRenderer.invoke(BUBBLE_IPC.begin), report: value => ipcRenderer.invoke(BUBBLE_IPC.report, value) },
   characters: characterReadApi(),
   reportCharacterLoadFailure: selection => ipcRenderer.send(CHARACTER_IPC.loadFailed, selection),

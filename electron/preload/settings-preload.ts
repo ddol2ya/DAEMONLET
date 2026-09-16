@@ -33,6 +33,7 @@ const api: SettingsDesktopApi = {
   dismissOnboarding: (choice) => request(SETUP_IPC.onboardingDismiss, choice),
   getSettings: () => request(SETUP_IPC.settingsGet),
   updateSettings: (patch) => request(SETUP_IPC.settingsPatch, patch),
+  setBubblePlacement: action => request(SETUP_IPC.bubblePlacement, action),
   resetPetPosition: () => request(SETUP_IPC.resetPosition),
   restartAdapter: () => request(SETUP_IPC.restartAdapter),
   exportDiagnostics: () => request(SETUP_IPC.exportDiagnostics),

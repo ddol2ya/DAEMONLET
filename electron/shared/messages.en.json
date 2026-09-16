@@ -823,5 +823,15 @@
   "캐릭터에게 물어보기": "Ask the character",
   "에게 물어보기": " — ask a question",
   "작업": "Task",
-  "지피쨩": "Gpichan"
+  "지피쨩": "Gpichan",
+  "말풍선 위치": "Bubble position",
+  "위치 조절": "Adjust position",
+  "말풍선 위치 조절": "Adjust bubble position",
+  "말풍선 이동 손잡이": "Move bubble handle",
+  "이 위치에 말풍선이 나타나요.": "Bubbles appear here.",
+  "캐릭터를 움직이면 함께 따라갑니다.": "They follow the character when it moves.",
+  "사용자 지정": "Custom",
+  "Option + 드래그로 캐릭터를 이동할 수 있어요.": "Option-drag the character to move it.",
+  "Alt + 드래그로 캐릭터를 이동할 수 있어요.": "Alt-drag the character to move it.",
+  "메뉴바·트레이를 표시하지 못해 설정 창에서 접근할 수 있도록 복구했습니다.": "The menu bar or tray is unavailable. Access was restored through Settings."
 }
