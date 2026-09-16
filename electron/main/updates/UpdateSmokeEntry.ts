@@ -5,7 +5,8 @@ import { MacUpdater } from "electron-updater"
 import { readFile, writeFile, mkdir, unlink, appendFile } from "node:fs/promises"
 import { join } from "node:path"
 import { createHash } from "node:crypto"
-import { release } from "node:os"
+import { release, homedir } from "node:os"
+import { readFileSync, writeFileSync } from "node:fs"
 import { AppController } from "../AppController"
 import { CharacterRegistry } from "../CharacterRegistry"
 import { createPackValidator } from "../CharacterPackWorker"
@@ -18,7 +19,7 @@ if (!__APP_QA__) throw Error("UPDATE_SMOKE_ONLY")
 registerAppScheme(); app.enableSandbox()
 let controller: AppController | null = null
 void (async () => {
-  const config = JSON.parse(await readFile(join(process.resourcesPath, "update-smoke.json"), "utf8"))
+  const config = JSON.parse(readFileSync(join(process.resourcesPath, "update-smoke.json"), "utf8"))
   const feed = new URL(config.feed)
   if (feed.protocol !== "http:" || feed.hostname !== "127.0.0.1" || !config.profile || !config.output) throw Error("UPDATE_SMOKE_ONLY")
   process.env.DAEMONLET_DATA_HOME = config.profile
@@ -42,10 +43,10 @@ void (async () => {
     await writeFile(settingsFile, JSON.stringify(settings))
   }
   installAppProtocol(dataRoot, undefined, characters)
-  const adapter = { whenReady: () => app.whenReady(), version: app.getVersion(), name: "Daemonlet update review", isPackaged: true, userDataPath: config.profile, baseCachePath: config.output, appUpdateConfigPath: join(process.resourcesPath, "app-update.yml"), quit: () => app.quit(), relaunch: () => app.relaunch(), onQuit: (handler: (code: number) => void) => { app.once("quit", (_, code) => handler(code)) } }
   let nativeDownloads = 0; autoUpdater.on("update-downloaded", () => { nativeDownloads++ })
-  const updater = new MacUpdater({ provider: "generic", url: feed.href }, adapter)
-  const engine = new OfficialUpdateEngine(updater, join(config.output, "daemonlet-for-codex-updater"))
+  const updater = new MacUpdater({ provider: "generic", url: feed.href })
+  const engine = new OfficialUpdateEngine(updater, join(homedir(), "Library", "Caches", config.cacheName))
+  updater.on("error", error => writeFileSync(join(config.output, "engine-error.json"), JSON.stringify({ message: error.message, stack: error.stack })))
   const target = { platform: "darwin", arch: "arm64", osVersion: release(), kind: "mac" as const, automatic: true }
   controller = new AppController(__dirname, characters, undefined, undefined, {
     engine: () => engine, platform: async () => target, fetchLatest: undefined, autoCheck: () => false,

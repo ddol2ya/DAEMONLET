@@ -44,9 +44,12 @@ if (values.serve) {
     const result = await build({ absWorkingDir: root, bundle: true, platform: 'node', target: 'node24', format: 'cjs', external: ['electron'], minify: true, metafile: true, define: { __APP_QA__: 'true', __SETUP_SMOKE__: 'false' }, entryPoints: [join(root, 'electron/main/updates/UpdateSmokeEntry.ts')], outfile: join(stage, 'dist-electron/main.cjs') })
     await writeFile(join(stage, 'dist-electron/build-mode.json'), JSON.stringify({ schemaVersion: 1, production: false, setupSmoke: false, updateSmoke: true }))
     await writeFile(join(stage, 'dist-electron/bundle-inputs.json'), JSON.stringify({ production: false, inputs: Object.keys(result.metafile.inputs) }))
+    const cacheName = 'daemonlet-updater-qa-' + basename(output).replace(/[^a-zA-Z0-9-]/g, '-')
+    await writeFile(join(stage, 'dist-electron/app-update.yml'), JSON.stringify({ provider: 'generic', url: 'http://127.0.0.1:' + port, updaterCacheDirName: cacheName }))
     const smokeConfig = join(stage, 'update-smoke.json')
-    await writeFile(smokeConfig, JSON.stringify({ feed: 'http://127.0.0.1:' + port, output, profile, nextVersion: '0.7.3', ...(values.pack ? { pack: resolve(values.pack) } : {}), protocolPort: 45944, hookPort: 45945 }))
+    await writeFile(smokeConfig, JSON.stringify({ feed: 'http://127.0.0.1:' + port, output, profile, cacheName, nextVersion: '0.7.3', ...(values.pack ? { pack: resolve(values.pack) } : {}), protocolPort: 45944, hookPort: 45945 }))
     const config = signedForgeConfig(base, signer)
+    config.packagerConfig.appBundleId = 'io.github.ddol2ya.daemonlet.update-review.' + createHash('sha256').update(output).digest('hex').slice(0, 12)
     config.packagerConfig.electronVersion = pkg.devDependencies.electron
     config.packagerConfig.extraResource = [join(stage, 'dist-electron/codex'), join(stage, 'dist-electron/native'), join(stage, 'dist-electron/app-update.yml'), join(root, 'dist-notices/licenses'), smokeConfig]
     utils.registerForgeConfigForDirectory(stage, config)
@@ -58,6 +61,6 @@ if (values.serve) {
   const hash = createHash('sha512'); for await (const part of createReadStream(archive)) hash.update(part)
   const sha512 = hash.digest('base64'), size = (await stat(archive)).size
   await writeFile(join(feed, 'latest-mac.yml'), JSON.stringify({ version: '0.7.3', files: [{ url: file, sha512, size }], path: file, sha512, minimumSystemVersion: '22.0.0', daemonlet: { appId: 'io.github.ddol2ya.daemonlet', platform: 'darwin', arch: 'arm64', installType: 'mac' } }))
-  await writeFile(join(output, 'qa-build.json'), JSON.stringify({ apps, archive, sha512, size, signed: true, notarized: false, productionCandidate: false, publicUpload: false }, null, 2))
+  await writeFile(join(output, 'qa-build.json'), JSON.stringify({ apps, archive, sha512, size, signed: true, isolatedNativeBundleId: true, notarized: false, productionCandidate: false, publicUpload: false }, null, 2))
   console.log(JSON.stringify({ apps, output, next: 'Start this script with --serve, launch apps[0], inspect download-only.json, then write the authorized target version to approve-install.' }, null, 2))
 }
