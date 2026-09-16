@@ -1,3 +1,5 @@
+> Historical cross-home evidence. The current implementation and policy are in [Official read-only side conversations](side-chat-official-readonly.md). These prior account/custom results do not establish the new path.
+
 # Paginated side chat
 
 PR #17 continues on `feature/character-side-chat` from `5643267` as a Draft.

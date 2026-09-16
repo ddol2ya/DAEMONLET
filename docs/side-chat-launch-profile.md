@@ -1,3 +1,5 @@
+> Historical cross-home evidence. The current implementation and policy are in [Official read-only side conversations](side-chat-official-readonly.md). These prior account/custom results do not establish the new path.
+
 > Paginated follow-up: see [current support and evidence](side-chat-paginated.md). The legacy and historical account results below retain their original scope.
 
 # Side-chat launch profile v2

@@ -1,3 +1,5 @@
+> Historical cross-home evidence. The current implementation and policy are in [Official read-only side conversations](side-chat-official-readonly.md). These prior account/custom results do not establish the new path.
+
 # Character side conversation: implementation and validation
 
 Unreleased implementation; the experimental setting defaults to **OFF**. One production combination has passed real account testing. No public release or automatic merge is part of this work.

@@ -1,6 +1,6 @@
 import type { ChatSessionClosed } from "../../electron/main/side-chat/SideChatBackend"
 import { app, dialog, BrowserWindow, clipboard, ipcMain } from "electron"
-import { writeFile } from "node:fs/promises"
+import { mkdir, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { installAppProtocol, registerAppScheme } from "../../electron/main/AppProtocol"
 import { SideChatService } from "../../electron/main/side-chat/SideChatService"
@@ -63,7 +63,10 @@ ipc.register(); service.subscribe(() => win.show(service.snapshot()))
 const result: Record<string, unknown> = { backend: "synthetic", realAccountCalls: 0, status: "FAIL" }
 try {
   service.configure(true, "ko"); service.applyPersona({ id: "gpichan", revision: "builtin", label: "지피쨩", compiled: compilePersona("지피쨩", neutralPersona(), "ko") })
-  service.setCandidates([{ threadId: "parent", title: "합성 작업 · 부모 대화", cwd: root }], "parent"); service.setMode("compact")
+  const project = join(await realpath(process.env.DAEMONLET_CHAT_SMOKE_USER!), "project")
+  await mkdir(project); await writeFile(join(project, "example.ts"), "export const example = 42;\n// selected file\n")
+  service.setConnectionMode("official-same-home")
+  service.setCandidates([{ threadId: "parent", title: "합성 작업 · 부모 대화", cwd: project }], "parent"); service.setMode("compact")
   const window = win.window!, contents = window.webContents
   const js = <T = any>(code: string): Promise<T> => contents.executeJavaScript(code)
   async function until(code: string) { for (let n = 0; n < 100; n++) { if (await js(code)) return; await wait(40) }; throw Error("UI condition timed out: " + code) }
@@ -80,6 +83,17 @@ try {
   await until('document.querySelector(".message")?.textContent.includes("듣고 있습니다")')
   assert(calls === 1, "one short-response call")
   await writeFile(join(output, "compact.png"), (await contents.capturePage()).toPNG())
+  const originalPicker = dialog.showOpenDialog
+  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [join(project, "example.ts")] })
+  try {
+    await js("document.querySelector('.file-selection summary').click();document.querySelector('.file-range button').click()")
+    await until("document.querySelector('.file-selection').textContent.includes('example.ts')")
+    assert(calls === 1, "File selection made no model call")
+    assert(service.snapshot().attachments?.[0]?.startLine === 1, "Selected excerpt metadata")
+    await writeFile(join(output, "file-selected.png"), (await contents.capturePage()).toPNG())
+    await js("document.querySelector('.file-selection summary').click()")
+    result.fileSelection = "PASS"
+  } finally { dialog.showOpenDialog = originalPicker }
   answer = { text: "긴 답변의 첫 전제입니다.\n\n" + "한글과 English 설명, 이모지 👨‍👩‍👧‍👦를 포함합니다.\n".repeat(12) + "\n```typescript\nconst longIdentifier = '" + "wide".repeat(30) + "';\n```\n\n| 열 | 긴 값 |\n| --- | --- |\n| 결과 | " + "table".repeat(40) + " |\n<script>alert(1)</script>\n![remote](https://invalid.example/image.png)", preview: "긴 설명과 코드를 준비했습니다. 전체 답변에서 전제를 확인해 주세요.", expression: "neutral" }
   await type("자세히 설명해 주세요"); await js("document.querySelector('.send').click()")
   await until('Boolean(document.querySelector(".expand"))')

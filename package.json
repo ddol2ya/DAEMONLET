@@ -50,7 +50,9 @@
     "side-chat:probe:tools": "node scripts/side-chat-tool-probe.mjs",
     "side-chat:probe:startup": "node scripts/side-chat-startup-probe.mjs",
     "side-chat:ui-smoke": "node scripts/side-chat-ui-smoke.mjs",
-    "side-chat:prepare-parent": "node scripts/side-chat-source-prepare.mjs"
+    "side-chat:prepare-parent": "node scripts/side-chat-source-prepare.mjs",
+    "side-chat:prepare-official": "node scripts/side-chat-official-prepare.mjs",
+    "side-chat:probe:official-startup": "node scripts/side-chat-official-startup-probe.mjs"
   },
   "dependencies": {
     "ag-psd": "29.0.0",
