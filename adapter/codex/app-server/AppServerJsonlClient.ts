@@ -1,6 +1,7 @@
 import { EventEmitter, once } from "node:events"
 import type { Readable, Writable } from "node:stream"
 
+
 type JsonObject = Record<string, unknown>
 
 export type JsonlClientOptions = {
@@ -13,7 +14,7 @@ export type JsonlClientOptions = {
 export class AppServerJsonlClient {
   private readonly options: JsonlClientOptions
   private readonly events = new EventEmitter()
-  private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
+  private readonly pending = new Map<number, { method: string; resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
   private nextId = 1
   private buffer = Buffer.alloc(0)
   private closed = false
@@ -30,6 +31,19 @@ export class AppServerJsonlClient {
   }
 
   get pendingRequestCount(): number { return this.pending.size }
+
+  onClose(listener: () => void): () => void {
+    this.events.on("close", listener)
+    return () => this.events.off("close", listener)
+  }
+  async respondToServerRequest(id: unknown, result: unknown): Promise<void> {
+    if (typeof id !== "number" && typeof id !== "string") return
+    await this.write({ id, result })
+  }
+  async rejectServerRequest(id: unknown): Promise<void> {
+    if (typeof id !== "number" && typeof id !== "string") return
+    await this.write({ id, error: { code: -32601, message: "Side chat does not support server requests" } })
+  }
 
   onNotification(listener: (method: string, params: unknown) => void): () => void {
     this.events.on("notification", listener)
@@ -111,7 +125,7 @@ export class AppServerJsonlClient {
         reject(new Error(`app-server request timed out: ${method}`))
       }, timeoutMs)
       timer.unref()
-      this.pending.set(id, { resolve, reject, timer })
+      this.pending.set(id, { method, resolve, reject, timer })
     })
     // Return the response promise immediately so close/error rejection is always
     // observed, including when the transport breaks while a write is draining.
@@ -126,16 +140,16 @@ export class AppServerJsonlClient {
     return result
   }
 
-  async initialize(clientInfo: { name: string; title: string; version: string }): Promise<unknown> {
+  async initialize(clientInfo: { name: string; title: string; version: string }, profile: "observer" | "side-chat" = "observer"): Promise<unknown> {
     if (this.handshakeState !== "NEW") throw new Error("app-server client was already initialized")
     this.handshakeState = "INITIALIZING"
     const result = await this.request("initialize", {
       clientInfo,
       capabilities: {
-        experimentalApi: false,
+        experimentalApi: profile === "side-chat",
         requestAttestation: false,
         optOutNotificationMethods: [
-          "item/agentMessage/delta",
+          ...(profile === "observer" ? ["item/agentMessage/delta"] : []),
           "item/reasoning/summaryTextDelta",
           "item/reasoning/textDelta",
           "item/commandExecution/outputDelta",
@@ -159,6 +173,7 @@ export class AppServerJsonlClient {
       pending.reject(reason)
     }
     this.pending.clear()
+    this.events.emit("close")
     this.events.removeAllListeners()
   }
 }

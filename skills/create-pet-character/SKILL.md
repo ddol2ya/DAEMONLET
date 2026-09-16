@@ -1,9 +1,14 @@
 ---
 name: create-pet-character
-description: Create Daemonlet character packs from reference images or an appearance description, using per-pose source artwork, the user's ComfyUI/See-through environment, local rigging tools and visual validation. Use for a new character or new poses; output an external .petchar pack.
+description: Create a Daemonlet character or poses as an external .petchar pack, or add/update the persona of an existing pack from supplied character sources while preserving artwork and rigs.
 ---
 
 # Daemonlet character production
+
+## Choose the task first
+
+- **Persona only:** Existing pack + personality/source material, with no new artwork or poses. Read [persona.md](references/persona.md) and use `validate-persona` / `upgrade-persona`. Skip all image, framing, pose-count, ComfyUI, Python and GPU questions below. Preserve the original archive and every visual/rig/dialogue byte. Do not rerun the independent payload builder.
+- **New character or poses:** Follow the production inputs below. Use the same confirmed personality for pose/reaction planning, fixed dialogue and `persona.json`; read [persona.md](references/persona.md) before packaging. New packs include a validated persona unless the user explicitly requests omission.
 
 Read [production.md](references/production.md) for executable commands and data contracts. Use `scripts/creator.mjs info` and `check` to locate and validate the supplied runtime. The source checkout and complete skill ZIP both include the required local tools; an instructions-only copy does not.
 
@@ -26,7 +31,7 @@ Ask what personality and speaking style the user wants, and request a source suc
 
 For an existing character, establish the character's name, originating work and relevant version when ambiguous, then research their personality using available web tools, prioritizing official profiles and original-work material. Present a concise, linked summary of traits, speech style and likely interaction reactions, distinguish sourced facts from interpretation, and explicitly ask whether this is the personality the user intends. If research is unavailable or inconclusive, say so and request source material instead of inventing a profile. Respect requested adaptations and confirm them separately from the original characterization.
 
-Reuse an already confirmed profile. Otherwise wait for confirmation before using the personality to finalize pose expressions, reactions and dialogue; carry the agreed profile into the production plan.
+If the user explicitly asks to apply supplied character sources and they are consistent, apply them without repeating personality confirmation; retain source evidence and distinguish interpretation. Omit unsupported claims and leave material identity conflicts unresolved. Reuse an already confirmed profile. Otherwise wait for confirmation before using the personality to finalize pose expressions, reactions and dialogue; carry the agreed profile into the production plan.
 
 ### Explain poses and choose illustration counts
 

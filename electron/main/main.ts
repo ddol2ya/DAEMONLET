@@ -5,7 +5,6 @@ import { mkdir, realpath } from "node:fs/promises"
 import { registerActivationHandler } from "./AppActivation"
 import { AppController } from "./AppController"
 import { installAppProtocol, registerAppScheme } from "./AppProtocol"
-import { createSetupSmokeContext } from "./SetupSmoke"
 import { CharacterRegistry } from "./CharacterRegistry"
 import { createPackValidator } from "./CharacterPackWorker"
 import { prepareDesktopAdapterPorts } from "./DesktopAdapterConfig"
@@ -49,7 +48,7 @@ if (!app.requestSingleInstanceLock()) {
     // Vite serves development HTML; standalone smoke uses the built renderer.
     // CharacterRegistry still reads the authoring catalog from public in dev.
     installAppProtocol(devOrigin ? dataRoot : join(appRoot, "dist"), undefined, characters, devOrigin)
-    const readyController = new AppController(currentDirectory, characters, __SETUP_SMOKE__ ? await createSetupSmokeContext() : undefined, startup)
+    const readyController = new AppController(currentDirectory, characters, __SETUP_SMOKE__ ? await (await import("./SetupSmoke")).createSetupSmokeContext() : undefined, startup)
     await readyController.start()
     controller = readyController
   }).catch((error) => {

@@ -10,6 +10,16 @@ const fakeApp = (isPackaged = true) => {
 }
 
 describe("application identity", () => {
+  it("ignores QA environment overrides in production while honoring an explicit app data profile", () => {
+    vi.stubGlobal("__APP_QA__", false)
+    try {
+      const app = fakeApp(), env = { ELECTRON_SMOKE_USER_DATA: resolve("/qa/ignored"), DAEMONLET_DATA_HOME: resolve("/profiles/separate"), CODEX_HOME: "/preserved-codex" }
+      configureDesktopIdentity(app, env, "darwin")
+      expect(app.getPath("userData")).toBe(resolve("/profiles/separate")); expect(env.CODEX_HOME).toBe("/preserved-codex")
+      const normal = fakeApp(); configureDesktopIdentity(normal, { ELECTRON_SMOKE_USER_DATA: resolve("/qa/ignored") }, "darwin")
+      expect(normal.getPath("userData")).toBe(join(resolve("/profiles"), "Daemonlet for Codex"))
+    } finally { vi.unstubAllGlobals() }
+  })
   it.each(["darwin", "win32"] as const)("isolates ordinary %s startup without a smoke override", platform => {
     const app = fakeApp(), environment = { CODEX_HOME: "/actual-codex" }
     configureDesktopIdentity(app, environment, platform)

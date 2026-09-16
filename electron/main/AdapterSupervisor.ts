@@ -60,6 +60,20 @@ export async function probeExternalAdapter(
 }
 
 export class AdapterSupervisor {
+  private readonly sideChats = new Set<string>()
+  private sideChatGeneration = 0
+  private sideChatWaiters = new Map<number, () => void>()
+  async excludeSideChat(id: string): Promise<void> {
+    if (!isThreadUuid(id) || this.sideChats.size >= 512 || this.diagnostics.adapterOwnership === "EXTERNAL_PROCESS") throw new Error("CHAT_POLICY_UNENFORCEABLE")
+    this.sideChats.add(id)
+    const child = this.child, generation = ++this.sideChatGeneration
+    if (!child) return
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => { this.sideChatWaiters.delete(generation); reject(new Error("CHAT_POLICY_UNENFORCEABLE")) }, 3000)
+      this.sideChatWaiters.set(generation, () => { clearTimeout(timer); resolve() })
+      child.postMessage({ type: "exclude-side-chats", ids: [...this.sideChats], generation } satisfies AdapterWorkerCommand)
+    })
+  }
   private child: UtilityProcess | null = null
   private state: AdapterStatus = { state: "STOPPED", message: null, restartCount: 0 }
   private diagnostics: SanitizedAdapterDiagnostics
@@ -132,17 +146,20 @@ export class AdapterSupervisor {
     this.child = child
     child.on("message", (message) => this.onMessage(child, message as AdapterWorkerMessage))
     child.once("exit", (code) => this.onExit(child, code))
+    child.postMessage({ type: "exclude-side-chats", ids: [...this.sideChats], generation: this.sideChatGeneration } satisfies AdapterWorkerCommand)
     child.postMessage({ type: "start", mode: "HOOK_OBSERVER" } satisfies AdapterWorkerCommand)
   }
 
   private onMessage(child: UtilityProcess, message: AdapterWorkerMessage): void {
     if (this.child !== child || !message || typeof message !== "object") return
+    if (message.type === "side-chat-excluded") { this.sideChatWaiters.get(message.generation)?.(); this.sideChatWaiters.delete(message.generation); return }
     if (message.type === "source-availability" && typeof message.available === "boolean") {
       this.setState({ ...this.state, codexAvailable: message.available })
       return
     }
     if (message.type === "conversation-target") {
       const t = message.value
+      if (t && this.sideChats.has(t.sessionId)) return
       const home = this.options.codexHome ?? process.env.CODEX_HOME ?? join(homedir(), ".codex")
       if (!t || typeof t.sessionId !== "string" || typeof t.turnId !== "string" || typeof t.path !== "string" || t.path.length > 4096 || !isThreadUuid(t.sessionId) || !isThreadUuid(t.turnId) || !belongsToLocalCodexHome(t.path, t.sessionId, home)) return
       const key = activityCorrelationKey(canonicalRunId(t.sessionId, t.turnId))
@@ -284,7 +301,7 @@ export class AdapterSupervisor {
   }
 
   crashOwnedWorkerForSmokeTest(): boolean {
-    if (process.env.ELECTRON_SMOKE_TEST !== "1" || this.diagnostics.adapterOwnership !== "OWNED_UTILITY") return false
+    if (typeof __APP_QA__ !== "undefined" && !__APP_QA__ || process.env.ELECTRON_SMOKE_TEST !== "1" || this.diagnostics.adapterOwnership !== "OWNED_UTILITY") return false
     const pid = this.child?.pid
     if (!pid) return false
     try {

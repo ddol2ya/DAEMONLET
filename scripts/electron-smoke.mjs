@@ -3,17 +3,27 @@ import { spawn } from "node:child_process"
 import { createServer } from "node:net"
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { extractFile } from "@electron/asar"
 import { createHash } from "node:crypto"
 import { startSmokeDesktopPresence } from "./smoke-desktop-presence.mjs"
 
 const root = resolve(import.meta.dirname, "..")
+// Refuse before creating profiles or starting processes: production candidates
+// must be driven externally, with no in-bundle smoke hook or evidence sink.
+const candidate = process.env.ELECTRON_SMOKE_EXECUTABLE
+const mode = candidate
+  ? JSON.parse(extractFile(resolve(dirname(candidate), process.platform === "darwin" ? "../Resources/app.asar" : "resources/app.asar"), "dist-electron/build-mode.json").toString())
+  : JSON.parse(await readFile(join(root, "dist-electron/build-mode.json"), "utf8"))
+if (mode.production !== false) throw Error("This QA launcher requires a QA build; inspect production candidates through their normal UI")
 const evidenceDirectory = resolve(process.env.ELECTRON_SMOKE_EVIDENCE_DIRECTORY ?? join(root, "outputs/evidence/electron-desktop-pet"))
 const bellEvidenceDirectory = resolve(process.env.ELECTRON_SMOKE_BELL_DIRECTORY ?? join(root, "outputs/evidence/bell-character/electron"))
 const adapterMode = process.env.ELECTRON_SMOKE_ADAPTER_MODE ?? "owned"
 const forceTrayOffscreen = process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1"
 const dialogueEvidence = process.env.ELECTRON_SMOKE_DIALOGUE_EVIDENCE
 const hybridEvidence = process.env.ELECTRON_SMOKE_HYBRID_EVIDENCE
+// Account-free QA only. Old approval markers can never authorize a later run.
+if (Object.keys(process.env).some(key => /^ELECTRON_SMOKE_(LIVE_|OFFICIAL_|PAGINATED_)/.test(key))) throw Error("Live account options are not accepted by this QA launcher")
 const activityEvidence = process.env.ELECTRON_SMOKE_ACTIVITY_EVIDENCE
 const recoveryLifecycle = process.env.ELECTRON_SMOKE_RECOVERY === "1"
 if (adapterMode !== "owned" && adapterMode !== "external") throw new Error(`Unsupported ELECTRON_SMOKE_ADAPTER_MODE: ${adapterMode}`)
@@ -53,7 +63,7 @@ if (activityEvidence) {
     records: [{ key: createHash("sha256").update("codex-adapter\0fixture-failure").digest("hex"), activityId: "activity-1", state: "failed", revision: 2, firstObservedAt: at, lastObservedAt: at, eventAt: at, endedAt: at, acknowledgedAt: null, confidence: null, category: null }],
   }), { mode: 0o600 })
 }
-const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence)
+const isolatedPresence = process.platform === "win32" || Boolean(dialogueEvidence || hybridEvidence || process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS)
 const shortCodexHome = process.env.ELECTRON_SMOKE_DESKTOP_CONTROL_EVIDENCE || isolatedPresence
 const smokeCodexHome = shortCodexHome
   ? await mkdtemp(join(process.platform === "darwin" ? "/private/tmp" : tmpdir(), "2dl-desktop-home-"))
@@ -126,6 +136,7 @@ try {
   if (code !== 0) throw new Error(`Electron smoke failed with exit ${String(code)}\n${stderr.slice(-4000)}`)
 
   result = JSON.parse(await readFile(resultPath, "utf8"))
+  if (process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS && result.sideChatPackValidation?.status !== "PASS") throw new Error("Side chat pack switch smoke failed")
   const activityHistory = JSON.parse(await readFile(join(smokeUserData, "activity/history.json"), "utf8"))
   result.activityHistory = {
     schemaVersion: activityHistory.version,

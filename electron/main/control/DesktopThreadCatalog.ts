@@ -49,7 +49,8 @@ async function readSessionNames(root: string, uid: number): Promise<Map<string, 
 }
 
 /** Read only the local metadata index; neither resume saved threads nor query transcript columns. */
-export async function readDesktopThreadCatalog(home: string): Promise<DesktopThreadMetadata[]> {
+export async function readDesktopThreadCatalog(home: string, page?: { offset: number; query: string }, rawPage?: (hasMore: boolean) => void): Promise<DesktopThreadMetadata[]> {
+  if (page && (!Number.isSafeInteger(page.offset) || page.offset < 0 || page.offset > 100000 || page.query.length > 120)) throw new Error("INVALID_REQUEST")
   const root = await realpath(home), info = await lstat(root)
   if (!info.isDirectory() || !privateToUser(info)) throw new Error("UNSAFE_SOCKET")
   const files = (await readdir(root)).filter(name => /^state_[1-9][0-9]?\.sqlite$/.test(name)).sort((a, b) => Number(b.slice(6, -7)) - Number(a.slice(6, -7)))
@@ -65,9 +66,14 @@ export async function readDesktopThreadCatalog(home: string): Promise<DesktopThr
     const columns = new Set(db.prepare("PRAGMA table_info(threads)").all().map(row => row.name))
     if (!["id", "rollout_path", "cwd", "title", "source", "updated_at", "archived"].every(name => columns.has(name))) throw new Error("PROTOCOL_UNSUPPORTED")
     const name = columns.has("name") ? "name" : "NULL"
-    const rows = db.prepare(`SELECT id, rollout_path, cwd, title, ${name} AS name, source, updated_at FROM threads WHERE archived=0 ORDER BY updated_at DESC LIMIT 64`).all()
+    const query = page?.query.trim() ?? ""
+    const pattern = `%${query.replace(/[\\%_]/g, value => "\\" + value)}%`
+    const namedIds = query ? [...names].filter(([, title]) => title.toLocaleLowerCase().includes(query.toLocaleLowerCase())).slice(0, 128).map(([id]) => id) : []
+    const where = query ? ` AND (title LIKE ? ESCAPE '\\' OR ${name} LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\'${namedIds.length ? ` OR id IN (${namedIds.map(() => "?").join(",")})` : ""})` : ""
+    const rows = db.prepare(`SELECT id, rollout_path, cwd, title, ${name} AS name, source, updated_at FROM threads WHERE archived=0${where} ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?`).all(...(query ? [pattern, pattern, pattern, ...namedIds] : []), page ? 65 : 64, page?.offset ?? 0)
+    rawPage?.(rows.length > 64)
     const result: DesktopThreadMetadata[] = []
-    for (const row of rows) {
+    for (const row of rows.slice(0, 64)) {
       let source = row.source
       if (typeof source === "string" && source.startsWith('"')) { try { source = JSON.parse(source) } catch { continue } }
       if (typeof source !== "string" || !sources.has(source) || typeof row.id !== "string" || !isThreadUuid(row.id) || typeof row.rollout_path !== "string" || !belongsToLocalCodexHome(row.rollout_path, row.id, home)) continue
@@ -77,4 +83,12 @@ export async function readDesktopThreadCatalog(home: string): Promise<DesktopThr
     }
     return result
   } finally { db.close() }
+}
+
+export async function readDesktopThreadCatalogPage(home: string, page: { offset: number; query: string }) {
+  let hasMore = false
+  const items = await readDesktopThreadCatalog(home, page, more => { hasMore = more })
+  // Pagination follows examined rows, including filtered metadata. An ineligible
+  // page must not permanently hide eligible parents farther down the index.
+  return { items, hasMore }
 }

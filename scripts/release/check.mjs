@@ -22,6 +22,13 @@ export async function checkCandidate(asar) {
   if (JSON.stringify(catalog.characters) !== JSON.stringify(expected)) throw new Error('Unexpected built-in characters')
   const mode = json('dist-electron/build-mode.json')
   if (!mode.production || mode.setupSmoke) throw new Error('Not a production build')
+  const graph = json('dist-electron/bundle-inputs.json')
+  if (graph.production !== true || !Array.isArray(graph.inputs) || !graph.inputs.includes('electron/main/side-chat/SideChatBackend.ts')
+    || graph.inputs.some(path => typeof path !== 'string' || /(?:Smoke|fixture|tests\/|scripts\/side-chat|runtime-patches)/i.test(path))) throw new Error('Unverified production input graph')
+  const main = extract('dist-electron/main.cjs').toString('utf8')
+  if (['fresh-approval-four-submissions', 'user-authorized-six-requests', 'private-official-answers', 'DAEMONLET_CHAT_SMOKE', 'readOnlySource', 'SOURCE_RUNTIME_UNSUPPORTED'].some(marker => main.includes(marker))) throw new Error('Side chat QA or custom code shipped')
+  for (const required of ['dist/activity-bubble.html', 'dist-electron/activity-preload.cjs', 'dist/characters/gpichan/persona.json']) if (!files.includes(required)) throw new Error('Missing side chat runtime asset: ' + required)
+  if (files.includes('dist/side-chat.html') || files.includes('dist-electron/side-chat-preload.cjs')) throw new Error('Standalone chat surface shipped')
   const needed = await runtimeAssetPaths(resolve(root, 'public/characters'))
   for (const path of needed) {
     const packaged = extract('dist/characters/' + path)
@@ -55,7 +62,7 @@ export async function checkCandidate(asar) {
       packages.push(`${pkg.name}@${pkg.version}`)
     }
   }
-  return { status: 'structure-verified', characters: expected, runtimeFiles: needed.length, packages: [...new Set(packages)].sort(), developmentAssets: 0 }
+  return { status: 'structure-verified', characters: expected, runtimeFiles: needed.length, packages: [...new Set(packages)].sort(), developmentAssets: 0, productionInputs: graph.inputs.length, sideChatQaExcluded: true }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

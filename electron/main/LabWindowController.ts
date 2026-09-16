@@ -37,7 +37,7 @@ export class LabWindowController {
     })
     bindWindowLanguage(win, "모션 실험실"); this.window = win
     secureWebContents(win.webContents, "lab", this.devServerUrl)
-    if (process.env.ELECTRON_SMOKE_TEST === "1") {
+    if ((typeof __APP_QA__ === "undefined" || __APP_QA__) && process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {
         process.stderr.write(`[lab:${details.level}] ${details.message}\n`)
         if (details.level === "error") this.onWarning?.(`Motion Lab console: ${details.message}`)

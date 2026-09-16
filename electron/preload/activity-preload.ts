@@ -3,6 +3,7 @@ exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import { ACTIVITY_IPC, type ActivityApi, type ActivitySnapshot } from "../shared/activity-contract"
 import { BUBBLE_IPC } from "../shared/bubble-presentation"
+import "./side-chat-preload"
 
 const api: ActivityApi = {
   getSnapshot: () => ipcRenderer.invoke(ACTIVITY_IPC.get),
@@ -10,6 +11,7 @@ const api: ActivityApi = {
   openResult: target => ipcRenderer.invoke(ACTIVITY_IPC.openResult, target),
   openCodex: () => ipcRenderer.invoke(ACTIVITY_IPC.openCodex),
   openConversation: target => ipcRenderer.invoke(ACTIVITY_IPC.openConversation, target),
+  openChat: target => ipcRenderer.invoke(ACTIVITY_IPC.openChat, target),
   openList: () => ipcRenderer.invoke(ACTIVITY_IPC.openList),
   setCollapsed: value => ipcRenderer.invoke(ACTIVITY_IPC.setCollapsed, value),
   setInteractionLocked: (value, pressed = false) => ipcRenderer.send(BUBBLE_IPC.interaction, value, pressed),

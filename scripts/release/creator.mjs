@@ -18,10 +18,11 @@ export async function packageCreator(requestedOutput){
  const skill=join(output,'stage/create-pet-character'),runtime=join(skill,'runtime')
  await cp(join(root,'skills/create-pet-character'),skill,{recursive:true,filter:p=>!/(?:^|\/)(runtime|node_modules|__pycache__)(?:\/|$)/.test(p)})
  await mkdir(runtime,{recursive:true})
+ await cp(join(root,'schemas'),join(runtime,'schemas'),{recursive:true})
  await cp(join(root,'src'),join(runtime,'src'),{recursive:true})
  await cp(join(root,'scripts/characters'),join(runtime,'scripts/characters'),{recursive:true,filter:p=>!p.includes('__pycache__')&&!p.endsWith('.pyc')})
  for(const file of ['run-seethrough.mjs','seethrough-profile.mjs','seethrough-workflow.mjs','build-seethrough-psd.mjs'])await cp(join(root,'scripts',file),join(runtime,'scripts',file))
- const graph=await build({absWorkingDir:root,stdin:{contents:"export * from './electron/main/CharacterPackAssets';export * from './electron/shared/character-pack-contract';export * from './electron/shared/character-pack-path';export * from './src/behavior/BehaviorManifest';export * from './src/dialogue/DialogueManifest'",resolveDir:root},bundle:true,platform:'node',format:'esm',write:false,metafile:true,logLevel:'silent'})
+ const graph=await build({absWorkingDir:root,stdin:{contents:"export * from './electron/main/CharacterPackAssets';export * from './electron/main/CharacterPackArchive';export * from './electron/shared/character-persona';export * from './electron/shared/character-pack-contract';export * from './electron/shared/character-pack-path';export * from './src/behavior/BehaviorManifest';export * from './src/dialogue/DialogueManifest'",resolveDir:root},bundle:true,platform:'node',format:'esm',write:false,metafile:true,logLevel:'silent'})
  // Renderer source also imports shared Electron geometry contracts not used by the pack validator.
  const renderer=await build({absWorkingDir:root,entryPoints:['src/main.tsx'],bundle:true,platform:'browser',write:false,outdir:'verification-build',metafile:true,external:['util'],loader:{'.png':'dataurl','.svg':'dataurl'},logLevel:'silent'})
  for(const file of new Set([...Object.keys(graph.metafile.inputs),...Object.keys(renderer.metafile.inputs)]))if(file.startsWith('electron/')){await mkdir(join(runtime,file,'..'),{recursive:true});await cp(join(root,file),join(runtime,file))}

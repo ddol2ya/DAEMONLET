@@ -30,12 +30,13 @@ export type DesktopSettingsV1 = {
   clickThrough: boolean
   adapterAutoStart: boolean
   speechBubblesEnabled: boolean
+  sideChatEnabled: boolean
   taskBubblesEnabled: boolean
 }
 
 export type DesktopSettingsPatch = Partial<Pick<DesktopSettingsV1,
   "characterId" | "language" | "scale" | "visible" | "alwaysOnTop" | "showOnAllWorkspaces" |
-  "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "taskBubblesEnabled"
+  "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "taskBubblesEnabled" | "sideChatEnabled"
 >>
 
 export type DisplayLike = {
@@ -63,6 +64,7 @@ export function defaultDesktopSettings(): DesktopSettingsV1 {
     adapterAutoStart: true,
     speechBubblesEnabled: true,
     taskBubblesEnabled: true,
+    sideChatEnabled: true,
   }
 }
 
@@ -108,6 +110,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
     adapterAutoStart: bool(input.adapterAutoStart, defaults.adapterAutoStart),
     speechBubblesEnabled: bool(input.speechBubblesEnabled, defaults.speechBubblesEnabled),
     taskBubblesEnabled: bool(input.taskBubblesEnabled, defaults.taskBubblesEnabled),
+    sideChatEnabled: bool(input.sideChatEnabled, defaults.sideChatEnabled),
   }
   const migrated = input.schemaVersion !== DESKTOP_SETTINGS_SCHEMA_VERSION || JSON.stringify(input) !== JSON.stringify(normalized)
   return { value: normalized, migrated, warnings }
@@ -116,7 +119,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
 export function validateDesktopSettingsPatch(value: unknown, characterAllowed: (id: string) => boolean = builtinCharacter): DesktopSettingsPatch | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
   const input = value as Record<string, unknown>
-  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled"])
+  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled", "sideChatEnabled"])
   if (Object.keys(input).some((key) => !allowed.has(key))) return null
   const patch: DesktopSettingsPatch = {}
   if ("language" in input) {
@@ -131,7 +134,7 @@ export function validateDesktopSettingsPatch(value: unknown, characterAllowed: (
     if (!finite(input.scale) || input.scale < MIN_WINDOW_SIZE / DEFAULT_WINDOW_SIZE || input.scale > MAX_WINDOW_SIZE / DEFAULT_WINDOW_SIZE) return null
     patch.scale = input.scale
   }
-  for (const key of ["visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled"] as const) {
+  for (const key of ["visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled", "sideChatEnabled"] as const) {
     if (key in input) {
       if (typeof input[key] !== "boolean") return null
       patch[key] = input[key]

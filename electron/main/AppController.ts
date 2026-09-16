@@ -1,7 +1,14 @@
+declare const __APP_QA__: boolean
+import { SideChatService } from "./side-chat/SideChatService"
+import { CodexSideChatBackend } from "./side-chat/SideChatBackend"
+import type { ChatParent } from "./side-chat/SideChatBackend"
+import { connectVerifiedSideChat } from "./side-chat/SideChatPolicy"
+import { SideChatPreferences } from "./side-chat/SideChatPreferences"
+import { SideChatSetupController } from "./side-chat/SideChatSetupController"
+import { PersonaResolver } from "./side-chat/PersonaResolver"
+import { SideChatIpcController } from "./SideChatIpcController"
 import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
 import type { StartupWindow } from "./StartupWindow"
-import { runHybridBubbleSmoke } from "./HybridBubbleSmoke"
-import { runDialogueSmoke } from "./DialogueSmoke"
 import { app, dialog, ipcMain, powerMonitor, screen, session, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron"
 import { join, resolve } from "node:path"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
@@ -26,7 +33,7 @@ import type { CharacterRegistry } from "./CharacterRegistry"
 import { CHARACTER_IPC, isCharacterId, type CharacterSelection } from "../shared/character-pack-contract"
 import { ActivityService } from "./activity/ActivityService"
 import { ActivityConversationTitles } from "./activity/ActivityConversationTitles"
-import { readDesktopThreadCatalog } from "./control/DesktopThreadCatalog"
+import { readDesktopThreadCatalog, readDesktopThreadCatalogPage } from "./control/DesktopThreadCatalog"
 import { homedir } from "node:os"
 import { ActivityHistoryStore } from "./activity/ActivityHistoryStore"
 import { createActivityClient } from "./activity/createActivityClient"
@@ -34,21 +41,26 @@ import { CodexAppLauncher } from "./activity/CodexAppLauncher"
 import { ActivityWindowController } from "./ActivityWindowController"
 import { ActivityBubbleWindowController } from "./ActivityBubbleWindowController"
 import { BubblePresentationIpcController } from "./BubblePresentationIpcController"
-import { runTaskControlSmoke } from "./TaskControlSmoke"
-import { runDesktopControlSmoke } from "./DesktopControlSmoke"
 import { TaskControlIpcController } from "./TaskControlIpcController"
 import { CodexThreadLauncher } from "./control/CodexThreadLauncher"
 import { TaskControlService } from "./control/TaskControlService"
 import { DictationService } from "./control/DictationService"
 import { ActivityIpcController } from "./ActivityIpcController"
-import { runActivitySmoke, runActivityRestoreSmoke } from "./ActivitySmoke"
-import { runRestartDetectionSmoke } from "./RestartDetectionSmoke"
-import { runResultOpenSmoke } from "./ResultOpenSmoke"
 
 const RECOVERY_SMOKE_SESSION_ID = "smoke-recovery-session"
 const RECOVERY_SMOKE_CONFIRMED_TURN_ID = "smoke-confirmed-turn"
 
 export class AppController {
+  private readonly sideChat: SideChatService = new SideChatService(parent => new CodexSideChatBackend(() => {
+    const options = this.sideChatSetup.options()
+    return connectVerifiedSideChat({ ...options, codexHome: parent.sourceHome ?? options.codexHome, authHome: options.codexHome })
+  }, id => this.adapter.excludeSideChat(id)))
+  private readonly sideChatSetup: SideChatSetupController = new SideChatSetupController(this.sideChat, new SideChatPreferences(app.getPath("userData")),
+    () => this.integration.sideChatSelection(), () => this.activityBubble.window, () => this.updateSettings({ sideChatEnabled: true }))
+  private sideChatPage = { offset: 0, query: "", generation: 0 }
+  private readonly sideChatIpc: SideChatIpcController
+  private readonly personaResolver: PersonaResolver
+  private personaGeneration = 0
   private settings!: DesktopSettingsV1
   private readonly store = new WindowBoundsStore(app.getPath("userData"))
   private readonly tray = new TrayController()
@@ -96,14 +108,17 @@ export class AppController {
     this.activityTitles = new ActivityConversationTitles(() => readDesktopThreadCatalog(process.env.CODEX_HOME ?? join(homedir(), ".codex")), titles => this.activity.setConversationTitles(titles))
     this.activityWindow = new ActivityWindowController(preload("activity"), this.devServerUrl)
     this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"), undefined, process.platform, appLanguage)
-    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel())
+    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => this.sideChat.setMode("hidden"))
+    this.personaResolver = new PersonaResolver((selection, path) => this.characters.readPersonaAsset(selection, path))
+    this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more))
+    this.subscriptions.push(this.sideChat.subscribe(() => this.activityBubble.updateChat(this.sideChat.snapshot())))
     this.bubbleIpc = new BubblePresentationIpcController(this.activityBubble, this.devServerUrl)
     this.taskControlIpc = new TaskControlIpcController(this.activityBubble, this.taskControl, this.dictation, this.devServerUrl, Date.now, this.threadLauncher)
     this.activityIpc = new ActivityIpcController(this.activityWindow, this.activity, this.codexApp, this.devServerUrl, Date.now, this.activityBubble, async key => {
       const target = this.adapter.conversationTarget(key)
       if (!target) throw new Error("UNAVAILABLE")
       await this.threadLauncher.open(target)
-    })
+    }, (key, activityId) => this.openSideChat(key, activityId))
     this.pet = new PetWindowController({
       preloadPath: preload("pet"),
       devServerUrl: this.devServerUrl,
@@ -118,7 +133,7 @@ export class AppController {
       workerPath,
       config: this.adapterConfig,
       // Never attach the test app to another installation's adapter.
-      allowExternalReuse: process.env.ELECTRON_SMOKE_ADAPTER_MODE === "external",
+      allowExternalReuse: __APP_QA__ && process.env.ELECTRON_SMOKE_ADAPTER_MODE === "external",
     })
     this.integration = new CodexIntegrationController({
       userData: app.getPath("userData"), appVersion: app.getVersion(), packaged: app.isPackaged,
@@ -171,15 +186,25 @@ export class AppController {
     this.registerIpc()
     this.settingsIpc.register()
     this.characterIpc.register()
+    this.sideChatIpc.register()
+    this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
+    await this.sideChatSetup.load()
+    let sideChatSelection = JSON.stringify(this.integration.sideChatSelection())
+    this.subscriptions.push(this.integration.subscribe(() => {
+      const selection = JSON.stringify(this.integration.sideChatSelection())
+      if (selection !== sideChatSelection) { sideChatSelection = selection; this.sideChatSetup.invalidate() }
+    }))
     this.activityIpc.register()
     this.bubbleIpc.register()
     this.taskControlIpc.register()
-    this.subscriptions.push(this.taskControl.subscribe(() => this.integration.notifyAdapterChanged()))
+    this.subscriptions.push(this.taskControl.subscribe(() => { this.integration.notifyAdapterChanged(); this.sideChat.updateTask(this.sideChat.parentThreadId(), this.taskControl.observedChatTask(this.sideChat.parentThreadId()), Date.now()) }))
     this.taskControl.connectDesktop()
     this.subscriptions.push(this.activity.subscribe(value => { this.rebuildTray(); this.activityBubble.update(value) }))
     await this.activity.start()
     void this.codexApp.available().then(available => { if (!this.quitting) this.activity.setNavigation(available ? "app" : "none") })
     this.subscriptions.push(this.characters.subscribe(snapshot => {
+      const active = snapshot.entries.find(e => e.id === this.settings.characterId)
+      if (active && this.lastReady?.id === active.id && this.lastReady.revision !== active.revision) { this.sideChat.beginCharacterApply(); this.personaGeneration++ }
       this.pet.send(CHARACTER_IPC.changed, snapshot)
       this.settingsWindow.send(CHARACTER_IPC.changed, snapshot)
       if (this.lab.window && !this.lab.window.isDestroyed()) this.lab.window.webContents.send(CHARACTER_IPC.changed, snapshot)
@@ -203,7 +228,7 @@ export class AppController {
     if (packagedMac && this.trayCreated) {
       this.trayVisibilityTimer = setTimeout(() => {
         this.trayVisibilityTimer = null
-        const forceOffscreen = process.env.ELECTRON_SMOKE_TEST === "1" && process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1"
+        const forceOffscreen = __APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1" && process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1"
         if (!forceOffscreen && this.tray.isVisibleOn(screen.getAllDisplays().map((display) => display.bounds))) return
         this.dockFallbackRestored = true
         app.setActivationPolicy("regular")
@@ -236,6 +261,8 @@ export class AppController {
     this.trayVisibilityTimer = null
     if (this.settingsPoll) clearInterval(this.settingsPoll)
     this.settingsPoll = null
+    this.sideChatIpc.dispose()
+    await this.sideChat.dispose()
     this.settingsWindow.destroy()
     this.activityWindow.destroy()
     this.activityBubble.destroy()
@@ -284,12 +311,13 @@ export class AppController {
       const requested = this.characters.get(this.settings.characterId)
       if (!requested || info.characterId !== requested.id || (info.revision ?? "builtin") !== requested.revision) return
       this.lastReady = { id: requested.id, revision: requested.revision }
+      void this.refreshPersona(this.lastReady)
       for (const waiter of this.readyWaiters) if (waiter.selection.id === requested.id && waiter.selection.revision === requested.revision) waiter.finish()
-      if (process.env.ELECTRON_SMOKE_TEST === "1") this.smokeReadyCharacters.add(info.characterId)
+      if (__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1") this.smokeReadyCharacters.add(info.characterId)
       this.startup?.close()
       this.pet.reportReady()
       this.pet.send(IPC.adapterStatus, this.adapter.getStatus())
-      if (process.env.ELECTRON_SMOKE_TEST === "1") void this.finishSmoke(info.characterId)
+      if (__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1") void this.finishSmoke(info.characterId)
     })
     ipcMain.on(IPC.alphaFailure, (event, value: unknown) => { if (trustedPet(event)) { const message = validateShortMessage(value); if (message) this.warn(`Alpha hit test: ${message}`) } })
     ipcMain.on(CHARACTER_IPC.loadFailed, (event, value: CharacterSelection) => { if (trustedPet(event) && value && typeof value.id === "string" && typeof value.revision === "string") void this.characterLoadFailed(value).catch(() => this.warn("캐릭터 복원에 실패했습니다.")) })
@@ -323,10 +351,15 @@ export class AppController {
       if (!this.characters.isAvailable(patch.characterId)) throw new Error("PACK_UNAVAILABLE")
       this.unavailableSelection = null
     }
-    if (patch.characterId !== undefined && patch.characterId !== this.settings.characterId) this.activityBubble.presentation.begin()
-    const previousScale = this.settings.scale
+    if (patch.characterId !== undefined && patch.characterId !== this.settings.characterId) {
+      this.activityBubble.presentation.begin(); this.sideChat.beginCharacterApply(); this.personaGeneration++
+    }
+    const previousScale = this.settings.scale, previousChatEnabled = this.settings.sideChatEnabled
     Object.assign(this.settings, patch)
     if (patch.language !== undefined) setAppLanguage(this.settings.language)
+    this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
+    if (previousChatEnabled !== this.settings.sideChatEnabled) this.sideChatSetup.invalidate()
+    if ((patch.language !== undefined || patch.sideChatEnabled === true) && this.lastReady) void this.refreshPersona(this.lastReady)
     if (patch.scale !== undefined && patch.scale !== previousScale) {
       const size = windowSizeForScale(patch.scale)
       const current = this.pet.window?.getBounds() ?? this.settings.bounds
@@ -383,6 +416,45 @@ export class AppController {
   }
 
   private savedSettings(): DesktopSettingsV1 { return { ...this.settings, characterId: this.unavailableSelection ?? this.settings.characterId } }
+  private async refreshPersona(selection: CharacterSelection) {
+    const requested = this.characters.get(this.settings.characterId)
+    if (requested?.id !== selection.id || requested.revision !== selection.revision) return
+    const generation = ++this.personaGeneration
+    try {
+      const binding = await this.personaResolver.resolve(selection, this.settings.language)
+      if (generation === this.personaGeneration && this.lastReady?.id === binding.id && this.lastReady.revision === binding.revision) this.sideChat.applyPersona(binding)
+    } catch { if (generation === this.personaGeneration) this.sideChat.personaFailed() }
+  }
+  private chatOpenGeneration = 0
+  private async openSideChat(key?: string, activityId?: string) {
+    const generation = ++this.chatOpenGeneration
+    const target = key ? this.adapter.conversationTarget(key) : null
+    if (activityId && !target || target && target.threadId !== this.sideChat.parentThreadId()) this.sideChat.clearParent()
+    this.sideChat.setMode("compact")
+    const epoch = this.sideChat.snapshot().epoch
+    await this.refreshChatParents(target?.threadId)
+    if (generation !== this.chatOpenGeneration || epoch !== this.sideChat.snapshot().epoch) return
+    if (target && this.settings.sideChatEnabled) this.sideChat.chooseThread(target.threadId, activityId)
+    await this.sideChatSetup.check()
+  }
+  private async refreshChatParents(query?: string, more = false) {
+    if (!this.settings.sideChatEnabled || this.quitting) return
+    const home = this.sideChatSetup.options().codexHome, epoch = this.sideChat.snapshot().epoch
+    const page = this.sideChatPage
+    page.query = query ?? page.query; page.offset = more ? page.offset + 64 : 0
+    const generation = ++page.generation
+    const catalog = await readDesktopThreadCatalogPage(home, { offset: page.offset, query: page.query }).catch(() => ({ items: [], hasMore: false }))
+    if (!this.settings.sideChatEnabled || this.quitting || generation !== page.generation || epoch !== this.sideChat.snapshot().epoch) return
+    const tasks = new Map<string, string>()
+    for (const entry of this.activity.snapshot().entries.slice().sort((a, b) => b.lastObservedAt - a.lastObservedAt)) {
+      const key = this.activity.conversationKey({ activityId: entry.activityId, revision: entry.revision })
+      const target = key ? this.adapter.conversationTarget(key) : null
+      if (target && !tasks.has(target.threadId)) tasks.set(target.threadId, entry.activityId)
+    }
+    const candidates: ChatParent[] = catalog.items.map(item => ({ threadId: item.id, title: item.title, cwd: item.cwd, sourceHome: home, activityId: tasks.get(item.id) }))
+    this.sideChat.setCandidates(candidates)
+    this.sideChat.setPreparation({ hasMoreParents: catalog.hasMore, parentQuery: page.query })
+  }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
     await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
     if (this.lastReady?.id === selection.id && this.lastReady.revision === selection.revision && this.settings.characterId === selection.id) { this.updateSettings({ characterId: selection.id }); return }
@@ -397,6 +469,7 @@ export class AppController {
     const current = this.characters.get(this.settings.characterId)
     if (current?.id !== selection.id || current.revision !== selection.revision) return
     for (const waiter of this.readyWaiters) if (waiter.selection.id === selection.id && waiter.selection.revision === selection.revision) waiter.finish(new Error("PACK_LOAD"))
+    this.personaGeneration++; this.sideChat.characterFailed()
     this.warn("새 캐릭터를 표시하지 못해 이전 정상 캐릭터로 돌아갑니다.")
     if (current.source === "external" && current.previousVersion && this.lastReady?.id === current.id && this.lastReady.revision !== current.revision) {
       await this.characters.rollback(selection)
@@ -420,6 +493,7 @@ export class AppController {
   private trayActions(): TrayActions {
     return {
       activity: () => this.activity.snapshot(),
+      openSideChat: () => { void this.openSideChat() },
       openTaskControl: () => { this.updateSettings({ visible: true, taskBubblesEnabled: true }); this.activityBubble.setView("control", false) },
       openActivity: () => {
         this.activityWindow.open()
@@ -476,6 +550,7 @@ export class AppController {
   }
 
   private async runRecoverySmoke(): Promise<Record<string, unknown>> {
+    if (__APP_QA__) {
     const initial = await this.waitForAdapterDiagnostics((value) => value.activeRunCount === 2 && value.provisionalRecoveredRunCount === 2)
     const utilityCrashTriggered = this.adapter.crashOwnedWorkerForSmokeTest()
     let restartStarted = false
@@ -542,7 +617,19 @@ export class AppController {
     }
   }
 
+    return {}
+  }
+
   private async finishSmoke(characterId: string): Promise<void> {
+    if (__APP_QA__) {
+    const { runSideChatPackSmoke } = await import("./SideChatPackSmoke")
+    const { runHybridBubbleSmoke } = await import("./HybridBubbleSmoke")
+    const { runDialogueSmoke } = await import("./DialogueSmoke")
+    const { runTaskControlSmoke } = await import("./TaskControlSmoke")
+    const { runDesktopControlSmoke } = await import("./DesktopControlSmoke")
+    const { runActivitySmoke, runActivityRestoreSmoke } = await import("./ActivitySmoke")
+    const { runRestartDetectionSmoke } = await import("./RestartDetectionSmoke")
+    const { runResultOpenSmoke } = await import("./ResultOpenSmoke")
     if (this.smokeFinishing) return
     this.smokeFinishing = true
     for (let attempt = 0; attempt < 150; attempt++) {
@@ -747,7 +834,13 @@ export class AppController {
       const persistedFalse = !persistedAfterClose.value.visible
       app.emit("activate")
       await new Promise((resolveWait) => setTimeout(resolveWait, 450))
-      const persistedAfterActivate = await this.store.load()
+      let persistedAfterActivate = await this.store.load()
+      // Native move/activation callbacks may restart the 350 ms save debounce.
+      // Await the persisted condition instead of racing a fixed 450 ms delay.
+      for (let n = 0; n < 20 && !persistedAfterActivate.value.visible; n++) {
+        await new Promise(resolveWait => setTimeout(resolveWait, 100))
+        persistedAfterActivate = await this.store.load()
+      }
       const dockActivateShowedPet = this.settings.visible && win.isVisible()
       visibilitySync = { closeHidden, settingFalse, persistedFalse, petHiddenBeforeActivate: closeHidden, dockActivateShowedPet, visiblePersistedTrue: persistedAfterActivate.value.visible }
     }
@@ -845,6 +938,11 @@ export class AppController {
       try { taskControlValidation = await runTaskControlSmoke({ bubble: this.activityBubble, control: this.taskControl, dictation: this.dictation, launcher: this.threadLauncher, evidenceDirectory: process.env.ELECTRON_SMOKE_TASK_CONTROL_EVIDENCE }) }
       catch (error) { this.warn(error instanceof Error ? error.message : "Task control packaged smoke failed") }
     }
+    let sideChatPackValidation: Awaited<ReturnType<typeof runSideChatPackSmoke>> | null = null
+    if (process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS && win) {
+      try { sideChatPackValidation = await runSideChatPackSmoke({ registry: this.characters, service: this.sideChat, resolver: this.personaResolver, pet: win, select: value => this.selectCharacter(value), output: process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS }) }
+      catch { this.warn("Side chat pack switch smoke failed") }
+    }
     const adapterDiagnostics = this.adapter.getDiagnostics()
     const protocolDiagnostics = this.protocol.getDiagnostics()
     const result = {
@@ -893,6 +991,7 @@ export class AppController {
       activityValidation,
       taskControlValidation,
       desktopControlValidation,
+      sideChatPackValidation,
       settingsPath: "userData/desktop-settings.json",
       warnings: this.warnings,
       rendererProcessGone: false,
@@ -900,5 +999,6 @@ export class AppController {
     if (path) await writeFile(resolve(path), `${JSON.stringify(result, null, 2)}\n`, "utf8")
     process.stdout.write(`ELECTRON_SMOKE_RESULT ${process.env.ELECTRON_SMOKE_DIALOGUE_EVIDENCE || process.env.ELECTRON_SMOKE_HYBRID_EVIDENCE ? "bubble validation recorded" : JSON.stringify(result)}\n`)
     await this.quit()
+    }
   }
 }

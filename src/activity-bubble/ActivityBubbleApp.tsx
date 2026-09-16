@@ -1,5 +1,9 @@
 import { useT } from "../i18n/useLanguage"
 import TaskControlPanel from "./TaskControlPanel"
+import { SideChatApp } from "../side-chat/SideChatApp"
+import type { SideChatSnapshot } from "../../electron/shared/side-chat-contract"
+import "../side-chat/side-chat.css"
+import { isComposing } from "../side-chat/presentation"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { ActivityApi, ActivityResponse, ActivitySnapshot } from "../../electron/shared/activity-contract"
 import { activityBubbleEntries } from "../../electron/shared/activity-bubble"
@@ -11,6 +15,9 @@ const categories = { command: "명령 실행", "file-change": "파일 변경", t
 export default function ActivityBubbleApp() {
   const t = useT()
   const [snapshot, setSnapshot] = useState<ActivitySnapshot | null>(null)
+  const [chat, setChat] = useState<SideChatSnapshot | null>(null)
+  const chatOpen = Boolean(chat && chat.mode !== "hidden")
+  const chatBusy = chatOpen && Boolean(chat?.applying || ["answering", "preparing"].includes(chat?.phase ?? ""))
   const [attention, setAttention] = useState({ waiting: 0, unread: 0 })
   const [selected, setSelected] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(false)
@@ -55,7 +62,7 @@ export default function ActivityBubbleApp() {
     void control?.getView().then(result => { if (result.ok && !viewChanged) applyView(result.value) }).catch(() => {})
     let interactive = false
     const pointer = (event: MouseEvent) => {
-      const next = event.target instanceof Element && Boolean(event.target.closest("button, input, textarea, select, summary, a"))
+      const next = event.target instanceof Element && Boolean(event.target.closest("button, input, textarea, select, summary, a, .chat .history"))
       if (interactive !== next) { interactive = next; api.setPointerInteractive(next) }
     }
     // Focus can move while a captured mouse press is still active (for
@@ -77,7 +84,7 @@ export default function ActivityBubbleApp() {
   }, [])
   useLayoutEffect(() => {
     const element = main.current
-    if (!element || view !== "activity") return
+    if (!element || view !== "activity" || chatOpen) return
     let frame: number | null = null
     const measure = () => {
       frame = null
@@ -87,16 +94,18 @@ export default function ActivityBubbleApp() {
     const observer = new ResizeObserver(() => { if (frame === null) frame = requestAnimationFrame(measure) })
     observer.observe(element); measure()
     return () => { observer.disconnect(); if (frame !== null) cancelAnimationFrame(frame) }
-  }, [view, collapsed, menuOpen])
+  }, [view, collapsed, menuOpen, chatOpen])
   useLayoutEffect(() => {
     if (!focusAfterToggle.current || view !== "activity") return
     focusAfterToggle.current = false
     main.current?.querySelector<HTMLElement>(collapsed ? ".mini-task-chip" : ".bubble-menu summary")?.focus({ preventScroll: true })
   }, [collapsed, view])
   const entries = snapshot ? activityBubbleEntries(snapshot) : []
-  const index = Math.max(0, entries.findIndex(r => r.activityId === selected))
-  const entry = entries[index]
-  useEffect(() => { if (selected !== (entry?.activityId ?? null)) setSelected(entry?.activityId ?? null) }, [entry?.activityId, selected])
+  const selectedId = chatOpen ? chat?.parent?.activityId : selected
+  const foundIndex = entries.findIndex(r => r.activityId === selectedId), index = Math.max(0, foundIndex)
+  const entry = chatOpen ? snapshot?.entries.find(r => r.activityId === chat?.parent?.activityId) : entries[index]
+  const taskName = chatOpen ? chat?.parent?.title ?? t("작업 선택") : entry?.name ?? t("새 작업을 기다려요")
+  useEffect(() => { if (!chatOpen && selected !== (entry?.activityId ?? null)) setSelected(entry?.activityId ?? null) }, [entry?.activityId, selected, chatOpen])
   const stale = snapshot?.connection !== "READY" || entry?.freshness === "rechecking"
   const perform = async <T,>(action: () => Promise<ActivityResponse<T>>, after?: (value: T) => void) => {
     if (actionPending.current) return
@@ -106,10 +115,15 @@ export default function ActivityBubbleApp() {
   }
   const api = window.activityDesktop
   const toggle = () => { closeMenu(); focusAfterToggle.current = document.activeElement?.matches(":focus-visible") ?? false; if (api) void perform(() => api.setCollapsed(!collapsed), setCollapsed) }
-  const cycle = (delta: number) => { if (entries.length) { setSelected(entries[(index + delta + entries.length) % entries.length].activityId); setError("") } }
+  const cycle = (delta: number) => {
+    if (!entries.length || chatBusy) return
+    const next = entries[(index + delta + entries.length) % entries.length]
+    if (chatOpen && api) void perform(() => api.openChat({ activityId: next.activityId, revision: next.revision }))
+    else { setSelected(next.activityId); setError("") }
+  }
   const release = (reason: string) => { if (releaseTimer.current) clearTimeout(releaseTimer.current); releaseTimer.current = setTimeout(() => { releaseTimer.current = null; hold(reason, false) }, 0) }
   const target = entry && { activityId: entry.activityId, revision: entry.revision }
-  return <><div className="activity-view" hidden={view !== "activity"}><main ref={main} className={`bubble-shell task-bubble ${collapsed ? "compact" : ""}`} data-state={entry?.state ?? "unknown"} data-activity-id={entry?.activityId} aria-label={t("작업 말풍선")}
+  return <><div className="activity-view" hidden={view !== "activity"}><main ref={main} className={`bubble-shell task-bubble ${collapsed ? "compact" : ""} ${chatOpen ? "has-chat" : ""}`} data-state={entry?.state ?? "unknown"} data-activity-id={entry?.activityId} aria-label={t("작업 말풍선")}
     onPointerDownCapture={event => {
       if (!(event.target instanceof Element)) return
       const button = event.target.closest("button, summary")
@@ -124,7 +138,7 @@ export default function ActivityBubbleApp() {
     onClickCapture={event => { if (blockedClick.current) { event.preventDefault(); event.stopPropagation(); blockedClick.current = false } }}
     onFocusCapture={event => { if (event.target.matches(":focus-visible")) hold("focus", true) }}
     onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) hold("focus", false) }}
-    onKeyDown={event => { if (["Enter", " "].includes(event.key)) { hold("keyboard", true); hold("native", false) } if (event.key === "Escape") { if (menuOpen) { event.preventDefault(); closeMenu(); menu.current?.querySelector("summary")?.focus() } else if (!collapsed) toggle() } }}
+    onKeyDown={event => { if (isComposing(event.nativeEvent)) return; if (["Enter", " "].includes(event.key)) { hold("keyboard", true); hold("native", false) } if (event.key === "Escape" && !event.defaultPrevented) { if (menuOpen) { event.preventDefault(); closeMenu(); menu.current?.querySelector("summary")?.focus() } else if (!collapsed) toggle() } }}
     onKeyUp={() => release("keyboard")}>
     {collapsed ? <button className="mini-task-chip" aria-label={t("작업 알림 펼치기")} aria-expanded="false" title={t`${entry?.name ?? t("작업 알림")} · ${entry ? t(labels[entry.state]) : ""} · 입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`} disabled={pending || !api} onClick={toggle}>
       <span className="mini-task-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></svg><span className={`task-dot ${stale ? "stale" : ""}`} /></span>
@@ -132,7 +146,7 @@ export default function ActivityBubbleApp() {
       <span className="sr-label" role="status" aria-live="polite">{t`입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`}</span>
     </button> : <><div className="bubble-top">
       <span className={`task-dot ${stale ? "stale" : ""}`} aria-hidden="true" />
-      <div className="task-heading"><strong>{stale ? t("작업 재확인 중") : entry ? t(labels[entry.state]) : t("작업 알림")}</strong>{!collapsed && entry && (entry.unread || entry.category || entry.state === "waiting" || stale) && <span>· {entry.unread ? t("미확인") : entry.state === "running" && entry.category ? t(categories[entry.category]) : entry.state === "waiting" ? t("대화에서 응답") : t("마지막 관찰")}</span>}</div>
+      <div className="task-heading"><strong>{entry ? stale ? t("작업 재확인 중") : t(labels[entry.state]) : t("작업")}</strong>{!collapsed && entry && (entry.unread || entry.category || entry.state === "waiting" || stale) && <span>· {entry.unread ? t("미확인") : entry.state === "running" && entry.category ? t(categories[entry.category]) : entry.state === "waiting" ? t("대화에서 응답") : t("마지막 관찰")}</span>}</div>
       <button className="text-button" aria-label={t("작업 목록 열기")} disabled={pending || !api} onClick={() => api && void perform(() => api.openList())}>{t("목록")}</button>
       <details ref={menu} className="bubble-menu" open={menuOpen} onToggle={event => { setMenuOpen(event.currentTarget.open); hold("menu", event.currentTarget.open) }}><summary aria-label={t("작업 말풍선 메뉴")} onClick={event => hold("menu", !(event.currentTarget.parentElement as HTMLDetailsElement).open)}>···</summary><div className="bubble-menu-panel">
         {window.taskControlDesktop && <button disabled={pending} onClick={() => { closeMenu(); void window.taskControlDesktop!.setView("control", false) }}>{t("Codex 제어")}</button>}
@@ -140,13 +154,15 @@ export default function ActivityBubbleApp() {
         {entry?.unread && entry.canOpenConversation && <button disabled={pending || !api} onClick={() => { closeMenu(); if (api && target) void perform(() => api.openResult(target), receive) }}>{t("열고 확인")}</button>}
       </div></details>
     </div>
-    <div className="bubble-bottom"><span className="task-name" title={entry?.name}>{entry?.name ?? t("새 작업을 기다려요")}</span><div className="task-links">
+    <div className="bubble-bottom"><span className="task-name" title={taskName}>{taskName}</span><div className="task-links">
       {entry?.canOpenConversation && <button className="text-button" disabled={pending || !api} onClick={() => api && target && void perform(() => api.openConversation(target))}>{t("대화 열기 ")}<span aria-hidden="true">↗</span></button>}
       {entry?.unread && <button className="text-button confirm" disabled={pending || !api} onClick={() => api && target && void perform(() => api.acknowledge({ targets: [target] }), receive)}>{t("확인")}</button>}
     </div></div>
     <div className="bubble-summary"><span role="status" aria-live="polite" aria-atomic="true">{attention.waiting ? t`입력 필요 ${attention.waiting}` : ""}{attention.waiting && attention.unread ? " · " : ""}{attention.unread ? t`미확인 ${attention.unread}` : ""}</span>
-      {entries.length > 1 && <div className="task-pager" aria-label={t("작업 선택")}><button className="text-button" aria-label={t("이전 작업")} disabled={pending} onClick={() => cycle(-1)}>‹</button><span>{index + 1}/{entries.length}</span><button className="text-button" aria-label={t("다음 작업")} disabled={pending} onClick={() => cycle(1)}>›</button></div>}
+      {entries.length > 1 && (!chatOpen || foundIndex >= 0) && <div className="task-pager" aria-label={t("작업 선택")}><button className="text-button" aria-label={t("이전 작업")} disabled={pending || chatBusy} onClick={() => cycle(-1)}>‹</button><span>{index + 1}/{entries.length}</span><button className="text-button" aria-label={t("다음 작업")} disabled={pending || chatBusy} onClick={() => cycle(1)}>›</button></div>}
     </div>
+    {!chatOpen && window.daemonletSideChat && <button className="task-chat-entry" aria-label={t("캐릭터에게 물어보기")} disabled={pending || !api} onClick={() => api && void perform(() => api.openChat(target ?? null))}><span>{chat?.character.label ?? t("지피쨩")}{t("에게 물어보기")}</span><span aria-hidden="true">↵</span></button>}
     {(error || snapshot?.storage === "error") && <p className="task-error" role="alert">{t(error) || t("이력 저장 실패 · 작업 목록에서 확인해 주세요.")}</p>}</>}
+  {window.daemonletSideChat && <SideChatApp api={window.daemonletSideChat} onSnapshot={setChat} />}
   </main></div><TaskControlPanel hidden={view !== "control"} collapsed={collapsed} /></>
 }

@@ -17,5 +17,5 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "vitest/globals"]
   },
-  "include": ["src", "adapter", "electron", "scripts/*.ts", "scripts/c1/*.ts", "tests", "vite.config.ts"]
+  "include": ["src", "adapter", "electron", "scripts/*.ts", "scripts/c1/*.ts", "scripts/side-chat/*.ts", "tests", "vite.config.ts"]
 }

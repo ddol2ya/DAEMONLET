@@ -42,7 +42,13 @@
     "creator:verify": "node scripts/release/verify-creator.mjs",
     "electron:install": "node node_modules/electron/install.js",
     "release:validation": "node scripts/release/validation-cli.mjs",
-    "language:smoke": "node scripts/language-smoke.mjs"
+    "language:smoke": "node scripts/language-smoke.mjs",
+    "test:side-chat": "vitest run tests/side-chat*.test.ts tests/character-persona.test.ts",
+    "side-chat:probe": "node scripts/side-chat.mjs backend",
+    "side-chat:probe:tools": "node scripts/side-chat.mjs tools",
+    "side-chat:probe:startup": "node scripts/side-chat.mjs startup",
+    "side-chat:ui-smoke": "node scripts/side-chat-ui-smoke.mjs",
+    "side-chat:prepare-official": "node scripts/side-chat.mjs prepare"
   },
   "dependencies": {
     "ag-psd": "29.0.0",

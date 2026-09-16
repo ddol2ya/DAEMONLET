@@ -10,7 +10,9 @@ Preserve selected source artwork and existing user packs. Verify visual transiti
 interactions and the packaged app, not only parser/unit-test success.
 
 ComfyUI, See-through and model weights are external dependencies; do not bundle them.
-Ask for the ComfyUI root, its Python, URL and GPU before using the production skill.
+Ask for the ComfyUI root, its Python, URL and GPU before image/pose production.
+Persona-only updates of existing packs skip image, pose and GPU setup questions;
+validate sourced persona data and repackage metadata without changing visual assets.
 If dependencies are missing or incompatible, offer a concrete installation or repair
 plan and ask for approval. After approval, carry out setup and validation within
 that scope without per-file reconfirmation. Disclose changes to existing packages

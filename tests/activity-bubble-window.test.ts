@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events"
 import { describe, expect, it, vi } from "vitest"
 import type { BrowserWindow } from "electron"
 import { defaultDesktopSettings } from "../electron/shared/desktop-settings"
+import { SideChatService } from "../electron/main/side-chat/SideChatService"
 import { ActivityStore } from "../electron/main/activity/ActivityStore"
 
 class FakeWebContents extends EventEmitter {
@@ -21,6 +22,8 @@ class FakeWindow extends EventEmitter {
   setBounds = vi.fn((r: typeof this.bounds) => { this.bounds = { ...r } })
   hide = vi.fn(() => { const wasVisible = this.visible; this.visible = false; if (wasVisible) this.emit("hide") })
   showInactive = vi.fn(() => { this.visible = true })
+  show = vi.fn(() => { this.visible = true })
+  focus = vi.fn()
   getBounds() { return { ...this.bounds } }
   isDestroyed() { return this.destroyed }
   isVisible() { if (this.destroyed) throw new Error("Object has been destroyed"); return this.visible }
@@ -183,6 +186,27 @@ describe("native activity window arbitration", () => {
     expect(win.isVisible()).toBe(false)
     await report("완료했습니다.", 85)
     expect(win.getBounds()).toEqual(opening)
+    f.c.destroy()
+  })
+})
+
+describe("conversation inside the task surface", () => {
+  it("reuses the task window for chat and expansion, retaining normal activity after hiding", async () => {
+    const f = await fixture(), service = new SideChatService(() => { throw Error("No automatic backend") })
+    service.configure(true, "ko"); service.setMode("compact"); f.c.updateChat(service.snapshot())
+    expect(f.c.window).toBe(f.win); expect(f.win.visible).toBe(true); expect(f.win.bounds.width).toBe(360); expect(f.win.focus).toHaveBeenCalledTimes(1)
+    service.setDraft("kept"); f.c.updateChat(service.snapshot()); expect(f.win.focus).toHaveBeenCalledTimes(1)
+    service.setMode("panel"); f.c.updateChat(service.snapshot()); expect(f.c.window).toBe(f.win); expect(f.win.bounds.width).toBe(480)
+    service.setMode("hidden"); f.c.updateChat(service.snapshot()); expect(f.c.window).toBe(f.win); expect(f.win.visible).toBe(true); expect(service.snapshot().draft).toBe("kept")
+    f.c.destroy()
+  })
+  it("allows explicit chat with task notifications off and follows Pet visibility", async () => {
+    const f = await fixture(), service = new SideChatService(() => { throw Error("No automatic backend") })
+    f.c.applySettings({ ...f.settings, taskBubblesEnabled: false }); expect(f.win.visible).toBe(false)
+    service.configure(true, "ko"); service.setMode("compact"); f.c.updateChat(service.snapshot()); expect(f.win.visible).toBe(true)
+    f.pet.visible = false; f.pet.emit("hide"); expect(f.win.visible).toBe(false)
+    f.pet.visible = true; f.pet.emit("show"); expect(f.win.visible).toBe(true)
+    service.setMode("hidden"); f.c.updateChat(service.snapshot()); expect(f.win.visible).toBe(false)
     f.c.destroy()
   })
 })

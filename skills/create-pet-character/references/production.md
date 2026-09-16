@@ -95,3 +95,9 @@ node scripts/characters/export-pack.mjs \
 ## 완료 기록
 
 원화/시트/파츠 해시, 요청과 실제 분해 설정, 선택/재생성 이력, 상태별 모션, 11단계 표정과 크기별 이미지/영상 검토, 앱 설치 결과, 권리 미확인 사항을 남긴다. 모델·원작·입력 이미지 라이선스는 서로 별개다. AI 생성 결과의 소유 조건만으로 원작 캐릭터 재배포 권한을 추정하지 않는다. 가중치는 사용자 환경에만 설치하고 앱이나 팩에 포함하지 않는다.
+
+## Persona data and persona-only updates
+
+Use [persona.md](persona.md) and the already confirmed personality for both fixed dialogue and the chat persona. Save `persona.json` in the private run, validate it, then pass `--persona <persona.json>` to `creator.mjs payload` alongside its existing required inputs. The payload tool keeps this flag optional for legacy technical callers; the skill's new-character workflow supplies it by default. Export resolves the explicit reference, validates the profile and includes `side-chat-persona-v1` only when present.
+
+For existing packs, use `creator.mjs upgrade-persona` directly. No new illustration, model loading, independent payload rebuild or rig conversion is involved. See the exact commands and byte-preservation report contract in persona.md.

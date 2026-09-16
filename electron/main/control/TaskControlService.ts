@@ -36,6 +36,14 @@ export class TaskControlService {
   private readonly actions = new Map<string, { signature: string; result: Promise<TaskControlSnapshot> }>()
   private unsubscribes: Array<() => void> = []
   constructor(private readonly connector: Connector = connectAppServerSocket, private readonly desktopConnector: Connector = (_path, closed) => DesktopControlConnection.connect(closed)) {}
+  selectedLocalChatThreadId(): string | undefined {
+    const selected = this.selectedKey ? this.threads.get(this.selectedKey) : null
+    return selected?.rolloutPath && belongsToLocalCodexHome(selected.rolloutPath, selected.threadId, process.env.CODEX_HOME ?? join(homedir(), ".codex")) ? selected.threadId : undefined
+  }
+  observedChatTask(threadId: string | null): string {
+    if (this.connection !== "ready") return "unknown"
+    return [...this.threads.values()].find(t => t.threadId === threadId)?.state ?? "unknown"
+  }
   snapshot(): TaskControlSnapshot { return { revision: this.revision, connection: this.connection, source: this.source, autoConnect: this.autoConnect, socketPath: this.socketPath, threads: [...this.threads.values()].map(({ threadId: _, turnId: __, rolloutPath: ___, ...value }) => ({ ...value, canSend: value.canSend && this.connection === "ready" && !this.pending, canStop: value.canStop && this.connection === "ready" && !this.pending, canOpenConversation: value.canOpenConversation && this.connection === "ready" })), selectedKey: this.selectedKey, pending: this.pending, issue: this.issue, needsClient: Boolean(this.selectedKey && this.clientRequests.has(this.threads.get(this.selectedKey)?.threadId ?? "")) } }
   subscribe(listener: (value: TaskControlSnapshot) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   private publish(): TaskControlSnapshot { this.revision++; const value = this.snapshot(); for (const listener of this.listeners) listener(value); return value }

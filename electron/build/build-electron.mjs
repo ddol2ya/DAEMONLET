@@ -17,6 +17,7 @@ await mkdir(resolve(outdir, "codex"), { recursive: true })
 await mkdir(resolve(outdir, "licenses"), { recursive: true })
 
 const common = {
+  absWorkingDir: root,
   bundle: true,
   platform: "node",
   target: "node24",
@@ -26,7 +27,7 @@ const common = {
   minify: production,
   metafile: true,
   logLevel: "info",
-  define: { __SETUP_SMOKE__: JSON.stringify(setupSmoke) },
+  define: { __SETUP_SMOKE__: JSON.stringify(setupSmoke), __APP_QA__: JSON.stringify(!production || setupSmoke) },
 }
 
 const bundles = await Promise.all([
@@ -40,6 +41,9 @@ const bundles = await Promise.all([
   build({ ...common, entryPoints: [resolve(root, "electron/utility/codex-adapter-worker.ts")], outfile: resolve(outdir, "codex/codex-adapter-worker.cjs") }),
 ])
 
+const productionInputs = [...new Set(bundles.flatMap(result => Object.keys(result.metafile.inputs)))].sort()
+if (production && !setupSmoke && productionInputs.some(file => /(?:Smoke|fixture|tests\/|scripts\/side-chat|runtime-patches)/i.test(file))) throw Error("QA code reached the production graph")
+await writeFile(resolve(outdir, "bundle-inputs.json"), JSON.stringify({ production: production && !setupSmoke, inputs: productionInputs }) + "\n")
 await writeLicenseBundle(resolve(outdir, "licenses"), bundles.flatMap(result => Object.keys(result.metafile.inputs)))
 
 await copyFile(resolve(root, "adapter/codex/hooks/hook-forwarder.mjs"), resolve(outdir, "codex/hook-forwarder.mjs"))

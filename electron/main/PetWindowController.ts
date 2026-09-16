@@ -76,7 +76,7 @@ export class PetWindowController {
       if (mainFrame) this.failSafe(`Pet load failed (${code} ${description}): ${url}`)
     })
     win.webContents.on("context-menu", () => this.options.onContextMenu?.(win))
-    if (process.env.ELECTRON_SMOKE_TEST === "1") {
+    if ((typeof __APP_QA__ === "undefined" || __APP_QA__) && process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {
         process.stderr.write(`[pet:${details.level}] ${details.message}\n`)
         if (details.level === "error") this.options.onWarning(`Renderer console: ${details.message}`)

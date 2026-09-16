@@ -27,12 +27,12 @@ function fixture() {
   const bubbleContents = { id: 9, mainFrame: bubbleFrame } as unknown as WebContents
   const bubble = { window: { isDestroyed: () => false, webContents: bubbleContents } as BrowserWindow, send: vi.fn(), setCollapsed: vi.fn(value => value) } as unknown as ActivityBubbleWindowController
   const bubbleSender = { sender: bubbleContents, senderFrame: bubbleFrame } as IpcMainInvokeEvent
-  const openConversation = vi.fn(async (_key: string) => {})
-  const controller = new ActivityIpcController(window, service as unknown as ActivityService, launcher as unknown as CodexAppLauncher, undefined, () => now, bubble, openConversation)
+  const openConversation = vi.fn(async (_key: string) => {}), openChat = vi.fn(async (_key?: string) => {})
+  const controller = new ActivityIpcController(window, service as unknown as ActivityService, launcher as unknown as CodexAppLauncher, undefined, () => now, bubble, openConversation, openChat)
   controller.register(); controllers.push(controller)
   const sender = { sender: contents, senderFrame: frame } as IpcMainInvokeEvent
   const invoke = (channel: string, args: unknown[] = [], event = sender) => mocks.handlers.get(channel)!(event, ...args)
-  return { controller, launcher, openConversation, service, window, bubble, bubbleSender, frame, contents, event, invoke, sender, advance: () => { now += 2100 } }
+  return { controller, launcher, openConversation, openChat, service, window, bubble, bubbleSender, frame, contents, event, invoke, sender, advance: () => { now += 2100 } }
 }
 
 describe("narrow activity IPC", () => {
@@ -162,4 +162,23 @@ describe("narrow activity IPC", () => {
     f.controller.dispose()
     expect(unsubscribe).toHaveBeenCalledOnce(); expect(mocks.handlers.size).toBe(0)
   })
+})
+
+ it("opens a child conversation only from an explicitly selected trusted task without opening or acknowledging its parent", async () => {
+   const f = fixture(), entry = f.service.snapshot().entries[0], target = { activityId: entry.activityId, revision: entry.revision }
+   expect(await f.invoke(ACTIVITY_IPC.openChat, [target], f.bubbleSender)).toEqual({ ok: true, value: null })
+   expect(f.openChat).toHaveBeenCalledExactlyOnceWith(f.service.conversationKey(target), target.activityId)
+   expect(f.openConversation).not.toHaveBeenCalled(); expect(f.launcher.open).not.toHaveBeenCalled(); expect(f.service.acknowledge).not.toHaveBeenCalled()
+   expect(await f.invoke(ACTIVITY_IPC.openChat, [target])).toMatchObject({ ok: false, code: "UNTRUSTED_SENDER" })
+   expect(await f.invoke(ACTIVITY_IPC.openChat, [{ ...target, threadId: "forged" }], f.bubbleSender)).toMatchObject({ ok: false, code: "INVALID_REQUEST" })
+   expect(await f.invoke(ACTIVITY_IPC.openChat, [{ ...target, revision: target.revision + 1 }], f.bubbleSender)).toMatchObject({ ok: false, code: "STALE_TARGET" })
+   expect(f.openChat).toHaveBeenCalledTimes(1)
+ })
+
+it("opens the explicit parent picker for an unmapped current task without opening or acknowledging a parent", async () => {
+  const f = fixture(), entry = f.service.snapshot().entries[0], target = { activityId: entry.activityId, revision: entry.revision }
+  vi.spyOn(f.service, "conversationKey").mockReturnValue(null)
+  expect(await f.invoke(ACTIVITY_IPC.openChat, [target], f.bubbleSender)).toEqual({ ok: true, value: null })
+  expect(f.openChat).toHaveBeenCalledExactlyOnceWith(undefined, target.activityId)
+  expect(f.openConversation).not.toHaveBeenCalled(); expect(f.launcher.open).not.toHaveBeenCalled(); expect(f.service.acknowledge).not.toHaveBeenCalled()
 })

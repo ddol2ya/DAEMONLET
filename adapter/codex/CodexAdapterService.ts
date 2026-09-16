@@ -23,6 +23,7 @@ const execFileAsync = promisify(execFile)
 type MaintenanceTimer = ReturnType<typeof setInterval>
 
 export type CodexAdapterServiceOptions = {
+  excludeSession?: (id: string) => boolean
   now?: () => number
   setMaintenanceTimer?: (callback: () => Promise<void>, delay: number) => MaintenanceTimer
   clearMaintenanceTimer?: (timer: MaintenanceTimer) => void
@@ -56,7 +57,7 @@ export class CodexAdapterService {
     this.live = new LiveActivityReconciler(this.registry, {
       now: options.now,
       snapshot: () => this.protocol?.publishSnapshot(),
-      target: value => { this.options.onConversationTarget?.(value); this.lifecycle?.observe(value.sessionId, value.turnId) },
+      target: value => { if (this.options.excludeSession?.(value.sessionId)) return; this.options.onConversationTarget?.(value); this.lifecycle?.observe(value.sessionId, value.turnId) },
       available: value => this.options.onSourceAvailability?.(value),
     })
   }
@@ -84,11 +85,12 @@ export class CodexAdapterService {
 
       if (this.config.mode === "HOOK_OBSERVER") {
         this.lifecycle = new CodexLifecycleObserver({ home: this.config.codexHome, now: this.options.now,
-          onEvent: event => this.apply({ kind: "event", event }), onTarget: value => this.live.target(value) })
+          onEvent: event => this.apply({ kind: "event", event }), onTarget: value => { if (!this.options.excludeSession?.(value.sessionId)) this.live.target(value) } })
         this.lifecycle.start()
         for (const run of this.registry.getIdMappings()) this.lifecycle.observe(run.sessionId, run.turnId)
         const { token } = await loadOrCreateAdapterToken(this.config.dataDir)
         this.ingress = new HookIngressServer({ token, host: this.config.hookHost, port: this.config.hookPort, onEvent: (event) => {
+          if (this.options.excludeSession?.(event.sessionId)) return Promise.resolve()
           this.lifecycle?.observe(event.sessionId, "turnId" in event ? event.turnId : undefined)
           return this.apply(mapHookEvent(event))
         } })
@@ -121,6 +123,7 @@ export class CodexAdapterService {
   }
 
   private async apply(action: NormalizedCodexAction): Promise<void> {
+    if (this.options.excludeSession?.(action.kind === "session-ended" ? action.sessionId : action.event.sessionId)) return
     let accepted = false
     let eventType: string
     let backend: CodexAdapterDiagnostics["mode"]
@@ -153,7 +156,7 @@ export class CodexAdapterService {
   }
 
   observeLiveActivity(value: LiveActivitySnapshot): void {
-    this.live.update(value)
+    this.live.update({ ...value, sessions: value.sessions.filter(s => !this.options.excludeSession?.(s.sessionId)) })
     void this.persist()
   }
 

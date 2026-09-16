@@ -77,6 +77,57 @@ describe("dialogue-priority presentation", () => {
   })
 })
 
+describe("side chat display arbitration", () => {
+  const speech = { text: "Old authored line", width: 150, height: 42, fadeMs: 160 }
+  it("consumes hidden reports during chat and restores activity without another Pet event", async () => {
+    const f = fixture()
+    await f.c.report({ epoch: f.epoch, sequence: 1, phase: "shown", available: true, anchor, speech })
+    f.c.setSideChatVisible(true)
+    expect(f.c.canShowActivity).toBe(false)
+    await f.c.report({ epoch: f.epoch, sequence: 2, phase: "hidden", available: true, anchor })
+    expect(f.c.speech).toBeNull()
+    await vi.advanceTimersByTimeAsync(BUBBLE_RETURN_DELAY_MS)
+    expect(f.c.canShowActivity).toBe(false)
+    f.c.setSideChatVisible(false)
+    expect(f.c.speech).toBeNull(); expect(f.c.canShowActivity).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  it("keeps new anchors, unavailability and sequence validation while suppressing permission", async () => {
+    const f = fixture(), moved = { ...anchor, x0: .2 }
+    await f.c.report({ epoch: f.epoch, sequence: 1, phase: "shown", available: true, anchor, speech })
+    f.c.setSideChatVisible(true)
+    expect(await f.c.report({ epoch: f.epoch, sequence: 3, phase: "shown", available: true, anchor: moved, speech })).toMatchObject({ granted: false })
+    expect(f.c.anchor).toEqual(moved)
+    await f.c.report({ epoch: f.epoch, sequence: 2, phase: "hidden", available: false, anchor: null })
+    await f.c.report({ epoch: f.epoch - 1, sequence: 100, phase: "hidden", available: false, anchor: null })
+    expect(f.c.anchor).toEqual(moved); expect(f.c.speech?.content).toEqual(speech)
+    await f.c.report({ epoch: f.epoch, sequence: 4, phase: "hidden", available: false, anchor: null })
+    f.c.setSideChatVisible(false)
+    expect(f.c.anchor).toBeNull(); expect(f.c.speech).toBeNull(); expect(f.c.canShowActivity).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+  it("does not let denied preparation retain an expired line's occupation", async () => {
+    const f = fixture(); await f.report("shown"); f.c.setSideChatVisible(true)
+    await f.report("hidden"); expect(await f.report("preparing")).toMatchObject({ granted: false })
+    await vi.advanceTimersByTimeAsync(BUBBLE_RETURN_DELAY_MS)
+    f.c.setSideChatVisible(false); expect(f.c.canShowActivity).toBe(true)
+  })
+  it("retains a latest shown lifetime during chat without allowing simultaneous activity on hide", async () => {
+    const f = fixture(); await f.report("hidden"); f.c.setSideChatVisible(true)
+    expect(await f.report("shown")).toMatchObject({ granted: false })
+    f.c.setSideChatVisible(false); expect(f.c.canShowActivity).toBe(false)
+  })
+  it("rejects pending/new preparations during chat, including when the input lock releases", async () => {
+    const f = fixture(); await f.report("hidden"); f.c.setInteractionLocked(true)
+    const pending = f.report("preparing"); f.c.setSideChatVisible(true)
+    expect(await pending).toMatchObject({ granted: false })
+    expect(await f.report("preparing")).toMatchObject({ granted: false })
+    f.c.setInteractionLocked(false); expect(f.c.canShowActivity).toBe(false)
+    f.c.setSideChatVisible(false); expect(f.c.canShowActivity).toBe(true)
+    expect(await f.report("preparing")).toMatchObject({ granted: true })
+  })
+})
+
 describe("presentation geometry ingress", () => {
   const valid = { epoch: 1, sequence: 1, available: true, phase: "hidden", anchor }
   it("accepts only finite normalized geometry and exact non-content fields", () => {

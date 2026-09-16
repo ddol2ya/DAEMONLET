@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "role": "Desktop conversation companion",
+    "traits": []
+  },
+  "speech": {
+    "formality": "polite",
+    "defaultLength": "brief",
+    "humor": "none",
+    "languagePolicy": "follow-app"
+  },
+  "examples": []
+}
