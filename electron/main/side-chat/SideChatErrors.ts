@@ -1,4 +1,10 @@
-import type { ChatError } from "../../shared/side-chat-contract"
+import { CHAT_ERRORS, CHAT_PREPARATION_ERRORS, type ChatError } from "../../shared/side-chat-contract"
+
+const safeCodes = new Set<ChatError>([...CHAT_ERRORS, ...CHAT_PREPARATION_ERRORS])
+export function chatError(error: unknown): ChatError {
+  const code = error instanceof Error ? error.message as ChatError : "SESSION_LOST"
+  return safeCodes.has(code) ? code : "SESSION_LOST"
+}
 
 /** Only documented structured enum/status fields. Never display server messages,
  * request bodies, personal paths, credentials, or inferred regex matches. */

@@ -1,15 +1,14 @@
 import { randomUUID } from "node:crypto"
 import { realpath } from "node:fs/promises"
-import { CHAT_ERRORS, CHAT_PREPARATION_ERRORS, SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatSubmission, type ChatError, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
+import { SIDE_CHAT_LIMITS, utf8Bytes, validChatInput, type ChatRequest, type ChatSubmission, type SideChatSnapshot, type ChatResponse } from "../../shared/side-chat-contract"
 import type { AppLanguage } from "../../shared/app-language"
 import type { PersonaBinding } from "./PersonaResolver"
 import type { ChatParent, ChatSessionClosed, SideChatBackend } from "./SideChatBackend"
 import { ProjectReadService, PROJECT_READ_LIMITS, type ProjectExcerpt } from "./ProjectReadService"
 
 
-const errors = new Set<ChatError>([...CHAT_ERRORS, ...CHAT_PREPARATION_ERRORS])
-export function chatError(error: unknown): ChatError { const code = error instanceof Error ? error.message as ChatError : "SESSION_LOST"; return errors.has(code) ? code : "SESSION_LOST" }
-errors.add("READ_ACCESS_DENIED"); errors.add("READ_LIMIT")
+import { chatError } from "./SideChatErrors"
+export { chatError }
 
 /** All transcripts, drafts and request IDs live only in this instance's memory. */
 export class SideChatService {
