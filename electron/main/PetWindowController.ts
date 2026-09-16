@@ -50,6 +50,7 @@ export class PetWindowController {
       skipTaskbar: true,
       alwaysOnTop: settings.alwaysOnTop,
       focusable: true,
+      acceptFirstMouse: true,
       webPreferences: { additionalArguments: languageArguments(),
         nodeIntegration: false,
         contextIsolation: true,

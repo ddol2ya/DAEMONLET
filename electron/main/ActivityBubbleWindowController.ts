@@ -167,7 +167,7 @@ export class ActivityBubbleWindowController {
     const win = new BrowserWindow({
       width: 276, height: 100, title: appText("Daemonlet 작업 말풍선"), show: false,
       transparent: true, frame: false, resizable: false, movable: false, minimizable: false, maximizable: false,
-      skipTaskbar: true, hasShadow: false, backgroundColor: "#00000000",
+      skipTaskbar: true, acceptFirstMouse: true, hasShadow: false, backgroundColor: "#00000000",
       webPreferences: { additionalArguments: languageArguments(), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, backgroundThrottling: false, preload: this.preloadPath },
     })
     bindWindowLanguage(win, "Daemonlet 작업 말풍선"); this.window = win; this.ready = false
