@@ -879,5 +879,9 @@
   "공식 GitHub 출처·HTTPS·버전·파일 해시는 확인하지만 발행자의 신원은 보증하지 않습니다. 배포 계정이 침해되면 악성 설치 파일이 실행될 수 있습니다. 다운로드와 설치·재시작은 계속 직접 승인해야 합니다. Windows 보안 설정은 바꾸지 않습니다.": "The official GitHub source, HTTPS, version and file hash are checked, but publisher identity is not guaranteed. A compromised release account could deliver a malicious installer. Downloads and installation/restarts still need your approval. Windows security settings remain unchanged.",
   "이 기기에서 허용": "Allow on this device",
   "발행자 미검증 경로입니다. 출처와 파일 무결성은 확인하지만 발행자 서명은 확인하지 않습니다.": "Publisher not verified. The source and file integrity are checked, but no publisher signature is verified.",
-  "이 기기에서만 적용됩니다. 켤 때 위험 안내와 명시적 동의가 필요합니다.": "Applies only on this device. Enabling requires an explanation of the risk and your explicit consent."
+  "이 기기에서만 적용됩니다. 켤 때 위험 안내와 명시적 동의가 필요합니다.": "Applies only on this device. Enabling requires an explanation of the risk and your explicit consent.",
+  "업데이트를 완료하지 못했습니다": "The update could not be completed",
+  "앱을 안전하게 종료합니다.": "The app will close safely.",
+  "앱을 다시 열면 업데이트 설정에서 다시 확인하거나 수동으로 설치할 수 있습니다. 자동으로 재시도하지 않습니다.": "Reopen the app to check again in Updates or install manually. It will not retry automatically.",
+  "이전 업데이트가 완료되지 않았습니다. 현재 버전을 확인하고 다시 확인하거나 수동으로 설치해 주세요. 자동으로 재시도하지 않습니다.": "The previous update did not complete. Check the current version, then check again or install manually. It will not retry automatically."
 }

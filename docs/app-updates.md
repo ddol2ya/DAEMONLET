@@ -13,6 +13,14 @@ Open **Check for updates…** in the character/tray menu, or **Settings → Upda
 
 On Mac, accepting step 3 starts Squirrel staging. Once staged, a subsequent normal app exit can apply it even if immediate restart fails. The dialog says this before staging. There is no claimed rollback or staging-cancel action. Temporary conversation text is never written to disk to preserve it across restarts.
 
+## Installation handoff failures
+
+Stopping background checks during update cleanup does not dispose the active handoff. The official adapter forwards synchronous exceptions and asynchronous updater error events to the candidate/attempt owner. It does not report a void quitAndInstall return as successful installation. Final process exit and OS shutdown detach the observer.
+
+Before destructive cleanup, a failure restores the existing Settings UI and input. After cleanup has started, the old controllers cannot be reused: a native error notice explains how to reopen the app, then this app exits without automatic relaunch. A small atomic update-attempt.json record contains only attempt ID, source/target versions and a failure flag—no transcript, paths, credentials or raw error text. If the next launch still runs N, Updates opens with manual retry guidance and suppresses background update checks until the user checks again. A boot at N+1 (or newer) clears the pending record.
+
+The current process cannot observe every installer failure after it exits. The pending record covers that uncertainty on next launch. Approved Mac staging can still apply on normal exit; no rollback or stage cancellation is claimed. OS shutdown does not trigger automatic relaunch or retry.
+
 ## Support and trust
 
 | Installation | Behavior / release gate |
@@ -62,6 +70,8 @@ Before an approved public release, prepare every supported platform's final asse
 scripts/update-smoke.mjs builds two **QA applications** (signed on Mac, explicitly opted-in unsigned NSIS on Windows), with the real AppController and official updater adapter, into a new private directory. It serves a localhost-only feed and uses a separate profile, cache and ports. The standalone UpdateSmokeEntry is never imported by production main.ts. Its explicit test consent substitutes for the native production dialog and is recorded as such.
 
 The driver can import an existing pack without changing its source file, check download-only without native staging, quit and relaunch N, then write an authorized install marker to apply N+1. It records running versions, settings, pack revisions and a hash of the CLI/consent preferences. These applications are not distributable candidates. A separately built clean production candidate must pass the normal ASAR/signature checks.
+
+With --handoff-failures, the excluded QA driver also runs cleanup-before, cleanup-after, install-throw and install-event cases through the real AppController lifecycle, and checks manual recovery on the next launch. Only the fixture replaces the native installation operation and dialog answers; its report distinguishes these injected failures from a real installer failure.
 
 Required evidence still includes real UI consent/cancellation, OS termination, native gesture/tray regressions, corrupt download/signature failure, disk/network failure, and actual Windows NSIS replacement under the recorded signed or explicitly opted-in unsigned policy. Signed-publisher validation remains a separate credential-dependent check. Report any unexecuted scenario as NOT_RUN or BLOCKED_CREDENTIALS. Never infer installer rollback, public feed success or Gatekeeper approval from a unit test.
 

@@ -17,7 +17,8 @@ export interface UpdateEngine {
   download(candidate: VerifiedRelease, signal: AbortSignal, progress: (percent: number) => void): Promise<void>
   verify(candidate: VerifiedRelease): Promise<void>
   prepare(): Promise<void>
-  install(): void
+  /** Starts a handoff, not installation completion. Own errors until unsubscribe/exit. */
+  install(onError: (error: unknown) => void): () => void
 }
 export async function detectUpdatePlatform(allowUnsignedWindows = false): Promise<UpdatePlatform> {
   const target: UpdatePlatform = { platform: process.platform, arch: process.arch, osVersion: release(), kind: "unsupported", automatic: false, reason: "UNSUPPORTED_INSTALL" }
@@ -63,6 +64,8 @@ export function createOfficialUpdateEngine(allowUnsignedWindows: () => boolean =
 }
 export class OfficialUpdateEngine implements UpdateEngine {
   private file: string | null = null
+  private installError?: (error: unknown) => void
+  private installStarted = false
   constructor(private readonly updater: AppUpdater, private readonly cacheRoot: string, private readonly allowUnsignedWindows: () => boolean = () => false) {
     updater.autoDownload = false
     updater.autoInstallOnAppQuit = false
@@ -72,8 +75,9 @@ export class OfficialUpdateEngine implements UpdateEngine {
     updater.disableDifferentialDownload = true
     updater.disableWebInstaller = true
     updater.logger = null
-    // check/download errors reject their promises; install errors remain observable.
-    updater.on("error", () => {})
+    // Check/download errors reject their promises. Install errors instead travel
+    // through the attempt-owned callback, including events after quitAndInstall returns.
+    updater.on("error", error => this.installError?.(error))
   }
   async check(): Promise<unknown> { return (await this.updater.checkForUpdates())?.updateInfo }
   async download(candidate: VerifiedRelease, signal: AbortSignal, progress: (percent: number) => void): Promise<void> {
@@ -124,8 +128,15 @@ export class OfficialUpdateEngine implements UpdateEngine {
       try { autoUpdater.checkForUpdates() } catch (error) { failed(error as Error) }
     })
   }
-  install(): void {
-    if (process.platform === "win32") process.env.DAEMONLET_OWNED_UPDATE_PID = String(process.pid)
-    this.updater.quitAndInstall(process.platform === "win32", true)
+  install(onError: (error: unknown) => void): () => void {
+    if (this.installStarted) throw Error("INSTALL_ALREADY_STARTED")
+    this.installStarted = true
+    this.installError = onError
+    const stop = () => { if (this.installError === onError) this.installError = undefined }
+    try {
+      if (process.platform === "win32") process.env.DAEMONLET_OWNED_UPDATE_PID = String(process.pid)
+      this.updater.quitAndInstall(process.platform === "win32", true)
+      return stop
+    } catch (error) { stop(); throw error }
   }
 }

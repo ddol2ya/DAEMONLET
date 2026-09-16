@@ -14,7 +14,7 @@ import base from '../forge.config.mjs'
 import { signedForgeConfig } from './macos/policy.mjs'
 const defaultDesktopSettings = () => ({ schemaVersion: 1, characterId: 'gpichan', alwaysOnTop: true, showOnAllWorkspaces: true, showOverFullScreen: false, clickThrough: true, speechBubblesEnabled: true, updateAutoCheck: false })
 const run = promisify(execFile), root = resolve(import.meta.dirname, '..')
-const { values } = parseArgs({ options: { output: { type: 'string' }, 'signing-manifest': { type: 'string' }, serve: { type: 'boolean' }, pack: { type: 'string' }, 'unsigned-windows': { type: 'boolean' }, failures: { type: 'boolean' }, 'install-baseline': { type: 'boolean' } } })
+const { values } = parseArgs({ options: { output: { type: 'string' }, 'signing-manifest': { type: 'string' }, serve: { type: 'boolean' }, pack: { type: 'string' }, 'unsigned-windows': { type: 'boolean' }, failures: { type: 'boolean' }, 'install-baseline': { type: 'boolean' }, 'handoff-failures': { type: 'boolean' } } })
 if (!values.output) throw Error('Require --output <new isolated QA directory>')
 const output = resolve(values.output), feed = join(output, 'feed'), port = 45943
 if (values.serve) {
@@ -52,7 +52,7 @@ if (values.serve) {
     const cacheName = 'daemonlet-updater-qa-' + basename(output).replace(/[^a-zA-Z0-9-]/g, '-')
     await writeFile(join(stage, 'dist-electron/app-update.yml'), JSON.stringify({ provider: 'generic', url: 'http://127.0.0.1:' + port, updaterCacheDirName: cacheName }))
     const smokeConfig = join(stage, 'update-smoke.json')
-    await writeFile(smokeConfig, JSON.stringify({ feed: 'http://127.0.0.1:' + port, output, profile, cacheName, nextVersion: '0.7.3', failures: values.failures === true, unsignedWindows: values['unsigned-windows'] === true, ...(values.pack ? { pack: resolve(values.pack) } : {}), protocolPort: 45944, hookPort: 45945 }))
+    await writeFile(smokeConfig, JSON.stringify({ feed: 'http://127.0.0.1:' + port, output, profile, cacheName, nextVersion: '0.7.3', failures: values.failures === true, handoffFailures: values['handoff-failures'] === true, unsignedWindows: values['unsigned-windows'] === true, ...(values.pack ? { pack: resolve(values.pack) } : {}), protocolPort: 45944, hookPort: 45945 }))
     const config = mac ? signedForgeConfig(base, signer) : { ...base, packagerConfig: { ...base.packagerConfig } }
     config.packagerConfig.appBundleId = reviewId
     config.packagerConfig.electronVersion = pkg.devDependencies.electron

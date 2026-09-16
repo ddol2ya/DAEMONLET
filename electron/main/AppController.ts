@@ -195,7 +195,7 @@ export class AppController {
       autoCheck: () => this.settings?.updateAutoCheck ?? false,
       confirmInstall: () => this.confirmUpdateRestart(), prepareShutdown: () => this.prepareUpdateExit(),
       handoff: () => { if (this.osEnding) throw Error("OS_SHUTDOWN"); this.exitReady = true },
-      resume: () => { this.updatePreparing = false; setApplicationInputLocked(false); this.rebuildTray() },
+      recoverFailure: () => this.recoverUpdateFailure(),
       openExternal: url => shell.openExternal(url),
       fetchLatest: async etag => {
         const response = await net.fetch(RELEASE_ROOT + "/latest", { headers: { Accept: "application/json", ...(etag ? { "If-None-Match": etag } : {}) }, signal: AbortSignal.timeout(15_000) })
@@ -231,7 +231,7 @@ export class AppController {
     this.registerIpc()
     this.settingsIpc.register()
     this.updateIpc.register()
-    void this.updates.start()
+    const updateRecovery = await this.updates.start()
     this.characterIpc.register()
     this.sideChatIpc.register()
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
@@ -287,8 +287,10 @@ export class AppController {
     screen.on("display-metrics-changed", this.onDisplaysChanged)
     powerMonitor.on("resume", this.onResume)
     powerMonitor.on("shutdown", this.onSystemShutdown)
+    app.once("will-quit", this.onFinalQuit)
     this.pet.window?.on("query-session-end", this.onSystemShutdown)
     if (await this.integration.start()) this.settingsWindow.open()
+    if (updateRecovery) this.updateIpc.open()
     if (__SETUP_SMOKE__ && this.setupSmoke) void this.setupSmoke.run({
       settings: this.settingsWindow, integration: this.integration, pet: this.pet, adapter: this.adapter,
       getDesktopSettings: () => structuredClone(this.settings), quit: () => this.quit(),
@@ -310,7 +312,32 @@ export class AppController {
     this.updateSettings({ visible: true })
   }
 
-  private onSystemShutdown = () => { this.osEnding = true; this.updates.dispose() }
+  private onSystemShutdown = () => { this.osEnding = true; this.updates.systemShutdown() }
+  private onFinalQuit = () => { this.updates.dispose(); powerMonitor.removeListener("shutdown", this.onSystemShutdown) }
+
+  private async recoverUpdateFailure(): Promise<void> {
+    if (this.osEnding) return
+    if (!this.quitting) {
+      this.updatePreparing = false; setApplicationInputLocked(false); this.rebuildTray()
+      this.updateIpc.open()
+      return
+    }
+    // Some controllers/IPC may already be destroyed. Block a concurrent native
+    // quit while showing a real OS notice; never pretend the old UI was restored.
+    this.exitReady = false
+    try {
+      await dialog.showMessageBox({ type: "error", title: appText("업데이트를 완료하지 못했습니다"),
+        message: appText("앱을 안전하게 종료합니다."),
+        detail: appText("앱을 다시 열면 업데이트 설정에서 다시 확인하거나 수동으로 설치할 수 있습니다. 자동으로 재시도하지 않습니다.") + (process.platform === "darwin" ? "\n" + appText("승인 후 Mac이 업데이트를 준비하면 다음 앱 종료 때 적용될 수 있습니다.") : ""),
+        buttons: [appText("종료")], defaultId: 0, cancelId: 0 })
+    } finally {
+      this.onFinalQuit()
+      this.exitReady = true
+      // Only this already-cleaned-up application exits. No relaunch, parent
+      // control, or process-name termination. Pending metadata survives for boot.
+      app.exit(1)
+    }
+  }
 
   private async setUnsignedWindowsPolicy(enabled: boolean): Promise<boolean> {
     if (process.platform !== "win32" || this.quitting || this.updatePreparing) return false
@@ -337,7 +364,7 @@ export class AppController {
       detail: appText("임시 대화·초안·첨부는 재시작하면 사라집니다. 설정·캐릭터팩·위치는 보존됩니다. 부모 Codex 작업은 계속 실행됩니다.") + (process.platform === "darwin" ? "\n" + appText("승인 후 Mac이 업데이트를 준비하면 다음 앱 종료 때 적용될 수 있습니다.") : ""),
       buttons: [appText("취소"), appText(running ? "자식 중단 및 재시작" : "업데이트 및 재시작")], defaultId: 0, cancelId: 0 })
     if (answer.response !== 1) return false
-    if (this.osEnding || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
     this.updatePreparing = true; setApplicationInputLocked(true); this.rebuildTray()
     return true
   }
@@ -353,7 +380,7 @@ export class AppController {
     // Fail before destroying windows if owned resource cleanup cannot complete.
     await this.adapter.stop(true)
     if (this.osEnding) throw Error("OS_SHUTDOWN")
-    await this.cleanupForExit()
+    await this.cleanupForExit(true)
   }
 
   async quit(): Promise<void> {
@@ -362,14 +389,15 @@ export class AppController {
     await this.quitPromise
   }
 
-  private async cleanupForExit(): Promise<void> {
+  private async cleanupForExit(forUpdate = false): Promise<void> {
     if (this.quitting) return
     this.placementOpening?.abort()
     this.activityBubble.cancelPlacement()
     this.petDrag.cancel()
     this.quitting = true
     setApplicationInputLocked(true)
-    this.updates.dispose()
+    if (forUpdate) this.updates.stopBackgroundChecks()
+    else this.updates.dispose()
     this.chatEntry.cancel()
     this.startup?.close()
     if (this.saveTimer) clearTimeout(this.saveTimer)
@@ -403,7 +431,7 @@ export class AppController {
     screen.removeListener("display-removed", this.onDisplaysChanged)
     screen.removeListener("display-metrics-changed", this.onDisplaysChanged)
     powerMonitor.removeListener("resume", this.onResume)
-    powerMonitor.removeListener("shutdown", this.onSystemShutdown)
+    if (!forUpdate) powerMonitor.removeListener("shutdown", this.onSystemShutdown)
   }
 
   private registerIpc(): void {

@@ -5,7 +5,9 @@ import { join } from "node:path"
 import type { UpdateAction, UpdateSnapshot } from "../../shared/update-contract"
 import { RELEASE_ROOT, validateRelease, type UpdatePlatform, type VerifiedRelease } from "./ReleasePolicy"
 import type { UpdateEngine } from "./OfficialUpdater"
+import { UpdateRecoveryStore } from "./UpdateRecoveryStore"
 const DAY = 24 * 60 * 60 * 1000
+type InstallAttempt = { id: string; candidateId: string; generation: number; failed: boolean; stop?: () => void }
 const publicErrors = new Set(["INVALID_METADATA", "INVALID_VERSION", "WRONG_PACKAGE", "UNSUPPORTED_OS", "INVALID_DIGEST", "INVALID_SIZE", "INVALID_SIGNATURE", "INVALID_DOWNLOAD", "PACK_BUSY", "SAVE_FAILED", "OS_SHUTDOWN", "NETWORK", "RATE_LIMITED"])
 export class UpdateService {
   private state: UpdateSnapshot
@@ -21,21 +23,29 @@ export class UpdateService {
   private cachedTag: string | undefined
   private lastManual = 0
   private policyBusy = false
+  private backgroundStopped = false
+  private recoveryPending = false
+  private installAttempt: InstallAttempt | null = null
+  private readonly recovery: UpdateRecoveryStore
   constructor(private readonly options: {
     version: string; platform: () => Promise<UpdatePlatform>; engine: () => UpdateEngine; dataRoot: string;
     setUnsignedWindowsPolicy?: (enabled: boolean) => Promise<boolean>;
     autoCheck: () => boolean; confirmInstall: () => Promise<boolean>;
-    prepareShutdown: () => Promise<void>; handoff: () => void; resume: () => void;
+    prepareShutdown: () => Promise<void>; handoff: () => void; recoverFailure: (reason: string) => void | Promise<void>;
     openExternal: (url: string) => Promise<void>;
     fetchLatest?: (etag?: string) => Promise<{ status: number; etag?: string; tag?: string }>;
     now?: () => number;
-  }) { this.state = { phase: "idle", currentVersion: options.version } }
+  }) { this.state = { phase: "idle", currentVersion: options.version }; this.recovery = new UpdateRecoveryStore(options.dataRoot) }
   private engine: UpdateEngine | null = null
   snapshot(): UpdateSnapshot { return structuredClone(this.state) }
   subscribe(listener: (value: UpdateSnapshot) => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
   private publish(patch: Partial<UpdateSnapshot>) { this.state = { ...this.state, ...patch }; for (const listener of this.listeners) listener(this.snapshot()) }
   private now() { return this.options.now?.() ?? Date.now() }
   async start() {
+    const previous = await this.recovery.read(this.options.version)
+    if (this.disposed) return false
+    this.recoveryPending = Boolean(previous)
+    if (previous) this.publish({ phase: "error", reason: "PREVIOUS_UPDATE_INCOMPLETE", version: previous.targetVersion })
     try {
       const stored = JSON.parse(await readFile(join(this.options.dataRoot, "update-check.json"), "utf8"))
       if (Number.isFinite(stored.nextAuto)) this.nextAuto = Math.min(Math.max(stored.nextAuto, 0), this.now() + 7 * DAY)
@@ -44,6 +54,7 @@ export class UpdateService {
     } catch { /* Missing or invalid metadata cache never resets user preferences. */ }
     this.timer = setInterval(() => { void this.check(true) }, 60_000); this.timer.unref()
     void this.check(true)
+    return this.recoveryPending
   }
   async act(action: UpdateAction): Promise<UpdateSnapshot> {
     if (this.disposed || this.policyBusy) return this.snapshot()
@@ -64,13 +75,16 @@ export class UpdateService {
   }
   async check(automatic: boolean): Promise<void> {
     if (this.disposed || this.download || ["checking", "downloading", "downloaded", "preparing", "handoff"].includes(this.state.phase)) return
-    if (automatic && (!this.options.autoCheck() || this.now() < this.nextAuto)) return
+    if (automatic && (this.backgroundStopped || this.recoveryPending || !this.options.autoCheck() || this.now() < this.nextAuto)) return
     if (!automatic && this.now() - this.lastManual < 10_000) return
     if (!automatic) this.lastManual = this.now()
     const generation = ++this.generation
+    this.installAttempt?.stop?.(); this.installAttempt = null
+    this.engine = null
     this.candidate = null
     this.publish({ phase: "checking", candidateId: undefined, version: undefined, reason: undefined, progress: undefined })
     try {
+      if (!automatic && this.recoveryPending) { await this.recovery.clear(); this.recoveryPending = false }
       const platform = await this.options.platform()
       if (generation !== this.generation || this.disposed) return
       if (platform.kind === "unsupported") { this.publish({ phase: "blocked", reason: platform.reason }); return }
@@ -113,26 +127,47 @@ export class UpdateService {
     finally { if (this.download === controller) this.download = null }
   }
   private async install() {
+    const attempt: InstallAttempt = { id: randomUUID(), generation: ++this.generation, candidateId: this.state.candidateId!, failed: false }
+    this.installAttempt = attempt
     this.publish({ phase: "preparing", reason: undefined })
     try {
       // No input, child, draft or window is touched before explicit native consent.
       const confirmed = await this.options.confirmInstall()
       if (this.disposed) return
-      if (!confirmed) { this.publish({ phase: "downloaded" }); return }
+      if (!confirmed) { this.installAttempt = null; this.publish({ phase: "downloaded" }); return }
       const platform = await this.options.platform()
       if (this.disposed) return
       if (!platform.automatic) throw Error("INVALID_SIGNATURE")
       await this.engine!.verify(this.candidate!)
       if (this.disposed) return
+      try { await this.recovery.begin(attempt.id, this.options.version, this.candidate!.version); this.recoveryPending = true } catch { throw Error("SAVE_FAILED") }
+      if (this.disposed) return
       await this.engine!.prepare()
       if (this.disposed) return
-      // Owned cleanup disposes this service; the application handoff independently
-      // checks OS shutdown after cleanup and before native installer launch.
+      // Stop background checks during owned cleanup, but keep this attempt's
+      // error ownership until will-quit or an explicit failure recovery decision.
       await this.options.prepareShutdown()
+      if (this.disposed) return
       this.publish({ phase: "handoff" })
       this.options.handoff()
-      this.engine!.install()
-    } catch (error) { if (!this.disposed) { this.options.resume(); this.publish({ phase: "error", reason: this.reason(error) }) } }
+      const stop = this.engine!.install(error => { void this.failInstall(attempt, error) })
+      attempt.stop = stop
+      if (attempt.failed || this.disposed) stop()
+      // A void native handoff is not proof that the installer succeeded. The
+      // pending record is resolved only by observing the target version on boot.
+    } catch (error) { await this.failInstall(attempt, error) }
   }
-  dispose() { this.disposed = true; this.generation++; this.download?.abort(); if (this.timer) clearInterval(this.timer); this.timer = null }
+  private async failInstall(attempt: InstallAttempt, error: unknown) {
+    if (this.disposed || this.installAttempt !== attempt || attempt.generation !== this.generation || attempt.candidateId !== this.state.candidateId || attempt.failed) return
+    attempt.failed = true; attempt.stop?.()
+    this.recovery.failed(attempt.id)
+    const reason = this.reason(error)
+    this.publish({ phase: "error", reason })
+    // The owner knows whether its windows/resources are still recoverable. A
+    // failure after destructive cleanup uses a native exit notice, not dead IPC.
+    try { await this.options.recoverFailure(reason) } catch { /* The durable attempt still gives manual next-launch recovery. */ }
+  }
+  stopBackgroundChecks() { this.backgroundStopped = true; if (this.timer) clearInterval(this.timer); this.timer = null }
+  systemShutdown() { this.dispose() }
+  dispose() { this.disposed = true; this.generation++; this.download?.abort(); this.stopBackgroundChecks(); this.installAttempt?.stop?.(); this.installAttempt = null }
 }
