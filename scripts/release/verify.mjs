@@ -32,6 +32,14 @@ for (const [name, relative, mutate] of [
   if (!failure || !/input graph|QA or custom/.test(failure.message)) throw Error('QA artifact negative control was not rejected: ' + name)
   qaRejected.push(name)
 }
+const obsolete = join(stage, 'dist/side-chat.html'), obsoleteArchive = join(output, 'standalone-chat.asar')
+await writeFile(obsolete, '<!doctype html><title>Obsolete standalone chat</title>', {flag: 'wx'})
+await createPackage(stage, obsoleteArchive)
+let rejectedStandalone = false
+try { await checkCandidate(obsoleteArchive) } catch (error) { rejectedStandalone = /Standalone chat surface/.test(error.message) }
+await rm(obsolete); await rm(obsoleteArchive)
+if (!rejectedStandalone) throw Error('Standalone chat surface negative control was accepted')
+qaRejected.push('standalone-chat')
 // Real archives, not a mocked parser. Keep the good candidate untouched.
 const path = join(stage, 'dist/licenses/CC-BY-4.0.txt'), original = await readFile(path)
 for (const mode of ['missing', 'empty', 'altered']) {

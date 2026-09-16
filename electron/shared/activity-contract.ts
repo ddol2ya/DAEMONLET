@@ -49,6 +49,7 @@ export type ActivityApi = {
   openResult(target: ActivityAckTarget): Promise<ActivityResponse<ActivitySnapshot>>
   openCodex(): Promise<ActivityResponse<null>>
   openConversation(target: ActivityAckTarget): Promise<ActivityResponse<null>>
+  openChat(target: ActivityAckTarget | null): Promise<ActivityResponse<null>>
   openList(): Promise<ActivityResponse<null>>
   setCollapsed(value: boolean): Promise<ActivityResponse<boolean>>
   setInteractionLocked(value: boolean, pressed?: boolean): void
@@ -62,6 +63,7 @@ export const ACTIVITY_IPC = {
   openList: "activity:open-list", setCollapsed: "activity:set-collapsed",
   openConversation: "activity:open-conversation",
   openResult: "activity:open-result",
+  openChat: "activity:open-chat",
 } as const
 
 const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v)

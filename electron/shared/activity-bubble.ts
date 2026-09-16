@@ -18,8 +18,8 @@ export function positionAnchoredActivityBubble(pet: Rect, area: Rect, anchor: Bu
 }
 
 /** Never put the companion over the Pet canvas (including its dialogue), if space permits. */
-export function positionActivityBubble(pet: Rect, area: Rect, collapsed: boolean, control = false): Rect {
-  const size = collapsed ? control ? TASK_CONTROL_BUBBLE_COMPACT_SIZE : ACTIVITY_BUBBLE_COMPACT_SIZE : control ? TASK_CONTROL_BUBBLE_SIZE : ACTIVITY_BUBBLE_SIZE
+export function positionActivityBubble(pet: Rect, area: Rect, collapsed: boolean, control = false, expandedSize?: { width: number; height: number }): Rect {
+  const size = collapsed ? control ? TASK_CONTROL_BUBBLE_COMPACT_SIZE : ACTIVITY_BUBBLE_COMPACT_SIZE : expandedSize ?? (control ? TASK_CONTROL_BUBBLE_SIZE : ACTIVITY_BUBBLE_SIZE)
   const width = Math.min(size.width, area.width), height = Math.min(size.height, area.height), gap = 8
   const centerX = pet.x + (pet.width - width) / 2, centerY = pet.y + (pet.height - height) / 2
   const clamp = (r: Rect): Rect => ({ ...r, x: Math.round(Math.max(area.x, Math.min(r.x, area.x + area.width - width))), y: Math.round(Math.max(area.y, Math.min(r.y, area.y + area.height - height))) })

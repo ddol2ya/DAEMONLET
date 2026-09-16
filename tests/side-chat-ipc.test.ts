@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { randomUUID } from "node:crypto"
-import type { SideChatWindowController } from "../electron/main/SideChatWindowController"
+import type { ActivityBubbleWindowController } from "../electron/main/ActivityBubbleWindowController"
 import { SideChatIpcController } from "../electron/main/SideChatIpcController"
 import { SideChatService } from "../electron/main/side-chat/SideChatService"
 import { SIDE_CHAT_IPC } from "../electron/shared/side-chat-contract"
@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => 
 vi.mock("electron", () => ({ ipcMain: { handle: (channel: string, fn: any) => mocks.handlers.set(channel, fn), removeHandler: (channel: string) => mocks.handlers.delete(channel) }, clipboard: { writeText: mocks.copy }, dialog: { showMessageBox: mocks.dialog } }))
 afterEach(() => { mocks.handlers.clear(); vi.clearAllMocks() })
 function fixture() {
-  const frame = { url: "pet://app/side-chat.html" }, contents = { id: 1, mainFrame: frame }, window = { isDestroyed: () => false, webContents: contents }
-  const service = new SideChatService(() => { throw Error("must not start") }), controller = new SideChatIpcController(service, { window } as unknown as SideChatWindowController)
+  const frame = { url: "pet://app/activity-bubble.html" }, contents = { id: 1, mainFrame: frame }, window = { isDestroyed: () => false, webContents: contents }
+  const service = new SideChatService(() => { throw Error("must not start") }), controller = new SideChatIpcController(service, { window } as unknown as ActivityBubbleWindowController)
   controller.register(); service.configure(true, "ko")
   const event = { sender: contents, senderFrame: frame }
   const invoke = (name: string, request: unknown, e: unknown = event, ...extra: unknown[]) => mocks.handlers.get(SIDE_CHAT_IPC.action)!(e, name, request, ...extra)
@@ -20,6 +20,10 @@ describe("side chat IPC authority", () => {
   it("restricts main frame/window even for same URL and does not expose raw profiles", async () => {
     const f = fixture(), get = mocks.handlers.get(SIDE_CHAT_IPC.get)!
     expect(get(f.event).ok).toBe(true)
+    for (const url of ["pet://app/side-chat.html", "pet://app/activity.html", "pet://app/pet.html"]) {
+      const original = f.event.senderFrame.url; f.event.senderFrame.url = url
+      expect(get(f.event).ok).toBe(false); f.event.senderFrame.url = original
+    }
     expect(get({ ...f.event, senderFrame: { url: f.event.senderFrame.url } }).ok).toBe(false)
     expect(get({ ...f.event, sender: { id: 2 } }).ok).toBe(false)
     expect(JSON.stringify(get(f.event))).not.toMatch(/developerInstructions|profileInput|threadId|cwd/)

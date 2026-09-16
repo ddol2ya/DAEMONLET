@@ -6,7 +6,12 @@
 `SideChatPreferences` stores only app-local consent, side-chat executable choice and
 the dismissed OFF notice. It never overwrites the shared task-control selection.
 `SideChatService` keeps drafts, attachments and conversation state in memory.
-`SideChatIpcController` validates window/frame, shape, epoch and request ownership.
+`SideChatIpcController` validates the existing activity-bubble Main frame, shape,
+epoch and request ownership. `ActivityBubbleWindowController` hosts the conversation
+inside the task card; there is no standalone chat window/HTML entry. Explicit
+activity targets resolve to Main-owned conversation keys and catalog parents without
+opening, acknowledging or controlling the parent. A bound parent stays fixed across
+background task-list changes; the user can select another task explicitly.
 
 `SideChatDiscovery` reuses standard CLI locations, inspects bounded PATH candidates
 without a shell, and resolves npm wrappers without running them. Unknown binaries

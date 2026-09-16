@@ -17,7 +17,7 @@ export type SideChatSnapshot = {
   connectionMode?: "official-same-home" | "unavailable"
   attachments?: Array<{ path: string; startLine: number; endLine: number; readAt: number; truncated: boolean }>
   handle: string; epoch: number; enabled: boolean; mode: "hidden" | "compact" | "panel"; language: AppLanguage
-  character: { id: string; label: string }; parent: { handle: string; title: string; contextAt: number | null } | null
+  character: { id: string; label: string }; parent: { handle: string; title: string; contextAt: number | null; activityId?: string } | null
   candidates: Array<{ handle: string; title: string }>; phase: "idle" | "preparing" | "answering" | "stopped" | "error"
   applying: boolean; requiresNewConversation: boolean; error: ChatError | null; notice: "character" | "language" | "parent" | "reset" | null
   messages: ChatMessage[]; draft: string; draftRevision: number; acceptedSubmission: ChatSubmission | null; task: { state: string; checkedAt: number | null }

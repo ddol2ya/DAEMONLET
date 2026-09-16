@@ -1,9 +1,9 @@
 import type { BrowserWindow, Session, WebContents } from "electron"
 
-export type WindowRole = "pet" | "lab" | "settings" | "activity" | "activity-bubble" | "speech-bubble" | "side-chat"
+export type WindowRole = "pet" | "lab" | "settings" | "activity" | "activity-bubble" | "speech-bubble"
 
 export function expectedRendererUrl(role: WindowRole, devServerUrl?: string): string {
-  const page = { pet: "pet.html", lab: "index.html", settings: "settings.html", activity: "activity.html", "activity-bubble": "activity-bubble.html", "speech-bubble": "speech-bubble.html", "side-chat": "side-chat.html" }[role]
+  const page = { pet: "pet.html", lab: "index.html", settings: "settings.html", activity: "activity.html", "activity-bubble": "activity-bubble.html", "speech-bubble": "speech-bubble.html" }[role]
   return devServerUrl ? `${devServerUrl.replace(/\/$/, "")}/${page}` : `pet://app/${page}`
 }
 

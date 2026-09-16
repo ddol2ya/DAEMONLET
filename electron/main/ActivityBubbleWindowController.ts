@@ -10,8 +10,9 @@ import { BubblePresentationCoordinator } from "./BubblePresentationCoordinator"
 import { BUBBLE_IPC } from "../shared/bubble-presentation"
 import { SpeechBubbleWindowController } from "./SpeechBubbleWindowController"
 import { dirname, join } from "node:path"
+import { SIDE_CHAT_IPC, type SideChatSnapshot } from "../shared/side-chat-contract"
 
-/** A display-only companion. It never connects to the adapter or touches Pet input. */
+/** One task surface for activity, explicit controls and the owned-child conversation. */
 export class ActivityBubbleWindowController {
   window: BrowserWindow | null = null
   private pet: BrowserWindow | null = null
@@ -25,10 +26,12 @@ export class ActivityBubbleWindowController {
   private inLayout = false
   private pressed = false
   private disposed = false
+  private chat: SideChatSnapshot | null = null
+  private focusChat = false
   readonly presentation = new BubblePresentationCoordinator(() => this.sync())
   readonly speech: SpeechBubbleWindowController
   get petWindow(): BrowserWindow | null { return this.pet }
-  constructor(private readonly preloadPath: string, private readonly devServerUrl?: string, private readonly onHidden: () => void = () => {}) {
+  constructor(private readonly preloadPath: string, private readonly devServerUrl?: string, private readonly onHidden: () => void = () => {}, private readonly hideChat: () => void = () => {}) {
     this.speech = new SpeechBubbleWindowController(join(dirname(preloadPath), "speech-preload.cjs"), devServerUrl)
   }
 
@@ -52,6 +55,17 @@ export class ActivityBubbleWindowController {
     this.applyWindowSettings(); this.sync()
   }
   update(snapshot: ActivitySnapshot): void { this.snapshot = snapshot; this.sync() }
+  updateChat(snapshot: SideChatSnapshot): void {
+    const wasOpen = this.chat !== null && this.chat.mode !== "hidden"
+    this.chat = snapshot
+    const open = snapshot.mode !== "hidden"
+    if (open && !wasOpen) {
+      this.onHidden(); this.view = "activity"; this.collapsed = false; this.focusChat = true
+      this.send(TASK_CONTROL_IPC.viewChanged, this.getView())
+    }
+    this.presentation.setSideChatVisible(open)
+    this.send(SIDE_CHAT_IPC.changed, snapshot)
+  }
   setInteractionLocked(locked: boolean, pressed = false): void {
     const wasLocked = this.presentation.interactionLocked
     this.pressed = pressed
@@ -59,12 +73,13 @@ export class ActivityBubbleWindowController {
     if (wasLocked === locked) this.sync()
   }
   setLayoutMode(value: boolean): void { this.inLayout = value; this.sync() }
-  setContentHeight(height: number): void { if (this.contentHeight !== height) { this.contentHeight = height; this.sync() } }
+  setContentHeight(height: number): void { if (this.contentHeight !== height && !this.presentation.sideChatVisible) { this.contentHeight = height; this.sync() } }
   setPointerInteractive(interactive: boolean): void { this.window?.setIgnoreMouseEvents(!interactive, { forward: true }) }
   send(channel: string, value: unknown): void { if (this.window && !this.window.isDestroyed()) this.window.webContents.send(channel, value) }
-  setCollapsed(value: boolean): boolean { this.collapsed = value; this.sync(); return this.collapsed }
+  setCollapsed(value: boolean): boolean { this.collapsed = value; if (value && this.presentation.sideChatVisible) this.hideChat(); this.sync(); return this.collapsed }
   getView(): { view: "activity" | "control"; collapsed: boolean } { return { view: this.view, collapsed: this.collapsed } }
   setView(view: "activity" | "control", collapsed: boolean): void {
+    if (view === "control" && this.presentation.sideChatVisible) this.hideChat()
     this.onHidden(); this.view = view; this.collapsed = collapsed; this.sync()
     this.send(TASK_CONTROL_IPC.viewChanged, this.getView())
   }
@@ -78,24 +93,26 @@ export class ActivityBubbleWindowController {
   private syncActivity(): void {
     if (this.window?.isDestroyed()) { this.window = null; this.ready = false }
     const pet = this.pet
+    const chatting = this.presentation.sideChatVisible && this.view === "activity"
     const empty = !this.snapshot || !activityBubbleEntries(this.snapshot).length
     const retainInput = this.presentation.interactionLocked && this.window?.isVisible()
-    if (this.presentation.sideChatVisible || !this.settings?.taskBubblesEnabled || !this.settings.visible || !pet || pet.isDestroyed() || !pet.isVisible() || pet.isMinimized() || this.view === "activity" && (this.inLayout || !this.presentation.canShowActivity || empty && !retainInput)) {
+    if (!this.settings || !chatting && !this.settings.taskBubblesEnabled || !this.settings.visible || !pet || pet.isDestroyed() || !pet.isVisible() || pet.isMinimized() || this.view === "activity" && !chatting && (this.inLayout || !this.presentation.canShowActivity || empty && !retainInput)) {
       if (this.view === "control" && this.window?.isVisible()) this.onHidden()
       this.window?.hide(); return
     }
     if (!this.window || this.window.isDestroyed()) this.create()
     const win = this.window!
-    if (this.view === "activity" && this.pressed && win.isVisible()) return
+    if (this.view === "activity" && !chatting && this.pressed && win.isVisible()) return
     const bounds = pet.getBounds()
     const area = screen.getDisplayMatching(bounds).workArea
     // Explicit controls keep their own adjacent slot and are not automatically hidden.
-    const next = this.view === "activity" && this.presentation.anchor
+    const next = chatting ? positionActivityBubble(bounds, area, false, false, this.chat?.mode === "panel" ? { width: 480, height: 640 } : { width: 360, height: 340 }) : this.view === "activity" && this.presentation.anchor
       ? positionAnchoredActivityBubble(bounds, area, this.presentation.anchor, this.collapsed, this.contentHeight)
       : positionActivityBubble(bounds, area, this.collapsed, this.view === "control")
     const current = win.getBounds()
     if (Object.keys(next).some(key => next[key as keyof typeof next] !== current[key as keyof typeof next])) win.setBounds(next, false)
-    if (this.ready && !win.isVisible()) win.showInactive()
+    if (this.ready && this.focusChat && chatting) { this.focusChat = false; win.setIgnoreMouseEvents(false); win.show(); win.focus() }
+    else if (this.ready && !win.isVisible()) win.showInactive()
   }
 
   private create(): void {
@@ -132,6 +149,7 @@ export class ActivityBubbleWindowController {
     win.once("closed", () => { if (this.window === win) { this.window = null; this.ready = false; if (this.view === "control") this.view = "activity" } this.onHidden(); release() })
     win.webContents.on("did-finish-load", () => {
       if (this.snapshot) this.send(ACTIVITY_IPC.changed, this.snapshot)
+      if (this.chat) this.send(SIDE_CHAT_IPC.changed, this.chat)
       this.send(TASK_CONTROL_IPC.viewChanged, this.getView())
       // An initially hidden transparent Windows window may finish loading
       // without emitting ready-to-show. Apply the existing visibility rules

@@ -151,3 +151,33 @@ describe("observed status parent binding", () => {
     f.finish(); await sent
   })
 })
+
+it("keeps an explicitly reopened task bound to the same context and rejects unknown task IDs", () => {
+  const f = fixture(), before = f.service.snapshot()
+  f.service.setDraft("keep the question")
+  f.service.chooseThread("parent")
+  expect(f.service.snapshot().epoch).toBe(before.epoch)
+  expect(f.service.snapshot().draft).toBe("keep the question")
+  expect(() => f.service.chooseThread("unlisted")).toThrow("NO_PARENT")
+  f.service.setCandidates([{ threadId: "B", title: "B task", cwd: "/synthetic", activityId: "activity-2" }])
+  f.service.chooseThread("B")
+  expect(f.service.snapshot().parent).toMatchObject({ title: "B task", activityId: "activity-2" })
+  expect(f.service.snapshot().draft).toBe("keep the question")
+  expect(f.factory).not.toHaveBeenCalled()
+})
+
+it("clears the old parent at a new task intent, preserving draft while lookup can fail", async () => {
+  const f = fixture(); f.service.setDraft("question about the new task")
+  f.service.clearParent()
+  expect(f.service.snapshot()).toMatchObject({ parent: null, draft: "question about the new task", messages: [] })
+  expect(() => f.service.chooseThread("missing")).toThrow("NO_PARENT")
+  await expect(f.service.send("question about the new task")).rejects.toThrow("NO_PARENT")
+  expect(f.factory).not.toHaveBeenCalled()
+})
+it("binds an explicit task row even when several rows share the same Codex thread", () => {
+  const f = fixture(); f.service.setCandidates([{ threadId: "parent", title: "Task", cwd: "/synthetic", activityId: "activity-2" }])
+  f.service.chooseThread("parent", "activity-1")
+  expect(f.service.snapshot().parent?.activityId).toBe("activity-1")
+  const epoch = f.service.snapshot().epoch; f.service.chooseThread("parent", "activity-1")
+  expect(f.service.snapshot().epoch).toBe(epoch); expect(f.factory).not.toHaveBeenCalled()
+})

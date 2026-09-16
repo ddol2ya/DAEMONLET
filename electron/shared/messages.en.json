@@ -819,5 +819,9 @@
   "캐릭터와 대화": "Chat with character",
   "캐릭터 대화 사용": "Enable character chat",
   "공식 Codex CLI로 선택한 대화와 프로젝트 파일에 대해 질문합니다. 보내기 전에는 모델을 호출하지 않습니다.": "Ask about a selected conversation and project files using official Codex CLI. No model request is made before you send.",
-  "캐릭터 페르소나의 형식·참조·권한 규격이 올바르지 않습니다.": "The persona format, reference or permission contract is invalid."
+  "캐릭터 페르소나의 형식·참조·권한 규격이 올바르지 않습니다.": "The persona format, reference or permission contract is invalid.",
+  "캐릭터에게 물어보기": "Ask the character",
+  "에게 물어보기": " — ask a question",
+  "작업": "Task",
+  "지피쨩": "Gpichan"
 }

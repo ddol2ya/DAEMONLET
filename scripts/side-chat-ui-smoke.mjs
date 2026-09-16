@@ -13,7 +13,7 @@ try {
   for (const name of await readdir(join(root, 'dist'))) if (name !== 'pet.html') await symlink(join(root, 'dist', name), join(fixtureDist, name))
   await writeFile(join(fixtureDist, 'pet.html'), '<!doctype html><html lang="ko"><head><meta charset="UTF-8"></head><body><div id="root"></div><script type="module" src="/bubble-pet.js"></script></body></html>')
   await build({ entryPoints: [join(root, 'tests/smoke/side-chat-pet.tsx')], outfile: join(fixtureDist, 'bubble-pet.js'), bundle: true, platform: 'browser', format: 'esm', define: { 'process.env.NODE_ENV': '"production"' }, logLevel: 'silent' })
-  await build({ entryPoints: [join(root, 'tests/smoke/side-chat-electron.ts')], outfile: main, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent' })
+  await build({ entryPoints: [join(root, 'tests/smoke/side-chat-electron.ts')], outfile: main, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], logLevel: 'silent', plugins: [{ name: 'qa-preparation-metadata', setup(bundler) { bundler.onResolve({ filter: /SideChatPolicy$/ }, () => ({ path: join(root, 'tests/smoke/side-chat-setup-policy.ts') })) } }] })
   const env = { ...process.env, DAEMONLET_CHAT_SMOKE_ROOT: root, DAEMONLET_CHAT_SMOKE_FIXTURE_DIST: fixtureDist, DAEMONLET_CHAT_SMOKE_OUTPUT: output, DAEMONLET_CHAT_SMOKE_USER: join(stage, 'user') }; delete env.ELECTRON_RUN_AS_NODE
   await new Promise((resolve, reject) => {
     const child = spawn(electron, [main], { env, stdio: 'ignore' })

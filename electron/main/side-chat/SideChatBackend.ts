@@ -6,7 +6,7 @@ import { resolveOfficialParent } from "./OfficialParentResolver"
 import { officialTurnError } from "./SideChatErrors"
 import { SIDE_CHAT_MODEL } from "./SideChatModelPolicy"
 
-export type ChatParent = { threadId: string; title: string; cwd: string; sourceHome?: string }
+export type ChatParent = { threadId: string; title: string; cwd: string; sourceHome?: string; activityId?: string }
 export type ForkContext = { threadId: string; lastTurnId: string; contextAt: number }
 export type ChatSessionClosed = { error: Error; hadSession: boolean }
 export interface SideChatBackend {

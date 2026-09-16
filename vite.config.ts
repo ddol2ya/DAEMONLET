@@ -31,7 +31,6 @@ export default defineConfig({
         settings: resolve(import.meta.dirname, "settings.html"),
         activity: resolve(import.meta.dirname, "activity.html"),
         activityBubble: resolve(import.meta.dirname, "activity-bubble.html"),
-        sideChat: resolve(import.meta.dirname, "side-chat.html"),
         speechBubble: resolve(import.meta.dirname, "speech-bubble.html"),
       },
     },

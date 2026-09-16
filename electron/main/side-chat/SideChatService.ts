@@ -96,10 +96,21 @@ export class SideChatService {
     this.state.task = { state, checkedAt }; this.publish()
   }
   parentThreadId() { return this.parent?.threadId ?? null }
+  clearParent() {
+    this.resetConversation("parent"); this.parent = null; this.state.parent = null
+    this.state.task = { state: "unknown", checkedAt: null }; this.publish()
+  }
+  chooseThread(threadId: string, activityId?: string) {
+    if (this.parent?.threadId === threadId && (!activityId || this.parent.activityId === activityId)) return
+    const candidate = [...this.candidates].find(([, parent]) => parent.threadId === threadId)
+    if (!candidate) throw Error("NO_PARENT")
+    if (activityId) this.candidates.set(candidate[0], { ...candidate[1], activityId })
+    this.chooseParent(candidate[0])
+  }
   chooseParent(handle: string) {
     const parent = this.candidates.get(handle)
     if (!parent) throw new Error("NO_PARENT")
-    this.resetConversation("parent"); this.state.task = { state: "unknown", checkedAt: null }; this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null }; this.publish()
+    this.resetConversation("parent"); this.state.task = { state: "unknown", checkedAt: null }; this.parent = { ...parent }; this.state.parent = { handle, title: parent.title, contextAt: null, ...(parent.activityId ? { activityId: parent.activityId } : {}) }; this.publish()
   }
   setMode(mode: SideChatSnapshot["mode"]) { this.state.mode = mode; this.publish() }
   setDraft(text: string, revision = this.state.draftRevision + 1) {

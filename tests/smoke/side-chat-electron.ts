@@ -4,7 +4,9 @@ import { mkdir, realpath, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { installAppProtocol, registerAppScheme } from "../../electron/main/AppProtocol"
 import { SideChatService } from "../../electron/main/side-chat/SideChatService"
-import { SideChatWindowController } from "../../electron/main/SideChatWindowController"
+import { SideChatSetupController } from "../../electron/main/side-chat/SideChatSetupController"
+import { SideChatPreferences, SIDE_CHAT_CONSENT_VERSION } from "../../electron/main/side-chat/SideChatPreferences"
+import { holdNextPreparation, preparationFixture } from "./side-chat-setup-policy"
 import { SideChatIpcController } from "../../electron/main/SideChatIpcController"
 import { compilePersona } from "../../electron/main/side-chat/PersonaCompiler"
 import { neutralPersona } from "../../electron/shared/character-persona"
@@ -57,24 +59,50 @@ const service = new SideChatService(() => {
     stop: async () => {}, close: async () => { opened = false; closes++ },
   }
 })
-const win = new SideChatWindowController({ preload: join(root, "dist-electron/side-chat-preload.cjs"), distRoot: join(root, "dist"), pet: () => pet, hidden: () => service.setMode("hidden"), visibility: value => bubbles.presentation.setSideChatVisible(value) })
-const ipc = new SideChatIpcController(service, win)
-ipc.register(); service.subscribe(() => win.show(service.snapshot()))
+const preferences = new SideChatPreferences(process.env.DAEMONLET_CHAT_SMOKE_USER!)
+const setup = new SideChatSetupController(service, preferences, () => ({ executablePath: "/official/A", codexHome: process.env.DAEMONLET_CHAT_SMOKE_USER! }), () => bubbles.window, () => service.configure(true, "ko"))
+await setup.load()
+const ipc = new SideChatIpcController(service, bubbles, undefined, setup)
+ipc.register(); service.subscribe(() => bubbles.updateChat(service.snapshot()))
 const result: Record<string, unknown> = { backend: "synthetic", realAccountCalls: 0, status: "FAIL" }
 try {
   service.configure(true, "ko"); service.applyPersona({ id: "gpichan", revision: "builtin", label: "지피쨩", compiled: compilePersona("지피쨩", neutralPersona(), "ko") })
   const project = join(await realpath(process.env.DAEMONLET_CHAT_SMOKE_USER!), "project")
   await mkdir(project); await writeFile(join(project, "example.ts"), "export const example = 42;\n// selected file\n")
   service.setConnectionMode("official-same-home")
-  service.setCandidates([{ threadId: "parent", title: "캐릭터 제작스킬에서 이미지 넣을때 조건이 있었나? 그리고 이미지 넣으면 어떤식으로 가공해주냐? ".repeat(3).slice(0, 120), cwd: project }], "parent"); service.setMode("compact")
-  const window = win.window!, contents = window.webContents
+  service.setCandidates([{ threadId: "parent", title: "캐릭터 제작스킬에서 이미지 넣을때 조건이 있었나? 그리고 이미지 넣으면 어떤식으로 가공해주냐? ".repeat(3).slice(0, 120), cwd: project, activityId: activity.entries[0].activityId }], "parent"); service.setMode("compact")
+  const window = bubbles.window!, contents = window.webContents
   const js = <T = any>(code: string): Promise<T> => contents.executeJavaScript(code)
   async function until(code: string) { for (let n = 0; n < 100; n++) { if (await js(code)) return; await wait(40) }; throw Error("UI condition timed out: " + code) }
-  await until('Boolean(document.querySelector("textarea"))')
-  await js("document.querySelector('.parent-search summary').click();document.querySelector('.context select').focus()")
+  await until('Boolean(document.querySelector(".chat textarea"))')
+  // R1: actual settings buttons + Controller; native metadata is an account-free QA double.
+  for (const discover of [false, true]) {
+    setup.invalidate()
+    const release = holdNextPreparation(), before = preparationFixture.connections.length, pending = setup.check()
+    for (let n = 0; n < 100 && preparationFixture.connections.length === before; n++) await wait(10)
+    assert(preparationFixture.connections.length === before + 1, "Old readiness check started")
+    const next = discover ? "/official/C" : "/official/B"
+    preparationFixture.detected = next
+    const picker = dialog.showOpenDialog
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [next] })
+    await js("document.querySelector('.conversation-options').open=true;document.querySelector('.connection-setup').open=true")
+    await js('Array.from(document.querySelectorAll(".connection-setup button")).find(e=>e.textContent===' + JSON.stringify(discover ? "감지한 공식 CLI 사용" : "CLI 파일 선택") + ').click()')
+    for (let n = 0; n < 100 && preferences.get().executable !== next; n++) await wait(10)
+    assert(preferences.get().executable === next, "New CLI selection saved")
+    release(); await pending
+    await until('document.querySelector(".connection-setup summary").textContent === "연결됨"')
+    assert(preparationFixture.connections.at(-1) === next && preparationFixture.connections.length === before + 2, "Latest selected CLI checked after cleanup")
+    dialog.showOpenDialog = picker
+  }
+  result.readinessSwitchButtons = "PASS (synthetic metadata, real Controller/renderer/preload/IPC)"
+  await preferences.save({ consentVersion: SIDE_CHAT_CONSENT_VERSION })
+  service.setCandidates([{ threadId: "parent", title: "캐릭터 제작스킬에서 이미지 넣을때 조건이 있었나? 그리고 이미지 넣으면 어떤식으로 가공해주냐? ".repeat(3).slice(0, 120), cwd: project, activityId: activity.entries[0].activityId }], "parent")
+  await wait(60)
+  await js("document.querySelector('.conversation-options').open=false")
+  await js("document.querySelector('.conversation-options summary').click();document.querySelector('.parent-search summary').click();document.querySelector('.context select').focus()")
   assert(await js("(()=>{const r=document.querySelector('.setup-region');return r.scrollWidth<=r.clientWidth+1 && r.scrollLeft===0 && document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight+1})()"), "Long parent title must not move preparation controls outside the compact viewport")
   result.longParentLayout = "PASS"
-  await js("document.querySelector('.parent-search summary').click()")
+  await js("document.querySelector('.conversation-options summary').click()")
   assert(calls === 0 && opens === 0, "Opening made no model call")
   const initialWindowId = window.id
   const type = async (text: string, delay = 260) => { await js(`(()=>{const e=document.querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,${JSON.stringify(text)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`); if (delay) await wait(delay) }
@@ -82,7 +110,8 @@ try {
   await js("document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true}))")
   await wait(100); assert(calls === 0, "IME Enter did not send")
   await js("document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',isComposing:true,bubbles:true}))")
-  assert(window.isVisible(), "IME Escape did not hide")
+  assert(window.isVisible() && !bubbles.getView().collapsed && service.snapshot().mode === "compact", "IME Escape did not collapse shared task window")
+  assert(await js('!document.querySelector(".task-error")'), "IME Escape did not invoke task controls")
   await js("document.querySelector('.send').click()")
   await until('document.querySelector(".message")?.textContent.includes("듣고 있습니다")')
   assert(calls === 1, "one short-response call")
@@ -101,7 +130,7 @@ try {
   answer = { text: "긴 답변의 첫 전제입니다.\n\n" + "한글과 English 설명, 이모지 👨‍👩‍👧‍👦를 포함합니다.\n".repeat(12) + "\n```typescript\nconst longIdentifier = '" + "wide".repeat(30) + "';\n```\n\n| 열 | 긴 값 |\n| --- | --- |\n| 결과 | " + "table".repeat(40) + " |\n<script>alert(1)</script>\n![remote](https://invalid.example/image.png)", preview: "긴 설명과 코드를 준비했습니다. 전체 답변에서 전제를 확인해 주세요.", expression: "neutral" }
   await type("자세히 설명해 주세요"); await js("document.querySelector('.send').click()")
   await until('Boolean(document.querySelector(".expand"))')
-  assert(window.getBounds().width === 380, "Long response did not expand window")
+  assert(window.getBounds().width === 360, "Long response did not expand window")
   await wait(180)
   await writeFile(join(output, "long-compact.png"), (await contents.capturePage()).toPNG())
   const beforeExpand = calls
@@ -117,17 +146,17 @@ try {
   service.updateTask("parent", "waiting", Date.now()); await wait(80)
   assert(await js('document.querySelector("textarea").value === "보존할 초안" && document.querySelector(".history").scrollTop === 0'), "Task updates preserve draft and scroll")
   service.setMode("hidden"); service.setMode("panel"); await wait(80)
-  assert(win.window?.id === initialWindowId && opens === 1, "Hide preserves window and fork")
+  assert(bubbles.window?.id === initialWindowId && opens === 1, "Hide preserves window and fork")
   contents.setZoomFactor(1.5); await wait(180)
   assert(await js('Array.from(document.querySelectorAll("footer button,textarea")).every(e=>e.getBoundingClientRect().bottom <= innerHeight+1)'), "Composer fits at 150%")
   await writeFile(join(output, "zoom-150.png"), (await contents.capturePage()).toPNG())
   contents.setZoomFactor(1)
   service.configure(true, "en"); service.applyPersona({ id: "gpichan", revision: "builtin", label: "Gpichan", compiled: compilePersona("Gpichan", neutralPersona(), "en") }); await wait(100)
-  assert(await js('document.body.textContent.includes("Side conversation")'), "Language updates UI")
+  assert(await js('document.querySelector("textarea").getAttribute("placeholder") === "Ask Gpichan"'), "Language updates UI")
   assert(calls === 2, "Language switch made no call")
   await writeFile(join(output, "english.png"), (await contents.capturePage()).toPNG())
   // F3: exercise the mounted React event path without waiting for the 200ms draft debounce.
-  const enter = () => js("document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))")
+  const enter = () => js("document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',bubbles:true}))")
   const idle = async () => { for (let n = 0; n < 150; n++) { if (service.snapshot().phase === "idle") return; await wait(20) }; throw Error("send did not finish") }
   await type("hello"); assert(service.snapshot().draft === "hello", "old draft reached Main")
   const beforeQuick = calls
@@ -172,7 +201,7 @@ try {
   // Recovery UI: no send or receipt until the user explicitly starts a new conversation.
   sendError = "CHAT_AUTH_REQUIRED"
   await type("expire authenticated child", 0); await enter()
-  await until('document.querySelector(".recovery")?.textContent.includes("Check your Codex login")')
+  await until('document.querySelector(".error")?.textContent.includes("Check your official Codex login") && Boolean(document.querySelector(".recovery"))')
   const recoveryCalls = calls, recoveryOpens = opens, recoveryReceipt = service.snapshot().acceptedSubmission
   await type("keep next recovery draft", 0); await enter(); await wait(280)
   assert(await js('document.querySelector(".send").disabled && document.querySelector("textarea").value === "keep next recovery draft"'), "Closed-child UI preserves draft and disables sending")
@@ -199,27 +228,28 @@ try {
   async function nativeUntil(check: () => unknown | Promise<unknown>, label: string) { for (let n = 0; n < 200; n++) { if (await check()) return; await wait(30) }; throw Error(label) }
   await nativeUntil(() => bubbles.window?.isVisible(), "F1 initial task bubble")
   for (let cycle = 0; cycle < 3; cycle++) {
+    pet.focus(); await wait(80)
     await petJs('document.querySelector("button").click()')
     await nativeUntil(() => bubbles.speech.window?.isVisible(), "F1 authored speech visible")
     service.setMode("compact"); await wait(60)
-    assert(!bubbles.window?.isVisible() && !bubbles.speech.window?.isVisible(), "F1 chat suppresses both native bubbles")
+    assert(bubbles.window?.isVisible() && !bubbles.speech.window?.isVisible(), "F1 conversation reuses task window and suppresses authored speech")
     if (cycle === 0) {
       service.setMode("hidden"); await nativeUntil(() => bubbles.speech.window?.isVisible(), "F1 unexpired speech resumes")
       service.setMode("compact")
     }
     await nativeUntil(() => petJs('document.querySelector("main").dataset.phase === "hidden"'), "F1 actual dialogue timer expired")
     await wait(100)
-    assert(bubbles.presentation.speech === null && !bubbles.speech.window?.isVisible() && !bubbles.window?.isVisible(), "F1 consumed hidden state under chat")
+    assert(bubbles.presentation.speech === null && !bubbles.speech.window?.isVisible() && bubbles.window?.isVisible(), "F1 consumed hidden speech state while task chat remains visible")
     service.setMode("hidden")
     await nativeUntil(() => bubbles.window?.isVisible(), "F1 task bubble returned without further Pet events")
     assert(bubbles.presentation.canShowActivity && !bubbles.speech.window?.isVisible(), "F1 expired speech did not replay")
   }
   await writeFile(join(output, "bubble-returned.png"), (await bubbles.window!.webContents.capturePage()).toPNG())
   Object.assign(result, { draftQuickSend: "PASS", newerDraftDuringPreparation: "PASS", sameTextNewRevision: "PASS", predispatchFailure: "PASS", imeCompositionEnd: "PASS", inputLimit: "PASS", unknownOutcomeNoRetry: "PASS", bubbleReturnCycles: 3, bubbleLifetimeHookIpcNative: "PASS" })
-  service.configure(false, "en"); await wait(80); assert(await js('document.querySelector("textarea").value === ""'), "Disable clears renderer draft"); assert(!window.isVisible() && !service.snapshot().messages.length && !service.snapshot().draft, "Disable clears memory and hides")
+  service.configure(false, "en"); await wait(80); assert(await js('document.querySelector("textarea").value === ""'), "Disable clears renderer draft"); assert(await js('document.querySelector(".chat").hidden') && !service.snapshot().messages.length && !service.snapshot().draft, "Disable clears chat memory while the task surface remains available")
   Object.assign(result, { status: "PASS", calls, forks: opens, ownedBackendCloses: closes, ime: "PASS", compactPanel: "PASS", noExpansionCall: "PASS", copyFullSource: "PASS", htmlRemoteMediaInactive: "PASS", taskStateDraftScroll: "PASS", hidePreservesWindow: "PASS", zoom150: "PASS", language: "PASS", disable: "PASS" })
 } catch (error) { result.error = String(error) }
-finally { ipc.dispose(); bubbleIpc.dispose(); await service.dispose(); win.destroy(); bubbles.destroy(); for (const w of BrowserWindow.getAllWindows()) w.destroy(); await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2) + "\n"); app.exit(result.status === "PASS" ? 0 : 1) }
+finally { ipc.dispose(); bubbleIpc.dispose(); await service.dispose(); bubbles.destroy(); for (const w of BrowserWindow.getAllWindows()) w.destroy(); await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2) + "\n"); app.exit(result.status === "PASS" ? 0 : 1) }
 
 }
 void main().catch(async error => { await writeFile(join(output, "result.json"), JSON.stringify({ status: "FAIL", error: String(error) })); app.exit(1) })

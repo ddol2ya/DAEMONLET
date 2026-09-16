@@ -1,17 +1,17 @@
 import { clipboard, dialog, ipcMain, type IpcMainInvokeEvent } from "electron"
 import { SIDE_CHAT_IPC, validateChatRequest, type ChatAction } from "../shared/side-chat-contract"
 import { chatError, type SideChatService } from "./side-chat/SideChatService"
-import type { SideChatWindowController } from "./SideChatWindowController"
+import type { ActivityBubbleWindowController } from "./ActivityBubbleWindowController"
 import { isTrustedSender } from "./SecurityPolicy"
 import type { SideChatSetupController } from "./side-chat/SideChatSetupController"
 
 export class SideChatIpcController {
   private rate = { since: 0, count: 0 }
   private sendPending = false
-  constructor(private readonly service: SideChatService, private readonly window: SideChatWindowController, private readonly devServerUrl?: string,
+  constructor(private readonly service: SideChatService, private readonly window: Pick<ActivityBubbleWindowController, "window">, private readonly devServerUrl?: string,
     private readonly setup?: SideChatSetupController, private readonly parents?: (query?: string, more?: boolean) => Promise<void>) {}
   register() {
-    const trusted = (e: IpcMainInvokeEvent) => isTrustedSender(e, this.window.window, "side-chat", this.devServerUrl)
+    const trusted = (e: IpcMainInvokeEvent) => isTrustedSender(e, this.window.window, "activity-bubble", this.devServerUrl)
     ipcMain.handle(SIDE_CHAT_IPC.get, (e, ...args) => trusted(e) && !args.length ? { ok: true, value: this.service.snapshot() } : { ok: false, code: "INVALID_REQUEST" })
     ipcMain.handle(SIDE_CHAT_IPC.action, async (e, action: ChatAction, value: unknown, ...extra) => {
       try {
