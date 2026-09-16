@@ -42,6 +42,22 @@ function fixture() {
   return { service, factory, instances, auth: (value: boolean) => { authenticated = value } }
 }
 describe("closed child recovery through the production service/backend/collector", () => {
+  it("a character apply while the setting is OFF cannot submit a model turn", async () => {
+    const f = fixture()
+    f.service.configure(false, "ko")
+    f.service.applyPersona({ id: "existing-external", revision: "fixture", label: "Existing character", compiled: compilePersona("Existing character", neutralPersona(), "ko") })
+    await expect(f.service.send("blocked UI attempt")).rejects.toThrow("CHAT_DISABLED")
+    expect(f.factory).not.toHaveBeenCalled(); expect(f.service.snapshot().acceptedSubmission).toBeNull()
+  })
+  it("checks same-home account/policy again before consuming the next draft", async () => {
+    const f = fixture(), first = f.service.send("first"); await tick(); f.instances[0].final(); await first
+    const old = f.instances[0], receipt = f.service.snapshot().acceptedSubmission
+    old.connection.beforeTurn = async () => { throw Error("CHAT_AUTH_REQUIRED") }
+    await f.service.send("retain this draft")
+    expect(f.service.snapshot()).toMatchObject({ draft: "retain this draft", acceptedSubmission: receipt, error: "CHAT_AUTH_REQUIRED", requiresNewConversation: true })
+    expect(old.client.request.mock.calls.filter(([m]) => m === "turn/start")).toHaveLength(1)
+    expect(old.stop).toHaveBeenCalledTimes(1)
+  })
   it.each(["auth", "count", "bytes", "malformed"])("invalidates a closed child after %s without accepting or consuming the next draft", async failure => {
     const f = fixture(), first = f.service.send("첫 질문"); await tick(); const old = f.instances[0]
     const code = failure === "auth" ? "CHAT_AUTH_REQUIRED" : failure === "malformed" ? "RESPONSE_INVALID" : "RESPONSE_LIMIT"

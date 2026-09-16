@@ -9,10 +9,13 @@ import { CHAT_LAUNCH_CONSTRAINTS, CHAT_MODEL_CATALOG, launchIsolatedChatProcess,
 import { resolveChatParentSource } from "./SideChatSource"
 import { PAGINATED_CHAT_RUNTIME } from "./SideChatRuntime"
 import { readChatAuthTokens } from "./SideChatAuth"
+import { connectOfficialSameHome } from "./OfficialSameHomeConnection"
+import { OFFICIAL_CHAT_OVERRIDES } from "./OfficialSameHomeLaunchProfile"
 
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex")
-export const SIDE_CHAT_SUPPORT = { policyVersion: 3, supportedRuntimes: [{ version: "0.154.0", platform: "darwin", arch: "arm64", executableSha256: "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc", model: "gpt-5.6-luna", parentContract: "legacy-no-dynamic-tools", kind: "official" }, PAGINATED_CHAT_RUNTIME], code: "CHAT_PROFILE_MISSING" } as const
-export const CHAT_PROFILE_HASH = sha(JSON.stringify({ constraints: CHAT_LAUNCH_CONSTRAINTS, catalog: CHAT_MODEL_CATALOG, environments: [], instructions: "collaboration-mode", parentContracts: ["legacy-no-dynamic-tools", "read-only-source-v1"] }))
+export const SIDE_CHAT_SUPPORT = { policyVersion: 4, supportedRuntimes: [{ version: "0.154.0", platform: "darwin", arch: "arm64", executableSha256: "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc", model: "gpt-5.6-luna", parentContract: "official-same-home", kind: "official", source: "@openai/codex@0.154.0-darwin-arm64", signingTeam: "2DC432GLL2" }, PAGINATED_CHAT_RUNTIME], code: "CHAT_PROFILE_MISSING" } as const
+export const ARCHIVED_CHAT_PROFILE_HASH = sha(JSON.stringify({ constraints: CHAT_LAUNCH_CONSTRAINTS, catalog: CHAT_MODEL_CATALOG, environments: [], instructions: "collaboration-mode", parentContracts: ["legacy-no-dynamic-tools", "read-only-source-v1"] }))
+export const CHAT_PROFILE_HASH = sha(JSON.stringify({ policy: "readonly-project-companion-v1", overrides: OFFICIAL_CHAT_OVERRIDES, environments: [], instructions: "collaboration-mode", parentContract: "official-same-home", readAccess: "user-selected-files" }))
 export type SideChatConnectOptions = { codexHome: string; authHome?: string; executable?: string | null }
 
 export async function inspectSideChatRuntime(selected?: string | null) {
@@ -60,6 +63,17 @@ export function assertChatConfiguration(requirements: any, effective: any, confi
  * switch, pack or renderer can admit an unverified executable/profile combination. */
 export async function connectVerifiedSideChat(options?: SideChatConnectOptions): Promise<ChatConnection> {
   if (!options) throw Error("CHAT_PROFILE_MISSING")
+  const { executable, runtime } = await inspectSideChatRuntime(options.executable)
+  if (runtime.kind === "official") {
+    if (options.authHome && await realpath(options.authHome) !== await realpath(options.codexHome)) throw Error("CHAT_AUTH_REQUIRED")
+    return connectOfficialSameHome(executable, options.codexHome)
+  }
+  // Saved custom selections require an explicit official executable selection.
+  throw Error("CHAT_RUNTIME_UNSUPPORTED")
+}
+
+/** Archived cross-home experiment, only for explicit development harnesses. */
+export async function connectArchivedSideChat(options: SideChatConnectOptions): Promise<ChatConnection> {
   const { executable, runtime } = await inspectSideChatRuntime(options.executable)
   const root = await realpath(await mkdtemp(join(tmpdir(), "daemonlet-side-chat-")))
   let connection: ChatConnection | null = null, stage = "launch"

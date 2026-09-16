@@ -1,4 +1,5 @@
 import { runPaginatedSideChatLiveSmoke } from "./SideChatPaginatedLiveSmoke"
+import { runOfficialReadOnlyLiveSmoke } from "./OfficialReadOnlyLiveSmoke"
 import { runSideChatLiveSmoke } from "./SideChatLiveSmoke"
 import { runSideChatPackSmoke } from "./SideChatPackSmoke"
 import { runSideChatGateSmoke } from "./SideChatGateSmoke"
@@ -195,6 +196,11 @@ export class AppController {
     this.characterIpc.register()
     this.sideChatIpc.register()
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
+    let sideChatSelection = JSON.stringify(this.integration.sideChatSelection())
+    this.subscriptions.push(this.integration.subscribe(() => {
+      const selection = JSON.stringify(this.integration.sideChatSelection())
+      if (selection !== sideChatSelection) { sideChatSelection = selection; this.sideChat.connectionChanged() }
+    }))
     this.activityIpc.register()
     this.bubbleIpc.register()
     this.taskControlIpc.register()
@@ -434,10 +440,17 @@ export class AppController {
     const catalog = await readDesktopThreadCatalog(home).catch(() => [])
     if (!this.settings.sideChatEnabled || this.quitting) return
     const runtime = await inspectSideChatRuntime(this.integration.sideChatSelection().executablePath).catch(() => null)
+    this.sideChat.setConnectionMode(runtime?.runtime.kind === "official" ? "official-same-home" : runtime?.runtime.kind === "custom" ? "custom-experimental" : "unavailable")
     const candidates: ChatParent[] = []
     for (const item of catalog.slice(0, 64)) {
       if (!this.settings.sideChatEnabled || this.quitting) return
       const parent: ChatParent = { threadId: item.id, title: item.title, cwd: item.cwd, path: item.path, sourceHome: home }
+      if (runtime?.runtime.kind === "official") {
+        // Catalog discovery is not official fork readiness. Only the selected
+        // parent is checked through official reads when connecting.
+        parent.source = { metadata: "pending", format: "unknown", reason: null }
+        candidates.push(parent); continue
+      }
       try {
         const source = await inspectChatSource(home, parent)
         parent.source = { metadata: "checked", format: source.format, reason: source.capabilities ? "PARENT_CAPABILITIES" : source.format === "paginated" && runtime?.runtime.parentContract !== "read-only-source-v1" ? "SOURCE_RUNTIME_UNSUPPORTED" : null }
@@ -937,6 +950,11 @@ export class AppController {
       this.updateSettings({ sideChatEnabled: true })
       paginatedSideChatValidation = await runPaginatedSideChatLiveSmoke({ service: this.sideChat, window: this.sideChatWindow, home: this.integration.sideChatSelection().codexHome!, selectedId: process.env.ELECTRON_SMOKE_PAGINATED_PARENT!, output: process.env.ELECTRON_SMOKE_PAGINATED_CHAT_OUTPUT })
     }
+    let officialReadOnlyValidation: Awaited<ReturnType<typeof runOfficialReadOnlyLiveSmoke>> | null = null
+    if (process.env.ELECTRON_SMOKE_OFFICIAL_OUTPUT && this.lastReady) {
+      this.updateSettings({ sideChatEnabled: true })
+      officialReadOnlyValidation = await runOfficialReadOnlyLiveSmoke({ service: this.sideChat, window: this.sideChatWindow, registry: this.characters, select: value => this.selectCharacter(value), home: this.integration.sideChatSelection().codexHome!, parentId: process.env.ELECTRON_SMOKE_OFFICIAL_PARENT!, output: process.env.ELECTRON_SMOKE_OFFICIAL_OUTPUT })
+    }
     const adapterDiagnostics = this.adapter.getDiagnostics()
     const protocolDiagnostics = this.protocol.getDiagnostics()
     const result = {
@@ -985,7 +1003,7 @@ export class AppController {
       activityValidation,
       taskControlValidation,
       desktopControlValidation,
-      sideChatValidation, liveSideChatValidation, paginatedSideChatValidation,
+      sideChatValidation, liveSideChatValidation, paginatedSideChatValidation, officialReadOnlyValidation,
       sideChatPackValidation,
       settingsPath: "userData/desktop-settings.json",
       warnings: this.warnings,

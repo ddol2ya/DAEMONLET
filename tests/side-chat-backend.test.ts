@@ -12,7 +12,8 @@ function deferred<T = any>() {
   return { promise, resolve, reject }
 }
 const flush = async () => { for (let n = 0; n < 8; n++) await Promise.resolve() }
-function fixture(manual = false) {
+function fixture(manual = false, official = false) {
+  const cwd = official ? process.cwd() : "/synthetic"
   let turnSequence = 0
   const starts: ReturnType<typeof deferred>[] = [], interrupts: ReturnType<typeof deferred>[] = []
   let notification: (method: string, params: unknown) => void = () => {}, closed = () => {}, request: (v: Record<string, unknown>) => void = () => {}
@@ -20,10 +21,11 @@ function fixture(manual = false) {
     initialize: vi.fn(async (_info: unknown, _profile: string) => ({})), onClose: (fn: () => void) => { closed = fn; return () => {} },
     onNotification: (fn: typeof notification) => { notification = fn; return () => {} }, onServerRequest: (fn: typeof request) => { request = fn; return () => {} },
     rejectServerRequest: vi.fn(async () => {}),
+    respondToServerRequest: vi.fn(async (_id: unknown, _result: unknown) => {}),
     request: vi.fn(async (method: string, params: any) => {
-      if (method === "thread/read") return { thread: { id: "parent", updatedAt: 1 } }
+      if (method === "thread/read") return { thread: { id: "parent", updatedAt: 1, cwd, ephemeral: false } }
       if (method === "thread/turns/list") return { data: [{ id: "working", status: "inProgress" }, { id: "complete", status: "completed", completedAt: 123 }] }
-      if (method === "thread/fork") return { thread: { id: "child", ephemeral: true } }
+      if (method === "thread/fork") return { thread: { id: "child", ephemeral: true }, model: "gpt-5.6-luna", approvalPolicy: "never", sandbox: { type: "readOnly" } }
       if (method === "turn/start") {
         if (manual) { const rpc = deferred(); starts.push(rpc); return rpc.promise }
         const id = `turn-${++turnSequence}`
@@ -33,12 +35,24 @@ function fixture(manual = false) {
       return {}
     }),
   }
-  const processStop = vi.fn(async () => {}), owned = vi.fn(async (_id: string) => {}), backend = new CodexSideChatBackend(async () => ({ client: client as unknown as AppServerJsonlClient, stop: processStop }), owned)
-  const open = () => backend.open({ threadId: "parent", title: "Parent", cwd: "/synthetic" }, compilePersona("A", neutralPersona(), "ko"))
+  const processStop = vi.fn(async () => {}), owned = vi.fn(async (_id: string) => {}), backend = new CodexSideChatBackend(async () => ({ client: client as unknown as AppServerJsonlClient, stop: processStop, ...(official ? { execution: { mode: "official-same-home" as const, cwd, model: "gpt-5.6-luna", instructions: "collaboration-mode" as const, noEnvironment: true } } : {}) }), owned)
+  const open = () => backend.open({ threadId: "parent", title: "Parent", cwd }, compilePersona("A", neutralPersona(), "ko"))
   const final = (threadId = "child", turnId = `turn-${turnSequence}`, text = JSON.stringify({ text: "Hello", preview: "", expression: "neutral" })) => notification("turn/completed", { threadId, turn: { id: turnId, status: "completed", items: [{ id: `answer-${turnId}`, type: "agentMessage", phase: "final_answer", text }] } })
-  return { starts, interrupts, notify: (method: string, params: unknown) => notification(method, params), backend, client, processStop, owned, open, final, closed: () => closed(), request: () => request({ id: 42, method: "item/commandExecution/requestApproval", params: { threadId: "child" } }) }
+  return { starts, interrupts, notify: (method: string, params: unknown) => notification(method, params), backend, client, processStop, owned, open, final, closed: () => closed(), request: (value?: Record<string, unknown>) => request(value ?? { id: 42, method: "item/commandExecution/requestApproval", params: { threadId: "child" } }) }
 }
 describe("dedicated side chat RPC", () => {
+  it("refuses inherited tools and ignores old-turn/parent requests without killing a later official turn", async () => {
+    const f = fixture(false, true); await f.open()
+    const a = f.backend.send("A"); f.final(); await a
+    const b = f.backend.send("B")
+    for (const [threadId, turnId] of [["child", "turn-1"], ["parent", "turn-2"]]) f.request({ id: 50, method: "item/tool/call", params: { threadId, turnId, tool: "external", arguments: {} } })
+    expect(f.processStop).not.toHaveBeenCalled()
+    f.request({ id: 51, method: "item/tool/call", params: { threadId: "child", turnId: "turn-2", tool: "external", arguments: { command: "forbidden" } } })
+    expect(f.client.respondToServerRequest).toHaveBeenCalledWith(51, expect.objectContaining({ success: false }))
+    f.final(); await expect(b).resolves.toMatchObject({ text: "Hello" })
+    expect(f.client.request.mock.calls.filter(([m]) => m === "turn/start").every(([, p]) => p.environments.length === 0 && p.approvalPolicy === "never" && p.sandboxPolicy.type === "readOnly")).toBe(true)
+    await f.backend.close()
+  })
   it("forks through last completed turn and never resumes/mutates parent", async () => {
     const f = fixture(); const context = await f.open()
     expect(context.lastTurnId).toBe("complete"); expect(f.owned).toHaveBeenCalledWith("child")

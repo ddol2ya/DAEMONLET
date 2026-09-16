@@ -3,11 +3,13 @@ import type { AppLanguage } from "./app-language"
 export const SIDE_CHAT_LIMITS = { inputPoints: 4000, inputBytes: 16000, responseBytes: 65536, previewBytes: 4096, messages: 100, historyBytes: 2 * 1024 * 1024 } as const
 export type ChatExpression = "neutral" | "happy" | "thinking"
 export type ChatResponse = { text: string; preview: string; expression: ChatExpression }
-export type ChatError = SourceError | "TURN_FAILED" | "CHAT_DISABLED" | "CHAT_PROFILE_MISSING" | "CHAT_MODEL_UNAVAILABLE" | "CHAT_RUNTIME_MISSING" | "CHAT_RUNTIME_UNSUPPORTED" | "CHAT_AUTH_REQUIRED" | "CHAT_MANAGED_POLICY" | "CHAT_EXECUTION_POLICY" | "PARENT_UNSUPPORTED" | "PARENT_CAPABILITIES" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
-export type ChatSourceReadiness = { metadata: "checked" | "blocked"; format: "legacy" | "paginated" | "unknown"; reason: ChatError | null }
+export type ChatError = SourceError | "READ_ACCESS_DENIED" | "READ_LIMIT" | "TURN_FAILED" | "CHAT_DISABLED" | "CHAT_PROFILE_MISSING" | "CHAT_MODEL_UNAVAILABLE" | "CHAT_RUNTIME_MISSING" | "CHAT_RUNTIME_UNSUPPORTED" | "CHAT_AUTH_REQUIRED" | "CHAT_MANAGED_POLICY" | "CHAT_EXECUTION_POLICY" | "PARENT_UNSUPPORTED" | "PARENT_CAPABILITIES" | "CHAT_POLICY_UNENFORCEABLE" | "NO_PARENT" | "BUSY" | "STALE_REQUEST" | "INVALID_REQUEST" | "INPUT_LIMIT" | "HISTORY_LIMIT" | "RESPONSE_LIMIT" | "RESPONSE_INVALID" | "REFUSED" | "STOPPED" | "SESSION_LOST" | "OUTCOME_UNKNOWN" | "PACK_PERSONA" | "REQUEST_LIMITED"
+export type ChatSourceReadiness = { metadata: "pending" | "checked" | "blocked"; format: "legacy" | "paginated" | "unknown"; reason: ChatError | null }
 export type ChatMessage = { id: string; role: "user" | "assistant"; text: string; preview: string; at: number }
 export type ChatSubmission = { requestId: string; draftRevision: number }
 export type SideChatSnapshot = {
+  connectionMode?: "official-same-home" | "custom-experimental" | "unavailable"
+  attachments?: Array<{ path: string; startLine: number; endLine: number; readAt: number; truncated: boolean }>
   handle: string; epoch: number; enabled: boolean; mode: "hidden" | "compact" | "panel"; language: AppLanguage
   character: { id: string; label: string }; parent: { handle: string; title: string; contextAt: number | null } | null
   candidates: Array<{ handle: string; title: string; source?: ChatSourceReadiness }>; phase: "idle" | "preparing" | "answering" | "stopped" | "error"
@@ -15,7 +17,7 @@ export type SideChatSnapshot = {
   messages: ChatMessage[]; draft: string; draftRevision: number; acceptedSubmission: ChatSubmission | null; task: { state: string; checkedAt: number | null }
 }
 export type ChatRequest = { handle: string; epoch: number; requestId: string; text?: string; draftRevision?: number }
-export type ChatAction = "send" | "stop" | "reset" | "draft" | "compact" | "panel" | "hide" | "parent" | "copy"
+export type ChatAction = "send" | "stop" | "reset" | "draft" | "compact" | "panel" | "hide" | "parent" | "copy" | "attach" | "detach"
 export type ChatResult = { ok: true; value: SideChatSnapshot } | { ok: false; code: ChatError }
 export type SideChatApi = { get(): Promise<ChatResult>; action(action: ChatAction, request: ChatRequest): Promise<ChatResult>; onChanged(listener: (snapshot: SideChatSnapshot) => void): () => void }
 export const SIDE_CHAT_IPC = { get: "side-chat:get", action: "side-chat:action", changed: "side-chat:changed" } as const
@@ -39,7 +41,7 @@ export function parseChatResponse(raw: string): ChatResponse {
 export function validateChatRequest(value: unknown, action: ChatAction): ChatRequest {
   const v = value as ChatRequest
   const revision = action === "send" || action === "draft"
-  const text = revision || action === "parent" || action === "copy"
+  const text = revision || action === "parent" || action === "copy" || action === "attach"
   const keys = revision ? "draftRevision,epoch,handle,requestId,text" : text ? "epoch,handle,requestId,text" : "epoch,handle,requestId"
   if (!v || typeof v !== "object" || Array.isArray(v) || Object.keys(v).sort().join() !== keys || typeof v.handle !== "string" || !/^[\da-f-]{36}$/.test(v.handle) || typeof v.requestId !== "string" || !/^[\da-f-]{36}$/.test(v.requestId) || !Number.isSafeInteger(v.epoch) || v.epoch < 1 || revision && (!Number.isSafeInteger(v.draftRevision) || v.draftRevision! < 0) || text && !validChatInput(v.text, true)) throw new Error("INVALID_REQUEST")
   return v

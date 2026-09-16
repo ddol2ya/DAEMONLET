@@ -5,11 +5,21 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { readChatParentContext } from "../electron/main/side-chat/SideChatParent"
-import { readChatAuthTokens } from "../electron/main/side-chat/SideChatAuth"
+import { readChatAuthIdentity, readChatAuthTokens } from "../electron/main/side-chat/SideChatAuth"
 import { inspectSideChatExecutable } from "../electron/main/side-chat/SideChatPolicy"
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 const root = async () => { const value = await mkdtemp(join(tmpdir(), "side-chat-guard-")); roots.push(value); return value }
+
+it("same-home binding reads identity without exporting tokens and tolerates same-account token rotation", async () => {
+  const home = await root(), path = join(home, "auth.json")
+  const write = (id: string, value: string) => writeFile(path, JSON.stringify({ auth_mode: "chatgpt", tokens: { account_id: id, access_token: value } }), { mode: 0o600 })
+  await write("account-a", "fixture-token-one"); expect(await readChatAuthIdentity(home)).toBe("account-a")
+  await write("account-a", "fixture-token-two"); expect(await readChatAuthIdentity(home)).toBe("account-a")
+  await write("account-b", "fixture-token-two"); expect(await readChatAuthIdentity(home)).toBe("account-b")
+  await writeFile(path, JSON.stringify({ auth_mode: "apiKey" }), { mode: 0o600 })
+  await expect(readChatAuthIdentity(home)).rejects.toThrow("CHAT_AUTH_REQUIRED")
+})
 async function parentFixture(meta: Record<string, unknown> = {}) {
   const home = await root(), id = randomUUID(), turn = randomUUID(), current = randomUUID()
   await mkdir(join(home, "sessions"))
