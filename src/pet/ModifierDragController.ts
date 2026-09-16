@@ -8,12 +8,14 @@ export class ModifierDragController {
   private active: { pointer: number; id: Promise<string | null>; point: { x: number; y: number } } | null = null
   private frame: number | null = null
   private rightAlt = false
-  constructor(private readonly canvas: HTMLCanvasElement, private readonly options: {
+  constructor(private readonly canvas: HTMLElement, private readonly options: {
     platform: string
     allowed(): boolean
     hit(x: number, y: number): boolean
     request(value: WindowDragRequest): Promise<WindowDragReply>
     lock(value: boolean, point?: { x: number; y: number }): void
+    gesture?(event: PointerEvent): boolean
+    onEscape?(): void
   }) {
     canvas.addEventListener("pointerdown", this.down, true)
     canvas.addEventListener("pointermove", this.move, true)
@@ -25,7 +27,7 @@ export class ModifierDragController {
   }
   private consume(event: Event) { event.preventDefault(); event.stopImmediatePropagation() }
   private down = (event: PointerEvent) => {
-    if (this.active || !this.options.allowed() || !isMoveGesture(event, this.rightAlt)) return
+    if (this.active || !this.options.allowed() || !(this.options.gesture ? this.options.gesture(event) : isMoveGesture(event, this.rightAlt))) return
     let hit = false
     try { hit = this.options.hit(event.clientX, event.clientY) } catch { return }
     if (!hit) return
@@ -52,7 +54,7 @@ export class ModifierDragController {
   private cancelEvent = (event: PointerEvent) => { if (this.active?.pointer === event.pointerId) { this.consume(event); this.cancel() } }
   private key = (event: KeyboardEvent) => {
     if (this.options.platform === "win32" && event.code === "AltRight") this.rightAlt = event.type === "keydown"
-    if (event.type === "keydown" && event.key === "Escape" && this.active) { this.consume(event); this.cancel() }
+    if (event.type === "keydown" && event.key === "Escape" && this.active) { this.consume(event); this.cancel(); this.options.onEscape?.() }
   }
   cancel = () => { this.rightAlt = false; this.finish("cancel") }
   private finish(action: "end" | "cancel") {

@@ -2,6 +2,7 @@ import { ipcMain, type IpcMainEvent, type IpcMainInvokeEvent } from "electron"
 import { BUBBLE_IPC, validatePetBubblePresentation } from "../shared/bubble-presentation"
 import type { ActivityBubbleWindowController } from "./ActivityBubbleWindowController"
 import { isTrustedSender } from "./SecurityPolicy"
+import { PLACEMENT_IPC } from "../shared/bubble-placement"
 
 export class BubblePresentationIpcController {
   private counts = new Map<string, { start: number; count: number }>()
@@ -13,6 +14,8 @@ export class BubblePresentationIpcController {
     this.counts.set(key, bucket); return ++bucket.count <= limit
   }
   register(): void {
+    ipcMain.handle(PLACEMENT_IPC.get, (event, ...args) => !args.length && this.accept(event, "activity-bubble", 10, "placement-get") ? this.bubble.placementSnapshot() : { editing: false, revision: 0 })
+    ipcMain.handle(PLACEMENT_IPC.action, (event, ...args) => args.length === 1 && this.accept(event, "activity-bubble", 120, "placement-action") ? this.bubble.placementAction(args[0]) : { ok: false })
     ipcMain.handle(BUBBLE_IPC.begin, (event, ...args: unknown[]) => {
       if (args.length || !this.accept(event, "pet", 10, "begin")) return 0
       return this.bubble.presentation.begin()
@@ -37,6 +40,7 @@ export class BubblePresentationIpcController {
     if (args.length === 1 && typeof height === "number" && Number.isInteger(height) && height >= 44 && height <= 480 && this.accept(event, "activity-bubble", 20, "height")) this.bubble.setContentHeight(height)
   }
   dispose(): void {
+    ipcMain.removeHandler(PLACEMENT_IPC.get); ipcMain.removeHandler(PLACEMENT_IPC.action)
     ipcMain.removeHandler(BUBBLE_IPC.begin); ipcMain.removeHandler(BUBBLE_IPC.report)
     ipcMain.removeListener(BUBBLE_IPC.interaction, this.interaction); ipcMain.removeListener(BUBBLE_IPC.pointer, this.pointer); ipcMain.removeListener(BUBBLE_IPC.height, this.height)
     this.counts.clear()

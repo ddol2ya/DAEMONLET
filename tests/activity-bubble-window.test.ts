@@ -31,10 +31,11 @@ class FakeWindow extends EventEmitter {
   async loadURL() {}
   destroy() { this.destroyed = true; this.emit("closed") }
 }
-vi.mock("electron", () => ({ BrowserWindow: FakeWindow, screen: { getDisplayMatching: () => ({ workArea: { x: 0, y: 24, width: 1440, height: 900 } }) } }))
-async function fixture(paintReady = true) {
+const cursor = vi.hoisted(() => ({ x: 300, y: 300 }))
+vi.mock("electron", () => ({ BrowserWindow: FakeWindow, screen: { getCursorScreenPoint: () => ({ ...cursor }), getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 24, width: 1440, height: 900 } }), getDisplayMatching: () => ({ workArea: { x: 0, y: 24, width: 1440, height: 900 } }) } }))
+async function fixture(paintReady = true, saved = vi.fn()) {
   const { ActivityBubbleWindowController } = await import("../electron/main/ActivityBubbleWindowController")
-  const hidden = vi.fn(), c = new ActivityBubbleWindowController("/preload.cjs", undefined, hidden)
+  const hidden = vi.fn(), c = new ActivityBubbleWindowController("/preload.cjs", undefined, hidden, undefined, placement => { settings.bubblePlacement = placement; c.applySettings(settings); saved(placement) })
   const pet = new FakeWindow(); pet.visible = true
   const settings = defaultDesktopSettings()
   c.attach(pet as unknown as BrowserWindow, settings)
@@ -48,6 +49,34 @@ async function fixture(paintReady = true) {
   return { c, pet, win, report, settings, hidden, store }
 }
 describe("native activity window arbitration", () => {
+  it("edits in the same window, commits only on Apply and retains the live chat and draft", async () => {
+    const saved = vi.fn(), f = await fixture(true, saved), factory = vi.fn(), service = new SideChatService(factory)
+    service.configure(true, "ko"); service.setDraft("unsent original"); service.setMode("panel"); f.c.updateChat(service.snapshot())
+    const conversation = JSON.stringify(service.snapshot()), originalBounds = { ...f.win.bounds }
+    f.c.beginPlacement(); const revision = f.c.placementSnapshot().revision
+    expect(f.c.window).toBe(f.win); expect(f.win.bounds).not.toEqual(originalBounds)
+    Object.assign(cursor, { x: 300, y: 300 })
+    const begin = f.c.placementAction({ action: "drag", revision, drag: { action: "begin" } })
+    if (!begin.ok || !begin.drag?.id) throw Error("drag did not begin")
+    Object.assign(cursor, { x: 450, y: 410 })
+    f.c.placementAction({ action: "drag", revision, drag: { action: "end", id: begin.drag.id } })
+    expect(saved).not.toHaveBeenCalled()
+    f.c.placementAction({ action: "cancel", revision }); expect(f.win.bounds).toEqual(originalBounds)
+    f.c.beginPlacement(); const next = f.c.placementSnapshot().revision
+    expect(f.c.placementAction({ action: "apply", revision })).toEqual({ ok: false })
+    f.c.placementAction({ action: "apply", revision: next })
+    expect(saved).toHaveBeenCalledOnce(); expect(f.settings.bubblePlacement.mode).toBe("relative")
+    expect(JSON.stringify(service.snapshot())).toBe(conversation); expect(factory).not.toHaveBeenCalled()
+    f.c.destroy()
+  })
+  it("shows a local preview with all bubbles OFF and processes dialogue expiry while editing", async () => {
+    const f = await fixture(), settings = { ...f.settings, taskBubblesEnabled: false, speechBubblesEnabled: false, sideChatEnabled: false }
+    f.c.applySettings(settings); expect(f.win.visible).toBe(false)
+    f.c.beginPlacement(); expect(f.win.visible).toBe(true)
+    await f.report("hidden"); f.c.cancelPlacement()
+    expect(f.win.visible).toBe(false); expect(settings).toMatchObject({ taskBubblesEnabled: false, speechBubblesEnabled: false, sideChatEnabled: false })
+    f.c.destroy()
+  })
   it("shows loaded activity even when a hidden window never emits ready-to-show", async () => {
     const f = await fixture(false)
     expect(f.win.visible).toBe(false)

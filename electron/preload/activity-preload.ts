@@ -4,6 +4,13 @@ import { contextBridge, ipcRenderer } from "electron"
 import { ACTIVITY_IPC, type ActivityApi, type ActivitySnapshot } from "../shared/activity-contract"
 import { BUBBLE_IPC } from "../shared/bubble-presentation"
 import "./side-chat-preload"
+import { PLACEMENT_IPC, type BubblePlacementApi } from "../shared/bubble-placement"
+
+const placement: BubblePlacementApi = {
+  get: () => ipcRenderer.invoke(PLACEMENT_IPC.get), action: value => ipcRenderer.invoke(PLACEMENT_IPC.action, value),
+  onChanged: listener => { const handler = (_event: Electron.IpcRendererEvent, value: Parameters<typeof listener>[0]) => listener(value); ipcRenderer.on(PLACEMENT_IPC.changed, handler); return () => ipcRenderer.removeListener(PLACEMENT_IPC.changed, handler) },
+}
+contextBridge.exposeInMainWorld("bubblePlacementDesktop", placement)
 
 const api: ActivityApi = {
   getSnapshot: () => ipcRenderer.invoke(ACTIVITY_IPC.get),

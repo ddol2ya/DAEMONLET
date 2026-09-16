@@ -7,6 +7,7 @@ import { SideChatPreferences } from "./side-chat/SideChatPreferences"
 import { SideChatSetupController } from "./side-chat/SideChatSetupController"
 import { PersonaResolver } from "./side-chat/PersonaResolver"
 import { WindowDragController } from "./WindowDragController"
+import { automaticBubblePlacement } from "../shared/bubble-placement"
 import { validWindowDragRequest } from "../shared/window-drag"
 import { SideChatEntryController } from "./side-chat/SideChatEntryController"
 import { SideChatIpcController } from "./SideChatIpcController"
@@ -121,7 +122,7 @@ export class AppController {
     this.activityTitles = new ActivityConversationTitles(() => readDesktopThreadCatalog(process.env.CODEX_HOME ?? join(homedir(), ".codex")), titles => this.activity.setConversationTitles(titles))
     this.activityWindow = new ActivityWindowController(preload("activity"), this.devServerUrl)
     this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"), undefined, process.platform, appLanguage)
-    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => { this.chatEntry.cancel(); this.sideChat.setMode("hidden") })
+    this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }, placement => this.updateSettings({ bubblePlacement: placement }))
     this.personaResolver = new PersonaResolver((selection, path) => this.characters.readPersonaAsset(selection, path))
     this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more), () => this.chatEntry.cancel())
     this.subscriptions.push(this.sideChat.subscribe(() => this.activityBubble.updateChat(this.sideChat.snapshot())))
@@ -178,6 +179,7 @@ export class AppController {
     this.settingsIpc = new SettingsIpcController({
       window: this.settingsWindow, integration: this.integration, devServerUrl: this.devServerUrl,
       getSettings: () => this.settings, updateSettings: (patch) => this.updateSettings(patch),
+      bubblePlacement: action => this.editBubblePlacement(action),
       resetPosition: () => this.resetPosition(), restartAdapter: () => this.restartAdapterSafely(),
       characterAllowed: this.characters.isAvailable,
     })
@@ -268,6 +270,8 @@ export class AppController {
 
   async quit(): Promise<void> {
     if (this.quitting) return
+    this.placementOpening?.abort()
+    this.activityBubble.cancelPlacement()
     this.petDrag.cancel()
     this.quitting = true
     this.chatEntry.cancel()
@@ -366,6 +370,7 @@ export class AppController {
   }
 
   private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+    if (patch.visible === false || patch.characterId !== undefined) { this.placementOpening?.abort(); this.activityBubble.cancelPlacement() }
     if (patch.visible === false || patch.scale !== undefined || patch.characterId !== undefined) this.petDrag.cancel()
     if (patch.visible === false || patch.sideChatEnabled === false) { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }
     if (patch.characterId !== undefined) {
@@ -450,8 +455,19 @@ export class AppController {
     } catch { if (generation === this.personaGeneration) this.sideChat.personaFailed() }
   }
   private async openSideChat(key?: string, activityId?: string) {
+    this.placementOpening?.abort(); this.activityBubble.cancelPlacement()
     const target = key ? this.adapter.conversationTarget(key) : null
     await this.chatEntry.open(target ? { threadId: target.threadId, activityId } : undefined, Boolean(activityId))
+  }
+  private placementOpening: AbortController | null = null
+  private async editBubblePlacement(action: "adjust" | "auto" | "reset") {
+    this.placementOpening?.abort()
+    if (action !== "adjust") { this.activityBubble.cancelPlacement(); this.updateSettings({ bubblePlacement: automaticBubblePlacement() }); return }
+    this.chatEntry.cancel()
+    const opening = this.placementOpening = new AbortController()
+    this.showPet()
+    if (await this.pet.reveal(opening.signal) && !opening.signal.aborted && !this.quitting) this.activityBubble.beginPlacement()
+    if (this.placementOpening === opening) this.placementOpening = null
   }
   private async refreshChatParents(query?: string, more = false) {
     if (!this.settings.sideChatEnabled || this.quitting) return
@@ -517,6 +533,7 @@ export class AppController {
         void this.codexApp.available().then(available => { if (!this.quitting) this.activity.setNavigation(available ? "app" : "none") })
       },
       characters: () => this.characters.snapshot().entries,
+      bubblePlacement: action => { void this.editBubblePlacement(action) },
       toggleVisible: () => this.updateSettings({ visible: !this.settings.visible }),
       setLayout: (enabled) => { if (enabled && !this.settings.visible) this.updateSettings({ visible: true }); this.setLayoutMode(enabled) },
       resetPosition: () => this.resetPosition(),

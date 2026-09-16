@@ -4,6 +4,7 @@ import { BUBBLE_IPC, type BubbleAnchor, type SpeechBubbleContent, type SpeechBub
 import type { BubbleRect } from "../shared/bubble-position"
 import type { DesktopSettingsV1 } from "../shared/desktop-settings"
 import { positionDesktopSpeechBubble } from "../shared/speech-bubble"
+import { bubblePlacementReference, positionRelativeBubble } from "../shared/bubble-placement"
 import { expectedRendererUrl, secureWebContents } from "./SecurityPolicy"
 
 /** A non-interactive companion: scaling Pet never resizes its text area. */
@@ -34,7 +35,7 @@ export class SpeechBubbleWindowController {
       this.appearanceKey = appearanceKey
     }
     const avoid = controls && !controls.isDestroyed() && controls.isVisible() ? controls.getBounds() : undefined
-    const area = screen.getDisplayMatching(bounds).workArea
+    const area = screen.getDisplayMatching(bubblePlacementReference(bounds, settings.bubblePlacement)).workArea
     if (!this.placement || this.placement.text !== frame.content.text) {
       this.placement = {
         text: frame.content.text, anchor: { ...anchor },
@@ -45,9 +46,10 @@ export class SpeechBubbleWindowController {
     // Pin one line to its opening pose. Animation reports cannot move a box
     // the user is reading; real window moves/resizes still reposition it.
     const placement = this.placement
-    const environment = JSON.stringify([bounds, area, avoid, frame.content.width, frame.content.height])
+    const environment = JSON.stringify([bounds, area, avoid, frame.content.width, frame.content.height, settings.bubblePlacement])
     if (!placement.bounds || placement.environment !== environment) {
-      placement.bounds = positionDesktopSpeechBubble(bounds, area, placement.anchor, { ...placement.content, width: frame.content.width, height: frame.content.height }, avoid)
+      const automatic = positionDesktopSpeechBubble(bounds, area, placement.anchor, { ...placement.content, width: frame.content.width, height: frame.content.height }, avoid)
+      placement.bounds = settings.bubblePlacement.mode === "relative" ? positionRelativeBubble(bounds, area, automatic, settings.bubblePlacement) : automatic
       placement.environment = environment
     }
     const next = placement.bounds

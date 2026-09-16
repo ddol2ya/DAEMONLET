@@ -1,4 +1,5 @@
 import { isAppLanguage, normalizeAppLanguage, type AppLanguage } from "./app-language"
+import { automaticBubblePlacement, parseBubblePlacement, type BubblePlacement } from "./bubble-placement"
 export const DESKTOP_SETTINGS_SCHEMA_VERSION = 1 as const
 export const CHARACTER_IDS = ["gpichan"] as const
 export const CHARACTER_NAMES = { gpichan: "지피쨩" } as const
@@ -32,11 +33,12 @@ export type DesktopSettingsV1 = {
   speechBubblesEnabled: boolean
   sideChatEnabled: boolean
   taskBubblesEnabled: boolean
+  bubblePlacement: BubblePlacement
 }
 
 export type DesktopSettingsPatch = Partial<Pick<DesktopSettingsV1,
   "characterId" | "language" | "scale" | "visible" | "alwaysOnTop" | "showOnAllWorkspaces" |
-  "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "taskBubblesEnabled" | "sideChatEnabled"
+  "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "taskBubblesEnabled" | "sideChatEnabled" | "bubblePlacement"
 >>
 
 export type DisplayLike = {
@@ -65,6 +67,7 @@ export function defaultDesktopSettings(): DesktopSettingsV1 {
     speechBubblesEnabled: true,
     taskBubblesEnabled: true,
     sideChatEnabled: true,
+    bubblePlacement: automaticBubblePlacement(),
   }
 }
 
@@ -111,6 +114,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
     speechBubblesEnabled: bool(input.speechBubblesEnabled, defaults.speechBubblesEnabled),
     taskBubblesEnabled: bool(input.taskBubblesEnabled, defaults.taskBubblesEnabled),
     sideChatEnabled: bool(input.sideChatEnabled, defaults.sideChatEnabled),
+    bubblePlacement: parseBubblePlacement(input.bubblePlacement) ?? automaticBubblePlacement(),
   }
   const migrated = input.schemaVersion !== DESKTOP_SETTINGS_SCHEMA_VERSION || JSON.stringify(input) !== JSON.stringify(normalized)
   return { value: normalized, migrated, warnings }
@@ -119,9 +123,10 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
 export function validateDesktopSettingsPatch(value: unknown, characterAllowed: (id: string) => boolean = builtinCharacter): DesktopSettingsPatch | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
   const input = value as Record<string, unknown>
-  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled", "sideChatEnabled"])
+  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled", "sideChatEnabled", "bubblePlacement"])
   if (Object.keys(input).some((key) => !allowed.has(key))) return null
   const patch: DesktopSettingsPatch = {}
+  if ("bubblePlacement" in input) { const placement = parseBubblePlacement(input.bubblePlacement); if (!placement) return null; patch.bubblePlacement = placement }
   if ("language" in input) {
     if (!isAppLanguage(input.language)) return null
     patch.language = input.language
