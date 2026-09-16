@@ -66,11 +66,15 @@ try {
   const project = join(await realpath(process.env.DAEMONLET_CHAT_SMOKE_USER!), "project")
   await mkdir(project); await writeFile(join(project, "example.ts"), "export const example = 42;\n// selected file\n")
   service.setConnectionMode("official-same-home")
-  service.setCandidates([{ threadId: "parent", title: "합성 작업 · 부모 대화", cwd: project }], "parent"); service.setMode("compact")
+  service.setCandidates([{ threadId: "parent", title: "캐릭터 제작스킬에서 이미지 넣을때 조건이 있었나? 그리고 이미지 넣으면 어떤식으로 가공해주냐? ".repeat(3).slice(0, 120), cwd: project }], "parent"); service.setMode("compact")
   const window = win.window!, contents = window.webContents
   const js = <T = any>(code: string): Promise<T> => contents.executeJavaScript(code)
   async function until(code: string) { for (let n = 0; n < 100; n++) { if (await js(code)) return; await wait(40) }; throw Error("UI condition timed out: " + code) }
   await until('Boolean(document.querySelector("textarea"))')
+  await js("document.querySelector('.parent-search summary').click();document.querySelector('.context select').focus()")
+  assert(await js("(()=>{const r=document.querySelector('.setup-region');return r.scrollWidth<=r.clientWidth+1 && r.scrollLeft===0 && document.querySelector('footer').getBoundingClientRect().bottom<=innerHeight+1})()"), "Long parent title must not move preparation controls outside the compact viewport")
+  result.longParentLayout = "PASS"
+  await js("document.querySelector('.parent-search summary').click()")
   assert(calls === 0 && opens === 0, "Opening made no model call")
   const initialWindowId = window.id
   const type = async (text: string, delay = 260) => { await js(`(()=>{const e=document.querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(e,${JSON.stringify(text)});e.dispatchEvent(new Event('input',{bubbles:true}));})()`); if (delay) await wait(delay) }
