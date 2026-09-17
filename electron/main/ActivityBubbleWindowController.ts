@@ -115,9 +115,12 @@ export class ActivityBubbleWindowController {
   }
   setInteractionLocked(locked: boolean, pressed = false): void {
     const wasLocked = this.presentation.interactionLocked
+    const wasPressed = this.pressed
     this.pressed = pressed
     this.presentation.setInteractionLocked(locked)
-    if (wasLocked === locked) this.sync()
+    // Native hide may synchronously report release before visibility settles.
+    // Only a changed press needs another sync when the lock is unchanged.
+    if (wasLocked === locked && wasPressed !== pressed) this.sync()
   }
   setLayoutMode(value: boolean): void { this.inLayout = value; this.sync() }
   setContentHeight(height: number): void { if (this.contentHeight !== height && !this.presentation.sideChatVisible) { this.contentHeight = height; this.sync() } }
@@ -146,7 +149,8 @@ export class ActivityBubbleWindowController {
     const retainInput = this.presentation.interactionLocked && this.window?.isVisible()
     if (!this.settings || !chatting && !editing && !this.settings.taskBubblesEnabled || !this.settings.visible || !pet || pet.isDestroyed() || !pet.isVisible() || pet.isMinimized() || this.view === "activity" && !chatting && !editing && (this.inLayout || !this.presentation.canShowActivity || empty && !retainInput)) {
       if (this.view === "control" && this.window?.isVisible()) this.onHidden()
-      this.window?.hide(); return
+      if (this.window?.isVisible()) this.window.hide()
+      return
     }
     if (!this.window || this.window.isDestroyed()) this.create()
     const win = this.window!
