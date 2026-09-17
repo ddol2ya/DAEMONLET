@@ -69,9 +69,9 @@ HTML·스크립트·원격 이미지는 실행/로드하지 않습니다. 앱 �
 
 | 항목 | 현재 범위 |
 | --- | --- |
-| 공식 CLI | 0.154.0 macOS arm64 npm native artifact. 2026-09-16 공식 안정 릴리스/npm latest와 대조. 해시·정책을 다시 확인한 뒤 실행. |
+| 공식 CLI | 0.154.0 macOS arm64 및 Windows x64 npm native artifact. 플랫폼별 공식 배포 출처와 바이트를 대조. 해시·정책을 다시 확인한 뒤 실행. |
 | macOS | macOS 27 Apple Silicon에서 직접 검증. 최소 OS·다중 OS 사용자·다중 모니터 실측은 후보 보고서의 NOT_RUN을 확인. |
-| Windows x64 | 발견 경로와 공통 단위 시험은 있으나 native 동시 home·ACL·인증·설치 실측 전이므로 사이드챗 연결은 차단. 기존 앱 기능의 Windows 지원과 별개. |
+| Windows x64 | 공식 0.154.0 x64에서 같은 home의 인증·권한·모델 목록, 선택한 실제 부모의 fork와 첫/후속 답변을 직접 검증. 설정·Hook·부모 완료 경계 보존 확인. file 인증 기준이며 credential store별 미실행 항목은 후보 보고서에 구분. |
 | 모델 | 현재 검증 후보는 `gpt-5.6-luna`, 낮은 추론 설정 하나. 계정 catalog와 교집합을 확인하며 대화 중 변경하지 않음. |
 | file 인증 | 실제 계정의 준비 검증. 보호된 account ID를 확인하며 토큰 복사·주입 없음. |
 | keyring/auto | 공식 사용량 응답의 검증된 workspace ID가 필요한 조건부 구현. 매 전송 전 새 제한 프로세스로 현재 인증을 조회. 실제 OS credential store 시험은 후보 보고서에서 별도 표시. 잠김/미로그인을 구분할 정보가 없는 응답은 조회 불가로 안내. |

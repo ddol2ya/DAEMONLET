@@ -3,8 +3,9 @@ import { parseArgs } from 'node:util'
 import { createHash } from 'node:crypto'
 import { access, copyFile, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import {requirePoseReviews} from './production-review.mjs'
 
-const { values } = parseArgs({ options: Object.fromEntries(['source', 'id', 'label', 'profile', 'behavior', 'dialogue', 'persona', 'output', 'runtime-patches'].map(k => [k, { type: 'string' }])) })
+const { values } = parseArgs({ options: {...Object.fromEntries(['source', 'id', 'label', 'profile', 'behavior', 'dialogue', 'persona', 'output', 'runtime-patches'].map(k => [k, { type: 'string' }])),reviewed:{type:'boolean',default:false}} })
 if (!values.source || !values.output || !values.behavior || !values.dialogue || !values.label?.trim() || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(values.id ?? '') || values.id.length > 64 || !['trial', 'full'].includes(values.profile)) throw new Error('Usage: node scripts/characters/build-independent-payload.mjs --source <selected-run> --id <id> --label <name> --profile trial|full --behavior <json> --dialogue <json> --output <payload> [--runtime-patches <pose-to-file-map.json>]')
 const source = await realpath(resolve(values.source)), destination = resolve(values.output)
 if (await access(destination).then(() => true, () => false)) throw new Error('Output exists. Choose a new output directory; no files were replaced.')
@@ -19,6 +20,10 @@ const required = values.profile === 'trial' ? ['waiting', 'writing', 'head-tap']
 const ids = index.models.map(m => m.id)
 if (ids.length !== new Set(ids).size || required.some(id => !ids.includes(id)) || ids.some(id => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id))) throw new Error('The profile is missing distinct required poses')
 const selected = values.profile === 'trial' ? index.models.filter(m => required.includes(m.id)) : index.models
+if (values.reviewed) {
+  if (values['runtime-patches']) throw Error('Apply runtime patches to a new source round and review it before building a reviewed payload')
+  await requirePoseReviews(source,selected.map(m=>m.id))
+}
 const patches = values['runtime-patches'] ? await json(resolve(values['runtime-patches'])) : {}
 const stage = `${destination}.building-${process.pid}`
 await mkdir(dirname(destination), { recursive: true })

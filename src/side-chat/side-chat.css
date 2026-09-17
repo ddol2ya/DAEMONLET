@@ -7,3 +7,5 @@
 @media(max-height:340px){.chat{gap:4px;padding-top:6px;margin-top:4px}.chat textarea{min-height:42px;height:42px}.chat .setup-region{max-height:35%}.chat .error{max-height:48px}}
 
 .chat .setup-region{grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:12px}.chat .setup-region:has(>details[open]){grid-template-columns:minmax(0,1fr)}
+
+.chat .setup-region{overscroll-behavior:contain;overflow-anchor:none}

@@ -43,14 +43,21 @@ try {
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
   const script = join(root, "mcp.cjs")
   await writeFile(script, `require('fs').appendFileSync(${JSON.stringify(mcpCanary)},${JSON.stringify("start\n")});require('readline').createInterface({input:process.stdin}).on('line',line=>{const r=JSON.parse(line);if(r.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:r.id,result:r.method==='initialize'?{protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'sentinel',version:'1'}}:r.method==='tools/list'?{tools:[]}: {}})+${JSON.stringify("\n")})});`)
-  const hookCommand = `printf canary >> '${hookCanary}'`
-  const hookBytes = JSON.stringify({ hooks: Object.fromEntries(["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"].map(event => [event, [{ hooks: [{ type: "command", command: hookCommand }] }]])) })
+  const hookScript = join(root, "hook.cjs"), notifyScript = join(root, "notify.cjs")
+  await writeFile(hookScript, `require("node:fs").appendFileSync(${JSON.stringify(hookCanary)},process.argv[2]+"\\n")`)
+  await writeFile(notifyScript, `require("node:fs").appendFileSync(${JSON.stringify(notifyCanary)},"notify")`)
+  const hookCommands = new Map(["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"].map(event => [event,
+    process.platform === "win32"
+      ? `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(`& '${process.execPath.replaceAll("'", "''")}' '${hookScript.replaceAll("'", "''")}' '${event}'`, "utf16le").toString("base64")}`
+      : `'${process.execPath.replaceAll("'", "'\\''")}' '${hookScript.replaceAll("'", "'\\''")}' '${event}'`,
+  ]))
+  const hookBytes = JSON.stringify({ hooks: Object.fromEntries([...hookCommands].map(([event, command]) => [event, [{ hooks: [{ type: "command", command }] }]])) })
   await writeFile(join(state, "hooks.json"), hookBytes)
-  const config: any = { ...FIXTURE_CONSTRAINTS, features: { ...FIXTURE_CONSTRAINTS.features, hooks: true, shell_tool: true }, notify: ["/bin/sh", "-c", `printf notify >> '${notifyCanary}'`], mcp_servers: { sentinel: { command: process.execPath, args: [script], enabled: true } }, model: "gpt-5.6-luna", model_provider: "fixture", model_providers: { fixture: { name: "OpenAI", base_url: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, wire_api: "responses", requires_openai_auth: false } } }
+  const config: any = { ...FIXTURE_CONSTRAINTS, features: { ...FIXTURE_CONSTRAINTS.features, hooks: true, shell_tool: true }, notify: [process.execPath, notifyScript], mcp_servers: { sentinel: { command: process.execPath, args: [script], enabled: true } }, model: "gpt-5.6-luna", model_provider: "fixture", model_providers: { fixture: { name: "OpenAI", base_url: `http://127.0.0.1:${(server.address() as { port: number }).port}/v1`, wire_api: "responses", requires_openai_auth: false } } }
   await writeFile(join(state, "config.toml"), stringify(config))
   const review = await seed()
   const listed: any = await review.client.request("hooks/list", { cwds: [cwd] })
-  const known = listed.data.flatMap((d: any) => d.hooks).filter((h: any) => h.command === hookCommand)
+  const known = listed.data.flatMap((d: any) => d.hooks).filter((h: any) => [...hookCommands.values()].includes(h.command))
   if (known.length < 3) throw Error("Sentinel hooks not discovered")
   await review.stop()
   config.hooks = { state: Object.fromEntries(known.map((h: any) => [h.key, { trusted_hash: h.currentHash }])) }
@@ -61,7 +68,15 @@ try {
   const first: any = await parent.client.request("turn/start", { threadId: thread.id, input: [{ type: "text", text: "Synthetic sentinel parent", text_elements: [] }] })
   await until(() => events.some(e => e.method === "turn/completed" && e.params.turn.id === first.turn.id))
   await new Promise(resolve => setTimeout(resolve, 150))
-  const baseline = await counts()
+  const hookEvents = async () => readFile(hookCanary, "utf8").then(text => text.trim().split("\n").filter(Boolean), () => [] as string[])
+  let baseline = await counts()
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const events = await hookEvents()
+    const hooksSettled = ["SessionStart", "UserPromptSubmit", "Stop"].every(name => events.includes(name))
+    if (Object.values(baseline).every(n => n > 0) && hooksSettled) break
+    await new Promise(resolve => setTimeout(resolve, 50)); baseline = await counts()
+  }
+  report.positiveHookEvents = await hookEvents()
   const parentConfig = await readFile(join(state, "config.toml"), "utf8")
   report.fixtureParentConfigChanged = parentConfig !== original
   report.positiveParent = baseline
@@ -98,7 +113,7 @@ try {
 finally {
   await backend?.close(); for (const c of connections) await c.stop()
   server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 }
 await writeFile(resolve(values.output), JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 })
 console.log(JSON.stringify(report, null, 2)); if (report.status !== "PASS") process.exitCode = 1

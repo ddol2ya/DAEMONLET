@@ -20,8 +20,32 @@ sys.path.insert(0,str(ROOT/'scripts/characters'))
 spec=importlib.util.spec_from_file_location('source_models',ROOT/'scripts/characters/build-source-models.py')
 source_models=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(source_models)
+from source_masks import component_at, load_mask
 
 class CreatorTools(unittest.TestCase):
+    def test_face_component_uses_reviewed_location_not_largest_skin_island(self):
+        mask=np.zeros((40,40),bool);mask[2:8,5:11]=True;mask[18:38,2:35]=True
+        selected=component_at(mask,[7,4])
+        self.assertEqual(int(selected.sum()),36)
+        self.assertFalse(selected[25,10])
+        with self.assertRaises(ValueError):component_at(mask,[0,0])
+
+    def test_reviewed_mask_requires_explicit_grayscale_and_matching_canvas(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);Image.new('L',(32,32),255).save(root/'mask.png')
+            self.assertEqual(load_mask(root,'mask.png',(32,32)).sum(),1024)
+            with self.assertRaises(ValueError):load_mask(root,'mask.png',(16,16))
+            Image.new('RGBA',(32,32),(255,255,255,255)).save(root/'rgba.png')
+            with self.assertRaises(ValueError):load_mask(root,'rgba.png',(32,32))
+
+    def test_mouth_extraction_does_not_leave_a_rectangular_skin_sprite(self):
+        source=np.zeros((1280,1280,4),np.uint8);source[:]=[240,205,190,255]
+        for x in range(600,640):
+            y=300+round(((x-620)/10)**2);source[y:y+2,x]=[135,50,60,255]
+        mouth,bounds=source_models.mouth_feature(source,[595,292,645,314])
+        self.assertEqual(int(mouth[293,596,3]),0)
+        self.assertGreater(int(mouth[301,620,3]),200)
+
     def test_native_iris_mask_is_independent_of_rgb(self):
         core = np.ones((32, 32), bool)
         masks = []

@@ -10,7 +10,7 @@ const labels = {
 }
 
 const errors: Record<ChatError, [string, string]> = {
-  CHAT_PLATFORM_UNVERIFIED: ["이 플랫폼의 실제 연결 검증이 아직 완료되지 않았습니다. 현재 검증 범위는 macOS Apple Silicon입니다.", "Connection validation is pending on this platform. The verified scope is macOS Apple Silicon."],
+  CHAT_PLATFORM_UNVERIFIED: ["이 플랫폼의 실제 연결 검증이 아직 완료되지 않았습니다. 지원하는 공식 CLI와 운영체제 조합을 확인해 주세요.", "Connection validation is pending on this platform. Check the supported official CLI and operating system combination."],
   CHAT_SETTINGS_UNREADABLE: ["캐릭터 대화 설정을 저장할 수 없습니다. 기존 파일은 보존했습니다. 앱 설정 파일의 접근 권한을 확인해 주세요.", "Chat preferences could not be saved. The original file is preserved. Check access to the app settings file."],
   CHAT_AUTH_IDENTITY_UNAVAILABLE: ["로그인은 감지했지만 공식 계정 조회에서 workspace 식별을 확인하지 못했습니다. 네트워크와 자격 증명 저장소 접근을 확인하고 다시 확인해 주세요. 설정은 변경하지 않았습니다.", "Login was detected, but official account metadata could not establish the workspace identity. Check network and credential-store access, then check again. Settings were not changed."],
   CHAT_AUTH_UNAVAILABLE: ["Codex 로그인 상태를 읽을 수 없습니다. 공식 CLI에서 자격 증명 저장소 접근과 로그인 상태를 확인해 주세요.", "Codex login status could not be read. Check credential-store access and login in the official CLI."],
@@ -53,6 +53,8 @@ export function SideChatApp({ api, onSnapshot }: { api: SideChatApi; onSnapshot?
   const [long, setLong] = useState(false), [previewFits, setPreviewFits] = useState(true)
   const [startLine, setStartLine] = useState(1), [endLine, setEndLine] = useState(400)
   const [query, setQuery] = useState("")
+  const [setupPending, setSetupPending] = useState<Partial<Record<ChatAction, boolean>>>({})
+  const setupRequests = useRef(new Set<ChatAction>())
   const editDraft = (text: string) => { revision.current++; draftRef.current = text; setDraft(text) }
   const receive = useCallback((next: SideChatSnapshot) => {
     const previous = stateRef.current
@@ -82,10 +84,16 @@ export function SideChatApp({ api, onSnapshot }: { api: SideChatApi; onSnapshot?
   useEffect(() => { if (snapshot) onSnapshot?.(snapshot) }, [snapshot, onSnapshot])
   const action = async (name: ChatAction, text?: string, submission?: ChatSubmission) => {
     const current = stateRef.current; if (!current) return
-    const result = await api.action(name, { handle: current.handle, epoch: current.epoch, requestId: submission?.requestId ?? crypto.randomUUID(), ...(text === undefined ? {} : { text }), ...(["send", "draft"].includes(name) ? { draftRevision: submission?.draftRevision ?? revision.current } : {}) })
-    if (stateRef.current?.epoch !== current.epoch) return
-    if (!result.ok) setError(result.code)
-    else { setError(null); receive(result.value) }
+    const setup = ["check", "discover-cli", "pick-cli"].includes(name)
+    if (setupRequests.current.has(name)) return
+    if (setup) { setupRequests.current.add(name); setSetupPending(old => ({ ...old, [name]: true })); setError(null) }
+    try {
+      const result = await api.action(name, { handle: current.handle, epoch: current.epoch, requestId: submission?.requestId ?? crypto.randomUUID(), ...(text === undefined ? {} : { text }), ...(["send", "draft"].includes(name) ? { draftRevision: submission?.draftRevision ?? revision.current } : {}) })
+      if (stateRef.current?.epoch !== current.epoch) return
+      if (!result.ok) setError(result.code)
+      else { setError(null); receive(result.value) }
+    } catch { if (stateRef.current?.epoch === current.epoch) setError("SESSION_LOST") }
+    finally { if (setup) { setupRequests.current.delete(name); setSetupPending(old => ({ ...old, [name]: false })) } }
   }
   useEffect(() => {
     const draftRevision = revision.current
@@ -144,9 +152,9 @@ export function SideChatApp({ api, onSnapshot }: { api: SideChatApi; onSnapshot?
           <summary>{!snapshot.enabled ? (ko ? "대화 꺼짐" : "Chat is off") : snapshot.readiness?.phase === "checking" ? (ko ? "연결 확인 중…" : "Checking connection…") : snapshot.readiness?.phase === "ready" ? (ko ? "연결됨" : "Connected") : (ko ? "연결 준비" : "Connection setup")}</summary>
           {snapshot.readiness?.phase === "ready" && <p>{snapshot.readiness.version} · {snapshot.readiness.model}</p>}
           {!snapshot.enabled && <button onClick={() => void action("enable")}>{ko ? "캐릭터 대화 사용" : "Enable character chat"}</button>}
-          <button disabled={busy || snapshot.readiness?.phase === "checking"} onClick={() => void action("check")}>{ko ? "다시 확인" : "Check again"}</button>
-          <button disabled={busy} onClick={() => void action("discover-cli")}>{ko ? "감지한 공식 CLI 사용" : "Use detected official CLI"}</button>
-          <button disabled={busy} onClick={() => void action("pick-cli")}>{ko ? "CLI 파일 선택" : "Choose CLI file"}</button>
+          <button disabled={busy || setupPending.check || snapshot.readiness?.phase === "checking"} onClick={() => void action("check")}>{setupPending.check ? (ko ? "확인 중…" : "Checking…") : (ko ? "다시 확인" : "Check again")}</button>
+          <button disabled={busy || setupPending["discover-cli"]} onClick={() => void action("discover-cli")}>{setupPending["discover-cli"] ? (ko ? "공식 CLI 확인 중…" : "Checking official CLI…") : (ko ? "감지한 공식 CLI 사용" : "Use detected official CLI")}</button>
+          <button disabled={busy || setupPending["pick-cli"]} onClick={() => void action("pick-cli")}>{ko ? "CLI 파일 선택" : "Choose CLI file"}</button>
           <button onClick={() => void action("help")}>{ko ? "설치·로그인 안내" : "Install / sign-in guide"}</button>
         </details>
         <details className="context-info"><summary>{ko ? "맥락·사용 안내" : "Context and usage"}</summary><p>{t.context}: {time(snapshot.parent?.contextAt ?? null)}</p><p>{t.checked}: {time(snapshot.task.checkedAt)}</p><p>{t.privacy}</p></details>

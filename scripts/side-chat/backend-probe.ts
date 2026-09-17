@@ -28,6 +28,16 @@ const root = await realpath(await mkdtemp(join(tmpdir(), "daemonlet-backend-prob
 await mkdir(cwd); await mkdir(state)
 const requests: any[] = [], events: any[] = [], connections: ChatConnection[] = []
 const report: any = { schemaVersion: 1, kind: "production-backend-real-cli-fake-provider", platform: process.platform, arch: process.arch, version: execFileSync(values.codex, ["--version"], { encoding: "utf8", env: { HOME: root, CODEX_HOME: state, PATH: "/usr/bin:/bin" } }).trim(), executableSha256: createHash("sha256").update(await readFile(values.codex)).digest("hex"), realAccountCalls: 0, status: "NOT_RUN", checks: {}, launchConstraints: FIXTURE_CONSTRAINTS }
+// Windows native lock files cannot be opened while a same-home process is alive.
+// Config/Hook and explicit parent-prefix reads remain mandatory; only store inventory is partial.
+const inventoryRead = async (path: string): Promise<Buffer | null> => {
+  try { return await readFile(path) }
+  catch (error) {
+    if (process.platform !== "win32" || (error as NodeJS.ErrnoException).code !== "EBUSY" || /(?:^|[\\/])(?:config\.toml|hooks\.json)$/.test(path)) throw error
+    report.nativeLockedFiles = [...new Set([...(report.nativeLockedFiles ?? []), relative(root, path)])]
+    return null
+  }
+}
 const replies = ["고유한 짧은 한국어 답변 · 72bde", "긴 본문입니다.\n".repeat(350) + "\n```typescript\nconst proof = 'original';\n```", "commentary와 구분한 최종 답변 · 93aca"]
 let replyIndex = -1
 const parentGate: { release?: () => void } = {}
@@ -153,7 +163,7 @@ try {
   const sourcePrefix = await readFile(parent.path)
   const sourceFiles = async () => {
     const result: Record<string, string> = {}
-    const scan = async (dir: string) => { for (const entry of await readdir(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) await scan(path); else if (entry.isFile()) result[relative(state, path)] = createHash("sha256").update(await readFile(path)).digest("hex") } }
+    const scan = async (dir: string) => { for (const entry of await readdir(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) await scan(path); else if (entry.isFile()) { const bytes = await inventoryRead(path); result[relative(state, path)] = bytes ? createHash("sha256").update(bytes).digest("hex") : "native-locked-not-inspected" } } }
     await scan(state); return result
   }
   const officialSourceBefore = await sourceFiles()
@@ -212,7 +222,7 @@ try {
   const paths: string[] = []
   async function walk(dir: string) { for (const entry of await readdir(dir, { withFileTypes: true })) { const path = join(dir, entry.name); if (entry.isDirectory()) await walk(path); else if (entry.isFile()) paths.push(path) } }
   await walk(root); report.childDiskMatches = []
-  for (const path of paths) { const bytes = await readFile(path); if (childIds.some(id => path.includes(id) || bytes.includes(Buffer.from(id))) || replies.some(text => bytes.includes(Buffer.from(text)))) report.childDiskMatches.push(relative(root, path)) }
+  for (const path of paths) { const bytes = await inventoryRead(path); if (!bytes) continue; if (childIds.some(id => path.includes(id) || bytes.includes(Buffer.from(id))) || replies.some(text => bytes.includes(Buffer.from(text)))) report.childDiskMatches.push(relative(root, path)) }
   if (officialSourceBefore) {
     const after = await sourceFiles()
     report.nativeStoreChanges = [...new Set([...Object.keys(officialSourceBefore), ...Object.keys(after)])].filter(path => officialSourceBefore[path] !== after[path])
@@ -223,7 +233,7 @@ try {
 finally {
   parentGate.release?.(); await service?.dispose(); for (const connection of connections) { await connection.stop() }
   server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve()))
-  await rm(root, { recursive: true, force: true })
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   report.checks.ownedProcessCleanup = "PASS"; report.fixtureRequests = requests.length
 }
 await writeFile(resolve(values.output), JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 })

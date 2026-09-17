@@ -52,6 +52,24 @@ describe("PetWindowController visibility", () => {
       controller.reportReady(); expect(window.isVisible()).toBe(false)
     } finally { controller.destroy() }
   })
+  it("captures Electron mouseDown without modifiers, consuming only a ready visible left-button origin", async () => {
+    const { PetWindowController } = await import("../electron/main/PetWindowController")
+    const controller = new PetWindowController({ preloadPath: "/preload.cjs", onBoundsChanged: vi.fn(), onWarning: vi.fn(), onCloseRequested: vi.fn() })
+    const settings = defaultDesktopSettings(), window = controller.create(settings) as unknown as FakeBrowserWindow
+    // Electron 43's before-mouse-event payload omits modifiers even for Option/Alt.
+    const down = (button = "left", x = 30) => window.webContents.emit("before-mouse-event", {}, { type: "mouseDown", button, x, y: 40 })
+    try {
+      down(); expect(controller.takeDragStart()).toBeNull()
+      controller.reportReady()
+      down(); expect(controller.takeDragStart()).toEqual({ x: 30, y: 40 })
+      expect(controller.takeDragStart()).toBeNull()
+      down("right"); expect(controller.takeDragStart()).toBeNull()
+      down("left", -1); expect(controller.takeDragStart()).toBeNull()
+      controller.setLayoutMode(true); down(); expect(controller.takeDragStart()).toBeNull()
+      controller.setLayoutMode(false)
+      controller.applySettings({ ...settings, visible: false }); down(); expect(controller.takeDragStart()).toBeNull()
+    } finally { controller.destroy() }
+  })
   it("aborts a reveal before readiness without displaying later", async () => {
     const { PetWindowController } = await import("../electron/main/PetWindowController")
     const controller = new PetWindowController({ preloadPath: "/preload.cjs", onBoundsChanged: vi.fn(), onWarning: vi.fn(), onCloseRequested: vi.fn() })
