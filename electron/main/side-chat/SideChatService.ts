@@ -74,12 +74,17 @@ export class SideChatService {
     this.publish()
   }
   /** Called at selection intent; replies are withheld until the renderer's ready result. */
-  beginCharacterApply() { this.state.applying = true; this.publish() }
-  characterFailed() { this.state.applying = false; const deferred = this.deferred; this.deferred = null; deferred?.(); this.publish() }
-  applyPersona(binding: PersonaBinding) {
+  private applyOwner: string | null = null
+  beginCharacterApply(owner: string = randomUUID()) { this.applyOwner = owner; this.state.applying = true; this.publish(); return owner }
+  characterFailed(owner?: string) {
+    if (owner !== undefined && this.applyOwner !== owner) return
+    this.applyOwner = null; this.state.applying = false; const deferred = this.deferred; this.deferred = null; deferred?.(); this.publish()
+  }
+  applyPersona(binding: PersonaBinding, owner?: string) {
+    if (owner !== undefined && this.applyOwner !== owner) return
     const changed = this.persona && (this.persona.id !== binding.id || this.persona.revision !== binding.revision || this.persona.compiled.bindingHash !== binding.compiled.bindingHash)
     if (changed) this.resetConversation("character")
-    this.persona = binding; this.state.character = { id: binding.id, label: binding.label }; this.state.applying = false
+    this.persona = binding; this.state.character = { id: binding.id, label: binding.label }; this.applyOwner = null; this.state.applying = false
     const deferred = this.deferred; this.deferred = null; if (!changed) deferred?.()
     this.publish()
   }

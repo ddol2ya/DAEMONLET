@@ -54,7 +54,7 @@ export type SanitizedAdapterDiagnostics = AdapterStatus & {
   warnings: string[]
 }
 
-export type PetReadyInfo = { webgl: boolean; characterId: string; revision?: string; firstFrameAt: number }
+export type PetReadyInfo = { webgl: boolean; characterId: string; revision: string; firstFrameAt: number; ticket: import("./character-load").CharacterLoadTicket }
 export type ProtocolBridgeStatus = { state: "DISCONNECTED" | "CONNECTING" | "OPEN" | "CLOSED" | "ERROR"; reason?: string; manual?: boolean }
 export type ProtocolConnectResult = { ok: true } | { ok: false; name: string; message: string }
 
@@ -78,7 +78,8 @@ export interface PetDesktopApi {
   onDragCancelled(listener: () => void): () => void
   bubble: BubblePresentationApi
   characters: CharacterReadApi
-  reportCharacterLoadFailure(selection: CharacterSelection): void
+  requestCharacterLoad(selection: CharacterSelection): Promise<import("./character-load").CharacterLoadTicket | null>
+  reportCharacterLoadFailure(ticket: import("./character-load").CharacterLoadTicket): void
   reportCharacterLoadDiagnostic(value: CharacterLoadDiagnostic): void
   getSettings(): Promise<DesktopSettingsV1>
   updateSettings(patch: DesktopSettingsPatch): Promise<DesktopSettingsV1>

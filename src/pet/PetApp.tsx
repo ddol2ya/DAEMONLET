@@ -14,8 +14,7 @@ import { SpeechBubbleOverlay } from "./SpeechBubbleOverlay"
 import type { DialogueSnapshot } from "../dialogue/types"
 import type { CharacterSnapshot } from "../../electron/shared/character-pack-contract"
 import type { CharacterLoadStage } from "../../electron/shared/character-load-diagnostics"
-
-const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+import { waitForCharacterFrame } from "./waitForCharacterFrame"
 
 export default function PetApp() {
   const t = useT()
@@ -37,6 +36,10 @@ export default function PetApp() {
     let disposed = false
     let loadKey: string | null = null
     let successfulKey: string | null = null
+    let successfulModelRevision: number | undefined
+    let activeTicket: string | null = null
+    let loadRequest = 0
+    let loadController: AbortController | null = null
     let loadEpoch = 0
     let currentSettings: DesktopSettingsV1 | null = null
     let characters: CharacterSnapshot | null = null
@@ -46,14 +49,15 @@ export default function PetApp() {
     let loadFailed = false
     let loadingCharacter = false
     let activeDiagnostic: ((stage: CharacterLoadStage) => void) | null = null
-    const contextLost = () => activeDiagnostic?.("context-lost")
+    let contextUnavailable = false
+    const contextLost = () => { contextUnavailable = true; successfulKey = null; activeDiagnostic?.("context-lost"); loadController?.abort() }
     canvas.addEventListener("webglcontextlost", contextLost)
     const session = new CharacterSession(canvas, "pet://app/characters/catalog.json")
     sessionRef.current = session
     // A native reload may abort fetch before React unmount cleanup runs. Retire
     // the old renderer immediately so cancellation cannot report a load error
     // or a late ready signal for the new renderer/character.
-    const unloading = () => { disposed = true; loadEpoch++; session.dialogue.setAvailable(false) }
+    const unloading = () => { disposed = true; loadEpoch++; loadController?.abort(); session.dialogue.setAvailable(false) }
     window.addEventListener("beforeunload", unloading)
     const updateAvailability = () => {
       if (disposed) { session.dialogue.setAvailable(false); return }
@@ -89,9 +93,15 @@ export default function PetApp() {
       const entry = characters.entries.find(e => e.id === next.characterId && e.status === "ready")
       if (!entry) return
       const key = `${entry.id}/${entry.revision}`
-      if (loadKey === key) return
+      const request = ++loadRequest
+      const ticket = await desktop.requestCharacterLoad({ id: entry.id, revision: entry.revision })
+      if (!ticket || disposed || request !== loadRequest) return
+      if (loadKey === key && activeTicket === ticket.requestId) return
+      activeTicket = ticket.requestId
+      loadController?.abort()
+      const controller = loadController = new AbortController()
       const epoch = ++loadEpoch
-      const loadId = crypto.randomUUID(), started = performance.now()
+      const loadId = ticket.requestId, started = performance.now()
       const stage = (value: CharacterLoadStage) => {
         if (!disposed) desktop.reportCharacterLoadDiagnostic({ loadId, epoch, id: entry.id, revision: entry.revision, stage: value, elapsedMs: Math.round(performance.now() - started), hidden: document.hidden })
       }
@@ -107,22 +117,29 @@ export default function PetApp() {
       try {
         await desktop.setMousePassthrough(false)
         if (disposed || epoch !== loadEpoch) return
-        await session.loadCharacter(next.characterId, undefined, stage)
+        // A fallback may still have the last painted model. Reuse requires the
+        // same committed runtime revision, then another real frame for this ticket.
+        if (successfulKey !== key || successfulModelRevision !== session.runtime.getModelRevision()) {
+          await session.loadCharacter(next.characterId, controller.signal, stage)
+        }
         if (disposed || epoch !== loadEpoch) return
         stage("first-frame")
-        await nextFrame()
+        await waitForCharacterFrame(controller.signal)
         if (disposed || epoch !== loadEpoch) return
+        if (contextUnavailable || canvas.getContext("webgl")?.isContextLost()) throw Error("WebGL context lost")
+        if (!session.runtime.hasRenderedModel(session.runtime.getModelRevision())) throw Error("Character frame was not rendered")
         successfulKey = key
+        successfulModelRevision = session.runtime.getModelRevision()
         loadingCharacter = false
         session.setInteractionEnabled(!inLayout && !dragging)
         setLoading(false)
         updateAvailability()
         alpha.reset()
         stage("ready")
-        desktop.reportReady({ webgl: true, characterId: entry.id, revision: entry.revision, firstFrameAt: performance.now() })
+        desktop.reportReady({ webgl: true, characterId: entry.id, revision: entry.revision, firstFrameAt: performance.now(), ticket })
       } catch (reason) {
         stage(reason instanceof DOMException && reason.name === "AbortError" ? "aborted" : "failed")
-        if (disposed || epoch !== loadEpoch || reason instanceof DOMException && reason.name === "AbortError") return
+        if (disposed || epoch !== loadEpoch) return
         const message = reason instanceof Error ? reason.message : String(reason)
         loadingCharacter = false
         setLoading(false)
@@ -131,7 +148,7 @@ export default function PetApp() {
         loadKey = null
         updateAvailability()
         if (!successfulKey) setError(message)
-        desktop.reportCharacterLoadFailure({ id: entry.id, revision: entry.revision })
+        desktop.reportCharacterLoadFailure(ticket)
         desktop.reportAlphaFailure(`Character load failed: ${message}`)
       }
     }
@@ -165,6 +182,7 @@ export default function PetApp() {
     window.addEventListener("resize", resize)
     return () => {
       disposed = true
+      loadController?.abort()
       unsubscribeSettings()
       unsubscribeCharacters()
       unsubscribeLayout()

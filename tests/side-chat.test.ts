@@ -42,6 +42,17 @@ describe("side chat lifetime", () => {
     f.service.applyPersona(persona("A")); expect(f.service.snapshot().epoch).toBe(epoch); expect(f.service.snapshot().messages).toHaveLength(2)
     expect(f.backend.close).not.toHaveBeenCalled()
   })
+  it("keeps the next character apply owned when an older failure or persona arrives", () => {
+    const f = fixture(); f.service.setDraft("preserved draft")
+    const old = f.service.beginCharacterApply(), current = f.service.beginCharacterApply()
+    f.service.characterFailed(old); f.service.applyPersona(persona("B"), old)
+    expect(f.service.snapshot().applying).toBe(true)
+    expect(f.service.snapshot().character.id).toBe("A")
+    f.service.applyPersona(persona("A"), current)
+    expect(f.service.snapshot().applying).toBe(false)
+    expect(f.service.snapshot().draft).toBe("preserved draft")
+    expect(f.factory).not.toHaveBeenCalled()
+  })
   it("ignores late replies across reset, rejects simultaneous requests and stops only its backend", async () => {
     const f = fixture(), sent = f.service.send("hello"); await tick()
     await expect(f.service.send("twice")).rejects.toThrow("BUSY")
