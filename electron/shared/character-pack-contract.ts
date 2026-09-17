@@ -51,9 +51,9 @@ export interface CharacterReadApi {
 }
 export interface CharacterManageApi extends CharacterReadApi {
   onProgress(listener: (value: PackProgress) => void): () => void
-  chooseImport(): Promise<ImportPreview | null>
+  chooseImport(requestId: string): Promise<ImportPreview | null>
   commitImport(token: string): Promise<CharacterEntry>
-  cancelImport(): Promise<void>
+  cancelImport(requestId: string): Promise<void>
   remove(selection: CharacterSelection): Promise<boolean>
   rollback(selection: CharacterSelection): Promise<boolean>
 }

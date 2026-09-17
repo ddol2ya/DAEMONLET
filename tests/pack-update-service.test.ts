@@ -19,7 +19,9 @@ const sourceFor = (id: string): PackUpdateSource => ({ schemaVersion: 1, provide
 const runtime = { ...PACK_RUNTIME, capabilities: PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1") }
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "pack-updates-")); roots.push(root)
+  let validationHold: (() => Promise<void>) | undefined
   const registry = new CharacterRegistry(join(root, "data"), await builtinFixture(join(root, "builtin")), async (request, signal) => {
+    if (request.kind === "archive") await validationHold?.()
     signal?.throwIfAborted()
     return request.kind === "archive" ? extractCharacterPack(request.path, request.transactionRoot!) : validatePackDirectory(request.path)
   }); registries.push(registry); await registry.initialize()
@@ -41,9 +43,41 @@ async function fixture() {
   const service = new PackUpdateService(options); services.push(service); await service.start()
   return { root, registry, service, provider, preferences, source, next, install, options, apply, archives,
     state: () => service.snapshot().find(s => s.packId === "style-a")!, feed: () => feed, setFeed: (f: PackUpdateFeed) => { feed = f }, advance: () => { now += 86400_000 }, setOwner: (v: string | null) => { owner = v }, setCanApply: (v: boolean) => { canApply = v }, setFailLoad: () => { failLoad = true }, setActive: (id: string) => { active = id }, active: () => active,
+    holdValidation: (hold: () => Promise<void>) => { validationHold = hold },
   }
 }
 describe("pack update transactions", () => {
+  it("keeps HF validation alive when the old page cancels its document's local import", async () => {
+    const f = await fixture(); await f.service.check("style-a", "window-1")
+    let release!: () => void
+    f.holdValidation(() => new Promise<void>(resolve => { release = resolve }))
+    const download = f.service.download("style-a", "window-1")
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"))
+    expect(f.state().phase).toBe("verifying")
+    // The old CharacterPacks unmount used this same document owner, including
+    // when it had never opened a local picker. It must not own an HF operation.
+    await f.registry.cancelImport("window-1")
+    release(); await download
+    expect(f.state()).toMatchObject({ phase: "ready", candidateId: expect.any(String) })
+    expect(f.registry.get("style-a")?.version).toBe("1.0.0")
+    await f.service.apply(f.state().candidateId!, "window-1")
+    expect(f.registry.get("style-a")?.version).toBe("1.0.1")
+  })
+  it("still cancels the HF Worker transaction when the document is retired", async () => {
+    const f = await fixture(); await f.service.check("style-a", "window-1")
+    let release!: () => void
+    f.holdValidation(() => new Promise<void>(resolve => { release = resolve }))
+    const download = f.service.download("style-a", "window-1")
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"))
+    f.setOwner(null)
+    const cancelled = f.service.cancel("window-1")
+    release(); await Promise.all([download, cancelled])
+    expect(f.registry.get("style-a")?.version).toBe("1.0.0")
+    expect(f.registry.readyForUpdate()).toBe(true)
+    expect(f.service.readyForUpdate()).toBe(true)
+    expect(await readdir(join(f.root, "data/characters/staging"))).toEqual([])
+    expect(await readdir(join(f.root, "data/pack-update-transactions"))).toEqual([])
+  })
   it("makes zero requests on install, selection, restart or automatic checks off", async () => {
     const f = await fixture(); await f.install("legacy", "1.0.0", null); await f.service.background()
     expect(f.provider.feed).not.toHaveBeenCalled(); expect(f.provider.download).not.toHaveBeenCalled()

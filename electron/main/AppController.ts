@@ -193,7 +193,7 @@ export class AppController {
       onClosed: (owner) => {
         this.integration.windowClosed(owner)
         void this.packUpdates?.cancel(owner)
-        if (!this.packUpdates?.applying()) void this.characters.cancelImport(owner)
+        void this.characterIpc?.retireOwner(owner)
         if (this.settingsPoll) clearInterval(this.settingsPoll)
         this.settingsPoll = null
       },

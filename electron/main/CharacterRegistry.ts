@@ -154,7 +154,7 @@ export class CharacterRegistry {
       await mkdir(root, { mode: 0o700 })
       const expiresAt = Date.now() + PACK_LIMITS.transactionMs
       const pending: Pending = { token, owner, root, controller, expiresAt, generation: this.index.generation,
-        timer: setTimeout(() => { void this.cancelImport(owner) }, PACK_LIMITS.transactionMs) }
+        timer: setTimeout(() => { if (this.pending === pending) void this.cancelImport(owner) }, PACK_LIMITS.transactionMs) }
       this.pending = pending
       try {
         const pack = await this.validate({ kind: "archive", path: source, transactionRoot: root }, controller.signal, progress)

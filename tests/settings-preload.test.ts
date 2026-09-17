@@ -24,6 +24,11 @@ describe("Settings preload", () => {
     expect(mocks.invoke).toHaveBeenCalledWith(SETUP_IPC.bubblePlacement, "adjust")
     await api.prepareConnection()
     expect(mocks.invoke).toHaveBeenCalledWith(SETUP_IPC.prepare)
+    const localRequest = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    await api.characters.chooseImport(localRequest)
+    expect(mocks.invoke).toHaveBeenCalledWith("characters.choose-import", localRequest)
+    await api.characters.cancelImport(localRequest)
+    expect(mocks.invoke).toHaveBeenCalledWith("characters.cancel-import", localRequest)
     await api.applyHookPlan("one-main-plan-id")
     expect(mocks.invoke).toHaveBeenCalledWith(SETUP_IPC.apply, "one-main-plan-id")
     const listener = vi.fn()

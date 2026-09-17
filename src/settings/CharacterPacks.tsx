@@ -26,6 +26,7 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [installed, setInstalled] = useState<CharacterEntry | null>(null)
   const [choosing, setChoosing] = useState(false)
+  const localRequest = useRef<string | null>(null)
   const [progress, setProgress] = useState<PackProgress | null>(null)
   const loadingDialog = useRef<HTMLDialogElement>(null)
   const loading = choosing && progress !== null || busy === "캐릭터 적용" || busy === "이전 버전 복원"
@@ -37,7 +38,13 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
     const unsubscribe = api.characters.onChanged(receive)
     const unsubscribeProgress = api.characters.onProgress(value => { if (active) setProgress(value) })
     void run("캐릭터 목록 확인", () => api.characters.list().then(receive))
-    return () => { active = false; unsubscribe(); unsubscribeProgress(); void api.characters.cancelImport().catch(() => {}) }
+    return () => {
+      active = false; unsubscribe(); unsubscribeProgress()
+      // A tab owns only its local picker. The settings document owns remote
+      // downloads/validation, restored from the Main snapshot on tab return.
+      const request = localRequest.current; localRequest.current = null
+      if (request) void api.characters.cancelImport(request).catch(() => {})
+    }
   }, [api])
   useEffect(() => {
     if (preview && !dialog.current?.open) dialog.current?.showModal()
@@ -48,16 +55,17 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
     if (!loading && loadingDialog.current?.open) { loadingDialog.current.close(); trigger.current?.focus() }
   }, [loading])
   const choose = async () => {
+    const request = crypto.randomUUID(); localRequest.current = request
     setProgress(null); setChoosing(true); setInstalled(null)
-    try { const result = await run("캐릭터 팩 검증", () => api.characters.chooseImport()); if (result) setPreview(result) }
-    finally { setChoosing(false) }
+    try { const result = await run("캐릭터 팩 검증", () => api.characters.chooseImport(request)); if (localRequest.current === request) { if (result) setPreview(result); else localRequest.current = null } }
+    finally { if (localRequest.current === request || localRequest.current === null) setChoosing(false) }
   }
-  const cancel = async () => { await api.characters.cancelImport(); setPreview(null) }
+  const cancel = async () => { const request = localRequest.current; localRequest.current = null; if (request) await api.characters.cancelImport(request); setPreview(null); setChoosing(false) }
   const apply = (entry: CharacterEntry) => { setProgress(null); return void run("캐릭터 적용", () => api.characters.select({ id: entry.id, revision: entry.revision })) }
   const commit = async () => {
     if (!preview) return
     const result = await run("캐릭터 팩 설치", () => api.characters.commitImport(preview.token))
-    if (result) { setInstalled(result); setPreview(null) }
+    if (result) { localRequest.current = null; setInstalled(result); setPreview(null) }
   }
   return <div className="character-packs">
     <div className="pack-toolbar"><h2>{t("캐릭터")}</h2><button ref={trigger} className="button secondary small" disabled={Boolean(busy)} onClick={() => void choose()}>{t("＋ 캐릭터 추가")}</button></div>

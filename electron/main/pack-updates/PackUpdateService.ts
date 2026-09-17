@@ -7,9 +7,10 @@ import type { CharacterRegistry } from "../CharacterRegistry"
 import { applicationInputAllowed } from "../updates/OperationGate"
 import { HuggingFacePackProvider, HfRateError } from "./HuggingFacePackProvider"
 import { PackUpdatePreferences } from "./PackUpdatePreferences"
+import { characterImportOwner } from "../CharacterImportOwner"
 
 type Check = { controller: AbortController; owner?: string; revision: string; source: PackUpdateSource; automatic: boolean }
-type Candidate = { id: string; owner: string; packId: string; revision: string; source: PackUpdateSource; feed: PackUpdateFeed; root: string; controller: AbortController; preview?: ImportPreview; applying?: boolean; timer?: ReturnType<typeof setTimeout> }
+type Candidate = { id: string; owner: string; registryOwner: string; packId: string; revision: string; source: PackUpdateSource; feed: PackUpdateFeed; root: string; controller: AbortController; preview?: ImportPreview; applying?: boolean; timer?: ReturnType<typeof setTimeout> }
 type Options = {
   registry: CharacterRegistry; dataRoot: string; appVersion: string; provider?: Pick<HuggingFacePackProvider, "feed" | "download">; preferences?: PackUpdatePreferences
   owner: () => string | null; selected: () => string; canApply: (id: string) => boolean
@@ -127,7 +128,7 @@ export class PackUpdateService {
     if (this.candidate || this.downloadTask || !this.o.registry.readyForUpdate()) throw Error("PACK_BUSY")
     const entry = this.target(id), pref = this.preferences.get(id, entry.update), feed = pref?.feed
     if (!feed || feed.packId !== id || !supportsUpdateRuntime(feed.runtime) || comparePackVersions(feed.minAppVersion, this.o.appVersion) > 0 || comparePackVersions(feed.version, entry.version) <= 0) throw Error("PACK_INCOMPATIBLE")
-    const c: Candidate = { id: randomUUID(), owner, packId: id, revision: entry.revision, source: entry.update, feed, root: "", controller: new AbortController() }
+    const c: Candidate = { id: randomUUID(), owner, registryOwner: characterImportOwner(owner, "remote-update"), packId: id, revision: entry.revision, source: entry.update, feed, root: "", controller: new AbortController() }
     c.root = join(this.root, c.id); this.candidate = c
     const task = this.receive(c); this.downloadTask = task
     try { await task } finally { if (this.downloadTask === task) this.downloadTask = undefined }
@@ -150,13 +151,15 @@ export class PackUpdateService {
       this.assertCandidate(c)
       if (!this.o.registry.readyForUpdate()) throw Error("PACK_BUSY")
       this.set(c.packId, { phase: "verifying" })
-      c.preview = await this.o.registry.prepareImport(file, c.owner)
+      c.preview = await this.o.registry.prepareImport(file, c.registryOwner)
       this.assertCandidate(c)
       const p = c.preview.entry
       // Read the validated staged manifest through the registry, not a second renderer claim.
-      const manifest = this.o.registry.preparedManifest(c.preview.token, c.owner)
+      const manifest = this.o.registry.preparedManifest(c.preview.token, c.registryOwner)
       if (p.id !== c.packId || p.version !== c.feed.version || !p.update || updateSourceKey(p.id, p.update) !== updateSourceKey(c.packId, c.source) || !sameUpdateRuntime(manifest.runtime, c.feed.runtime) || c.preview.kind !== "update") throw Error("PACK_UPDATE_METADATA")
-      c.timer = setTimeout(() => { void this.cancel(c.owner).catch(() => {}) }, Math.max(1, c.preview.expiresAt - this.now()))
+      c.timer = setTimeout(() => { if (this.candidate === c) void this.cancel(c.owner, c.packId).then(() => {
+        if (!this.candidate && this.live(c.packId, c.revision, c.source)) this.set(c.packId, { phase: "error", error: "PACK_TRANSACTION" })
+      }).catch(() => {}) }, Math.max(1, c.preview.expiresAt - this.now()))
       this.set(c.packId, { phase: "ready", candidateId: c.id })
     } catch (error) {
       const live = this.candidate === c && this.live(c.packId, c.revision, c.source)
@@ -172,7 +175,7 @@ export class PackUpdateService {
     if (c.preview.expiresAt <= this.now()) { await this.discard(c); throw Error("PACK_TRANSACTION") }
     c.applying = true; clearTimeout(c.timer); this.set(c.packId, { phase: "applying", error: undefined })
     try {
-      await this.o.apply(c.preview, owner)
+      await this.o.apply(c.preview, c.registryOwner)
       const current = this.o.registry.get(c.packId)
       if (current?.revision !== c.preview.entry.revision) throw Error("PACK_LOAD")
       this.set(c.packId, { phase: "applied", candidateId: undefined })
@@ -181,7 +184,7 @@ export class PackUpdateService {
   }
   private async discard(c: Candidate) {
     clearTimeout(c.timer)
-    if (c.preview) await this.o.registry.cancelImport(c.owner)
+    if (c.preview) await this.o.registry.cancelImport(c.registryOwner)
     await rm(c.root, { recursive: true, force: true })
     if (this.candidate === c) this.candidate = undefined
   }
@@ -189,7 +192,7 @@ export class PackUpdateService {
     for (const [key, check] of this.checks) if (check.owner === owner && (!id || key === id)) { check.controller.abort(); this.checks.delete(key); this.set(key, { phase: "idle" }) }
     const c = this.candidate
     if (!c || c.owner !== owner || id && c.packId !== id || c.applying) return
-    c.controller.abort(); await this.o.registry.cancelImport(owner)
+    c.controller.abort(); await this.o.registry.cancelImport(c.registryOwner)
     if (this.downloadTask) await this.downloadTask
     else await this.discard(c)
     if (this.live(c.packId, c.revision, c.source)) this.set(c.packId, { phase: "idle", candidateId: undefined, error: undefined })
