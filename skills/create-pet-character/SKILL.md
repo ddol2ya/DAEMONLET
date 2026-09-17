@@ -78,14 +78,22 @@ Normalize orientation/color/canvas with `scripts/prepare-reference.py` after any
 
 Follow the agreed per-pose illustration counts and confirmed personality. Review waiting/writing/head-tap first, then complete the requested set; these initial three illustrations count toward the total.
 
+Read [visual-review.md](references/visual-review.md) before the first decomposition and use its pilot and separate source/layers/visual/motion acceptance stages. A successful loader, overview or pack comparison never substitutes for both-eye/eyebrow and intermediate-expression review. Stop expanding a shared defect until the pilot repair is inspected.
+
 Each pose gets its own body, head, eyes and mouth from its own illustration. Reuse tools, not another pose's Base artwork or coordinates. Use `independent-model` with identity registration. The built-in Gpichan uses an older supported strategy and is not a template to copy into new artwork.
 
 See-through: 1280px, 30 steps and cached tag embeddings. **Enable group offload on both loaders only when the selected GPU has <=12 GiB total VRAM; disable it on both loaders above 12 GiB.** Use the ComfyUI server's selected CUDA device capacity, not free memory or a different client GPU. If capacity cannot be detected or multiple GPUs are ambiguous, obtain the selected GPU's capacity and pass it explicitly; do not guess. RTX 3060 12GB is the support target, not measured performance assurance. <=8GB is discouraged; if the user chooses to try, cap layer resolution at 1024 and depth at 720. Check the actual inference logs for the selected offload mode. Process one pose at a time without interrupting the user's other GPU jobs.
 
 Match native layers and geometry to the source. Review eye/skin masks and hair shape for this character. Do not assume blue irises, a particular skin tone or fixed hand/face coordinates. Add image edits for missing expressions or occluded paint while preserving source identity and registered sheet coordinates.
 
+Before local joint motion, inspect the isolated moving layer. If it also contains parts that must stay attached elsewhere (for example shoulder/torso or hair baked into an arm), split and restore hidden paint, or remake the affected layer, before rigging. Require full attachment-boundary coverage and enlarged full-cycle inspection; a stable pivot and sufficient hand travel do not establish a connected shoulder. See [motion-authoring.md](references/motion-authoring.md) for the layer review and connection evidence contract.
+
+Default new production to visibly expressive, pose-specific motion at desktop size. Read [motion-authoring.md](references/motion-authoring.md): use preparation, action, small overshoot and settling; stagger head/body/free limbs and secondary hair/accessories. Fit pivots, influence and contact constraints to each illustration. Increase useful movement through rigging and timing, not a global amplitude multiplier. Respect a user request for restrained motion or the character's intended acting style.
+
 ## Validation and delivery
 
 Verify blink/mouth/smile at eleven intermediate values, combined gaze/head states, 320/460/1280px, pose transitions, interruptions/re-entry, hand contact, click and petting. Inspect captures; parser and unit-test success alone does not establish visual quality. Create pose-specific motion rather than the same arm sway everywhere.
 
 Build a payload outside `public/characters`, export `.petchar`, and import through the app UI. Check selection, reactions and restart. Never overwrite frozen runs or mutate the built-in catalog to install a new character. Report the pack, unsupported reactions and the actual scope of visual/rights checks. Treat production as supervised and iterative, not guaranteed unattended completion.
+
+Use `creator.mjs review` as the current evidence ledger. The creator payload command requires current pose review passes; after export bind the final archive and record renderer/behavior/app/rights evidence. Asset changes invalidate previous reviews. Keep historical candidates and private evidence separate from the final pack; report disk usage independently of Git ignore status.

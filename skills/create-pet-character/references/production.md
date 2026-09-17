@@ -2,7 +2,7 @@
 
 `node <skill>/scripts/creator.mjs info`가 출력하는 runtime을 제작 작업 폴더로 사용한다. 소스에서는 레포 루트, 독립 스킬 ZIP에서는 동봉한 `runtime/`이다. 그 폴더에서 `npm ci`를 실행한다. ComfyUI·See-through·모델 설치는 `external-dependencies.json`의 공식 출처와 호환 버전을 따른다. 제작 Python에는 numpy/Pillow, 영상 검수에는 ffmpeg가 필요하다. 이미지 생성 접근 권한도 별도다.
 
-`creator.mjs`의 `decompose`, `build`, `finish`, `capture`, `verify`, `payload`, `export` 명령은 아래 스크립트를 해당 runtime에서 실행한다. 직접 실행할 때도 먼저 runtime으로 이동한다. `DAEMONLET_CREATOR_PYTHON`으로 자체 제작 Python을 선택할 수 있다.
+`creator.mjs`의 `decompose`, `build`, `finish`, `motion`, `capture`, `review`, `verify`, `payload`, `export` 명령은 아래 스크립트를 해당 runtime에서 실행한다. 직접 실행할 때도 먼저 runtime으로 이동한다. `DAEMONLET_CREATOR_PYTHON`으로 자체 제작 Python을 선택할 수 있다.
 
 ## 입력과 분해
 
@@ -70,15 +70,20 @@ python3 scripts/characters/finish-source-models.py adopt "<run>" --pose waiting 
 
 각 `model.json`에는 `psd`, `bodySource`, `overrides`, `pose`를 그 파일 기준 상대 경로로 쓴다. 모델 목록은 실제 선택한 모든 포즈를 포함해야 한다. 단발/반복 모션, `EyeBlink`, `MouthMorph`, `HeadFollow`와 입력 영역을 검토한다.
 
+## 검수와 모션
+
+첫 포즈부터 [visual-review.md](visual-review.md)의 원화·레이어·시각·모션 검수를 분리해 기록한다. `capture`의 `review.html`을 실제로 열어 양쪽 눈/눈썹, 눈·입 11단계, 투명 외곽과 크기별 결과를 본다. `--contacts`를 함께 사용해도 정적 캡처는 생략하지 않는다. [motion-authoring.md](motion-authoring.md)의 포즈별 동작·관절·접촉 계획과 `creator.mjs motion`으로 기존의 미세한 흔들림보다 명확한 연기를 만든다.
+
+`creator.mjs review --source <run>`이 반환하는 현재 fingerprint에 검수 기록을 연결한다. 자산 변경 후 예전 pass는 stale이므로 수정본을 다시 검수한다. 직접 payload 스크립트를 실행할 때도 제작에는 `--reviewed`를 사용한다.
+
 ## 클릭 3종과 팩
 
 사용자가 선택한 반응만 behavior의 `poseId` + 추가 두 개 `poseVariants`로 연결한다. 예: `"poseId":"head-tap","poseVariants":["head-tap-2","head-tap-3"]`. 런타임은 중복 없이 섞어 선택한다. 클릭 중/로딩 중에 다시 선택하거나 세 모델을 같은 순간 표시하지 않는다. exporter가 `pose-variants` capability를 자동 선언한다. 포즈별 대사는 `poseTriggers`와 `poseLines`로 연결하며 `pose-dialogue`가 자동 선언된다.
 
 ```sh
-node scripts/characters/capture-source-models.mjs --source "<run>" --output "<새-QA>" --motion
-node scripts/characters/capture-source-models.mjs --source "<run>" --output "<새-contact-QA>" --contacts
+node scripts/characters/capture-source-models.mjs --source "<run>" --output "<새-QA>" --motion --contacts
 node scripts/characters/build-independent-payload.mjs \
-  --source "<run>" --id "<new-id>" --label "<표시명>" --profile full \
+  --source "<run>" --id "<new-id>" --label "<표시명>" --profile full --reviewed \
   --behavior "<behavior.json>" --dialogue "<dialogue.ko.json>" \
   --output "outputs/character-packs/<new-id>/payload"
 node scripts/characters/verify-independent.mjs --source "<run>" --id "<new-id>" \

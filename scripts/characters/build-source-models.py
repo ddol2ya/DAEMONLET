@@ -16,6 +16,7 @@ from build_own_pose_models import correct_visible, feather, over, canon
 from build_a import largest
 from refine_base_face_a import holes
 from source_eye_blinks import rebuild_lid, make_profile
+from source_masks import component_at, load_mask
 
 read = lambda p: json.loads(p.read_text())
 YY, XX = np.indices((1280, 1280))
@@ -44,7 +45,8 @@ def mouth_feature(source, bounds):
     local=largest(contrast>max(7,float(contrast.max())*.24))
     assert local.sum()>3,'Empty source-specific mouth'
     b=box(local); b=[x0+b[0],y0+b[1],x0+b[2],y0+b[3]]
-    alpha=feather(roi([b[0]-3,b[1]-2,b[2]+3,b[3]+3]),.8)*roi(bounds)
+    core=np.zeros(source.shape[:2],bool);core[y0:y1,x0:x1]=holes(local)
+    alpha=feather(grow(core,3),.65)*roi(bounds)
     return sprite(source,alpha),b
 
 def register_panel(source, panel, nose_bounds):
@@ -71,7 +73,10 @@ def neutral_features(raw, source, geometry):
         allowed=(rgb[:,:,2]-rgb[:,:,0]>-42)&(rgb.mean(2)>65)&region
         native_white=raw.get('eyewhite-'+side)
         source_bounds=geometry.get('sourceEyeApertures',{}).get(side)
-        if source_bounds:
+        reviewed_mask=geometry.get('_sourceEyeMasks',{}).get(side)
+        if reviewed_mask is not None:
+            core=holes(largest(reviewed_mask>.5));native_white=np.zeros_like(source) if native_white is None else native_white
+        elif source_bounds:
             # Explicitly reviewed source bounds may recover a part omitted by
             # decomposition; all visible aperture/iris pixels still come from
             # this pose. Exclude its dark brown liner and warm cheek pixels.
@@ -108,10 +113,13 @@ def neutral_features(raw, source, geometry):
         if 'eyebrow-'+side in raw:parts['eyebrow-'+side]=sprite(source,raw['eyebrow-'+side][:,:,3]/255)
         anchors[key]={'x0':ab[0],'x1':ab[2]-1,'y0':ab[1],'y1':ab[3]-1,'icx':cx,'icy':cy,'closeY':ab[3]-2}
         records.append({'side':side,'aperture_bounds':ab,'visible_iris_bounds':ib,'iris_center':[cx,cy],'iris_radius':radius,'source_iris_pixels':int(iris_mask.sum()),'aperture_source':'reviewed own source colour mask' if source_bounds else 'own native aperture constrained to source colour'})
-    mb=box(raw['mouth_close'][:,:,3]>16)
-    if geometry.get('neutralMouthBounds'):
-        b=geometry['neutralMouthBounds'];mouth=sprite(source,feather(roi([b[0]-2,b[1]-2,b[2]+2,b[3]+2]),.8))
+    reviewed_mouth=geometry.get('_neutralMouthMask')
+    if reviewed_mouth is not None:
+        mouth=sprite(source,reviewed_mouth);b=box(reviewed_mouth>.5)
+    elif geometry.get('neutralMouthBounds'):
+        mouth,b=mouth_feature(source,geometry['neutralMouthBounds'])
     else:
+        mb=box(raw['mouth_close'][:,:,3]>16)
         mouth,b=mouth_feature(source,[mb[0]-7,mb[1]-5,mb[2]+7,mb[3]+5])
     parts['mouth_close']=mouth
     anchors['mouth']={'x0':b[0]-2,'x1':b[2]+2,'y0':b[1]-2,'y1':b[3]+2,'cx':(b[0]+b[2]-1)/2,'cy':(b[1]+b[3]-1)/2}
@@ -152,6 +160,8 @@ def build(root, spec, round_name):
     assert not out.exists(),'Preserve prior rounds; choose a new output round'
     (out/'layers').mkdir(parents=True);(out/'masks').mkdir()
     source=np.array(Image.open(d/'inputs/master.png').convert('RGBA'));geometry=read(d/'plan/geometry.json')
+    geometry['_sourceEyeMasks']={side:load_mask(d,ref,source.shape[:2]) for side,ref in geometry.get('sourceEyeMasks',{}).items()}
+    if geometry.get('neutralMouthMask'):geometry['_neutralMouthMask']=load_mask(d,geometry['neutralMouthMask'],source.shape[:2])
     assert read(d/'native/generation.json')['sourceSha256']==sha(d/'inputs/master.png')
     raw,order,native_files=load_layers(d/'native',read(next((d/'native').glob('*_layers.json'))),pose_local_sides=True)
     for ar in raw.values():ar[ar[:,:,3]<8]=0;ar[:,:,3]=np.uint8(np.rint(ar[:,:,3]*(source[:,:,3]/255)))
@@ -162,8 +172,17 @@ def build(root, spec, round_name):
         if name in raw:raw[name][:,:,3]*=roi(bounds)
     for name in ['face','front hair','back hair','nose','eyelash-l','eyelash-r','irides-l','irides-r']:
         assert name in raw and (raw[name][:,:,3]>8).sum()>4,'Required own native part missing: '+name
+    if 'faceComponentPoint' in geometry:
+        selected_face=component_at(raw['face'][:,:,3]>8,geometry['faceComponentPoint'])
+        Image.fromarray(np.uint8((raw['face'][:,:,3]>8)&~selected_face)*255).save(out/'masks/excluded-face-components.png')
+        raw['face'][:,:,3]*=selected_face
     features,anchors,eye_records=neutral_features(raw,source,geometry)
-    registrations=add_expressions(d,raw,source,features,anchors);blink_profiles(features,anchors)
+    registrations=add_expressions(d,raw,source,features,anchors)
+    for name,ref in geometry.get('featureMasks',{}).items():
+        assert name in features,'Unknown expression part: '+name
+        # Retain that part's own paint; masks are reviewed geometry, not generic colors.
+        features[name][:,:,3]=np.minimum(features[name][:,:,3],np.uint8(np.rint(load_mask(d,ref,source.shape[:2])*255)))
+    blink_profiles(features,anchors)
     parts={n:a for n,a in raw.items() if not n.startswith(('eye','irides','mouth')) and n not in ['background']};parts.update(features)
     preferred=['back hair','body','legwear','neck','ears-l','ears-r','topwear','bottomwear','handwear-r','handwear-l','objects','nose','face']
     preferred+=['eyewhite-l','irides-l','eyelash-l','eyewhite-r','irides-r','eyelash-r','eyebrow-l','eyebrow-r','mouth_close','eye_close-l','eye_close-r','mouth_open','mouth_smile','front hair']
