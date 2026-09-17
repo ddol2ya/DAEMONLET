@@ -721,6 +721,9 @@ export class AppController {
     if (!this.transitions.fail(ticket)) return
     this.traceCharacter("failed", ticket, undefined, ticket.requestId)
     if (current?.id !== ticket.id || current.revision !== ticket.revision) return
+    // Once the last working revision itself fails, it is no longer a recovery
+    // target. Otherwise it and the built-in fallback can alternate forever.
+    if (this.lastReady?.id === ticket.id && this.lastReady.revision === ticket.revision) this.lastReady = null
     this.warn("새 캐릭터를 표시하지 못해 이전 정상 캐릭터로 돌아갑니다.")
     if (current.source === "external" && current.previousVersion && this.lastReady?.id === current.id && this.lastReady.revision !== current.revision) {
       // Registry notification starts a new transition for the restored revision.
