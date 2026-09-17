@@ -1,0 +1,18 @@
+import { describe, expect, it } from "vitest"
+import { officialRuntimeEnvironment, officialSystemConfigFiles } from "../electron/main/side-chat/OfficialPlatform"
+
+describe("official Windows companion environment", () => {
+  it("reads the same ProgramData policy path that the child process will use", () => {
+    const env = { ProgramData: "D:\\Shared", SystemRoot: "D:\\Windows", APPDATA: "D:\\User\\Roaming", LOCALAPPDATA: "D:\\User\\Local", OPENAI_API_KEY: "forbidden", PATH: "unsafe", NODE_OPTIONS: "forbidden" }
+    const child = officialRuntimeEnvironment("D:\\User", "D:\\User\\.codex", "D:\\Temp", "win32", env)
+    expect(officialSystemConfigFiles("win32", env)).toEqual(["D:\\Shared\\OpenAI\\Codex\\config.toml", "D:\\Shared\\OpenAI\\Codex\\requirements.toml"])
+    expect(child).toMatchObject({ ProgramData: env.ProgramData, SystemRoot: env.SystemRoot, APPDATA: env.APPDATA, LOCALAPPDATA: env.LOCALAPPDATA, CODEX_HOME: "D:\\User\\.codex", PATH: "D:\\Windows\\System32" })
+    expect(child).not.toHaveProperty("OPENAI_API_KEY"); expect(child).not.toHaveProperty("NODE_OPTIONS")
+    expect(officialSystemConfigFiles("win32", child)).toEqual(officialSystemConfigFiles("win32", env))
+  })
+  it("rejects relative or malformed system locations and preserves the macOS environment", () => {
+    for (const ProgramData of ["relative", "C:\\bad\npath"]) expect(() => officialSystemConfigFiles("win32", { ProgramData })).toThrow("CHAT_EXECUTION_POLICY")
+    expect(() => officialRuntimeEnvironment("C:\\User", "C:\\.codex", "C:\\Temp", "win32", { APPDATA: "relative" })).toThrow("CHAT_EXECUTION_POLICY")
+    expect(officialRuntimeEnvironment("/user", "/user/.codex", "/tmp/chat", "darwin", { OPENAI_API_KEY: "forbidden" })).toEqual({ HOME: "/user", USERPROFILE: "/user", CODEX_HOME: "/user/.codex", TMPDIR: "/tmp/chat", TMP: "/tmp/chat", TEMP: "/tmp/chat", PATH: "/usr/bin:/bin:/usr/sbin:/sbin" })
+  })
+})

@@ -42,7 +42,7 @@ export async function inspectSideChatRuntime(selected?: string | null) {
       if (seen.has(executable)) continue
       seen.add(executable)
       const before = await lstat(executable); found = true
-      if (!before.isFile() || before.size > 350 * 1024 * 1024 || ![0, process.getuid?.()].includes(before.uid) || before.mode & 0o022) continue
+      if (!before.isFile() || before.size > 350 * 1024 * 1024 || process.platform !== "win32" && (![0, process.getuid?.()].includes(before.uid) || Boolean(before.mode & 0o022))) continue
       await access(executable, constants.X_OK)
       const hash = createHash("sha256")
       for await (const chunk of createReadStream(executable)) hash.update(chunk)

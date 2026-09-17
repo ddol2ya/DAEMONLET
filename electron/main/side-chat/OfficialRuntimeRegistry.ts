@@ -9,4 +9,13 @@ export const OFFICIAL_RUNTIME_REGISTRY = [{
   sourceCommit: "6b9826e3aa83b1a5947db50f4332cb9c65f1b340",
   parentContract: "official-same-home", permissionContract: "readonly-project-companion-v1",
   verifiedHost: "macOS 27 arm64", credentials: ["file", "keyring-with-protocol-identity", "auto-with-protocol-identity"],
+}, {
+  version: "0.154.0", platform: "win32", arch: "x64", kind: "official",
+  executableSha256: "be96b992178b1e467c225800da0d65f2c86d5eba1ef0b14632f65db381cbdfde",
+  executableBytes: 298169136,
+  source: "https://registry.npmjs.org/@openai/codex/0.154.0-win32-x64",
+  packageIntegrity: "sha512-Stg2KEJPIKVqPPR1wCverGOR4ey3RR3cvakR07w7FNKQUMzmHaOZomRsP2bR1qOT/67yHsks9rB+MCMfIWXcRA==",
+  sourceCommit: "6b9826e3aa83b1a5947db50f4332cb9c65f1b340",
+  parentContract: "official-same-home", permissionContract: "readonly-project-companion-v1",
+  verifiedHost: "Windows x64", credentials: ["file"],
 }] as const

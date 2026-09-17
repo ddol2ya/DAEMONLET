@@ -1,6 +1,7 @@
 import { mkdir, realpath } from "node:fs/promises"
 import { join } from "node:path"
 import { startChatProcess } from "./ChatProcess"
+import { officialRuntimeEnvironment } from "./OfficialPlatform"
 import { SIDE_CHAT_MODEL } from "./SideChatModelPolicy"
 import type { ChatConnection } from "./SideChatBackend"
 
@@ -43,9 +44,6 @@ export async function launchOfficialSameHomeProcess(options: OfficialLaunchOptio
     overrides[`mcp_servers.${name}.enabled`] = false
   }
   const args = Object.entries(overrides).flatMap(([key, value]) => ["-c", `${key}=${JSON.stringify(value)}`])
-  const process = startChatProcess(options.executable, [...args, "app-server", "--listen", "stdio://"], cwd, {
-    HOME: osHome, USERPROFILE: osHome, CODEX_HOME: codexHome,
-    PATH: "/usr/bin:/bin:/usr/sbin:/sbin", TMPDIR: temp, TMP: temp, TEMP: temp,
-  })
+  const process = startChatProcess(options.executable, [...args, "app-server", "--listen", "stdio://"], cwd, officialRuntimeEnvironment(osHome, codexHome, temp))
   return { ...process, execution: { mode: "official-same-home", cwd, model: SIDE_CHAT_MODEL.id, instructions: "collaboration-mode", noEnvironment: true } }
 }

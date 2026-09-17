@@ -20,6 +20,12 @@ are not executed. `OfficialRuntimeRegistry` pins reviewed bytes and provenance;
 permission compatibility and account/model readiness are distinct gates. Discovery
 is not proof of authentication, a successful fork or a model answer.
 
+Windows uses the same pinned native 0.154.0 path, with POSIX mode-bit checks
+limited to POSIX. Native hashes and file identity still gate launch. System policy
+is read from `%ProgramData%\OpenAI\Codex`; the child retains the same system
+and credential-store locations through a small environment allowlist, without
+inheriting user PATH, provider/token overrides or command hooks.
+
 `OfficialSameHomeConnection` launches only the admitted official executable, with
 restrictions applied before initialize. Config/requirements, account binding and
 catalog are checked again before sending. File credentials retain the protected

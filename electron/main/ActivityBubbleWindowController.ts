@@ -121,7 +121,7 @@ export class ActivityBubbleWindowController {
   }
   setLayoutMode(value: boolean): void { this.inLayout = value; this.sync() }
   setContentHeight(height: number): void { if (this.contentHeight !== height && !this.presentation.sideChatVisible) { this.contentHeight = height; this.sync() } }
-  setPointerInteractive(interactive: boolean): void { this.window?.setIgnoreMouseEvents(!interactive && !this.placementDraft, { forward: true }) }
+  setPointerInteractive(interactive: boolean): void { this.window?.setIgnoreMouseEvents(!interactive && !this.placementDraft && !this.presentation.sideChatVisible, { forward: true }) }
   send(channel: string, value: unknown): void { if (this.window && !this.window.isDestroyed()) this.window.webContents.send(channel, value) }
   setCollapsed(value: boolean): boolean { this.collapsed = value; if (value && this.presentation.sideChatVisible) this.hideChat(); this.sync(); return this.collapsed }
   getView(): { view: "activity" | "control"; collapsed: boolean } { return { view: this.view, collapsed: this.collapsed } }

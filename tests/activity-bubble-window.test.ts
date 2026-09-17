@@ -72,6 +72,15 @@ describe("native activity window arbitration", () => {
     expect(JSON.stringify(service.snapshot())).toBe(conversation); expect(factory).not.toHaveBeenCalled()
     f.c.destroy()
   })
+  it("keeps the entire open chat interactive, including setup scrollbars and gaps", async () => {
+    const f = await fixture(), service = new SideChatService(vi.fn())
+    service.configure(true, "ko"); service.setMode("compact"); f.c.updateChat(service.snapshot())
+    f.c.setPointerInteractive(false)
+    expect(f.win.setIgnoreMouseEvents).toHaveBeenLastCalledWith(false, { forward: true })
+    service.setMode("hidden"); f.c.updateChat(service.snapshot()); f.c.setPointerInteractive(false)
+    expect(f.win.setIgnoreMouseEvents).toHaveBeenLastCalledWith(true, { forward: true })
+    f.c.destroy()
+  })
   it("shows a local preview with all bubbles OFF and processes dialogue expiry while editing", async () => {
     const f = await fixture(), settings = { ...f.settings, taskBubblesEnabled: false, speechBubblesEnabled: false, sideChatEnabled: false }
     f.c.applySettings(settings); expect(f.win.visible).toBe(false)

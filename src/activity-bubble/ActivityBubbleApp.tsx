@@ -71,7 +71,7 @@ export default function ActivityBubbleApp() {
     void control?.getView().then(result => { if (result.ok && !viewChanged) applyView(result.value) }).catch(() => {})
     let interactive = false
     const pointer = (event: MouseEvent) => {
-      const next = event.target instanceof Element && Boolean(event.target.closest("button, input, textarea, select, summary, a, .chat .history"))
+      const next = event.target instanceof Element && Boolean(event.target.closest("button, input, textarea, select, summary, a, .chat"))
       if (interactive !== next) { interactive = next; api.setPointerInteractive(next) }
     }
     // Focus can move while a captured mouse press is still active (for

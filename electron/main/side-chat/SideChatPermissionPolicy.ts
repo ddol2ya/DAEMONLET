@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import { lstat, readFile, readdir, realpath } from "node:fs/promises"
-import { join } from "node:path"
+import { officialSystemConfigFiles } from "./OfficialPlatform"
+import { basename, join } from "node:path"
 import { parse } from "smol-toml"
 import { OFFICIAL_CHAT_OVERRIDES } from "./OfficialSameHomeLaunchProfile"
 
@@ -16,7 +17,7 @@ export async function inspectOfficialStartup(codexHome: string) {
   const home = await realpath(codexHome)
   const profiles = (await readdir(home)).filter(name => name.endsWith(".config.toml"))
   if (profiles.length > 32) throw Error("CHAT_EXECUTION_POLICY")
-  const paths = ["/etc/codex/config.toml", "/etc/codex/managed_config.toml", "/etc/codex/requirements.toml", join(home, "managed_config.toml"), join(home, "config.toml"), ...profiles.map(name => join(home, name))]
+  const paths = [...officialSystemConfigFiles(), join(home, "managed_config.toml"), join(home, "config.toml"), ...profiles.map(name => join(home, name))]
   const fingerprints = new Map<string, string>(), servers = new Set<string>()
   const inspect = (config: any) => {
     // Codex can log out a mismatched account while applying forced-login rules.
@@ -40,7 +41,7 @@ export async function inspectOfficialStartup(codexHome: string) {
   }
   for (const path of paths) {
     const value = await fingerprint(path)
-    if ((path.endsWith("/managed_config.toml") || path.endsWith("/requirements.toml")) && value.hash !== "absent") throw Error("CHAT_MANAGED_POLICY")
+    if (["managed_config.toml", "requirements.toml"].includes(basename(path)) && value.hash !== "absent") throw Error("CHAT_MANAGED_POLICY")
     fingerprints.set(path, value.hash); inspect(value.config)
   }
   return {

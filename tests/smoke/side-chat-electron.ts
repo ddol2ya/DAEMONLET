@@ -112,6 +112,41 @@ try {
     dialog.showOpenDialog = picker
   }
   result.readinessSwitchButtons = "PASS (synthetic metadata, real Controller/renderer/preload/IPC)"
+  // Native scroll/button input, with the real shared window and metadata-only provider.
+  await js("document.querySelector('.conversation-options').open=true;document.querySelector('.connection-setup').open=true;document.querySelector('.context-info').open=true")
+  let ignored: boolean | null = null
+  const setIgnore = window.setIgnoreMouseEvents.bind(window)
+  window.setIgnoreMouseEvents = (ignore, options) => { ignored = ignore; setIgnore(ignore, options) }
+  bubbles.setPointerInteractive(false)
+  assert(ignored === false, "Open chat never passes scrollbars or gaps through to the desktop")
+  const scrollPoint = await js("(()=>{const e=document.querySelector('.setup-region'),r=e.getBoundingClientRect();e.scrollTop=0;return {x:Math.round(r.left+12),y:Math.round(r.top+r.height/2)}})()")
+  contents.sendInputEvent({ type: "mouseMove", ...scrollPoint }); await wait(60)
+  contents.sendInputEvent({ type: "mouseWheel", ...scrollPoint, deltaY: -150, deltaX: 0 })
+  await until("document.querySelector('.setup-region').scrollTop > 0")
+  const scrolledDown = await js("document.querySelector('.setup-region').scrollTop")
+  contents.sendInputEvent({ type: "mouseWheel", ...scrollPoint, deltaY: 150, deltaX: 0 })
+  await until("document.querySelector('.setup-region').scrollTop < " + scrolledDown)
+  if (process.platform === "win32") {
+    const arrow = await js("(()=>{const e=document.querySelector('.setup-region'),r=e.getBoundingClientRect();e.scrollTop=e.scrollHeight;return {x:Math.floor(r.right-8),y:Math.ceil(r.top+7),before:e.scrollTop}})()")
+    contents.sendInputEvent({ type: "mouseMove", x: arrow.x, y: arrow.y }); await wait(60)
+    contents.sendInputEvent({ type: "mouseDown", button: "left", clickCount: 1, x: arrow.x, y: arrow.y })
+    contents.sendInputEvent({ type: "mouseUp", button: "left", clickCount: 1, x: arrow.x, y: arrow.y })
+    await until("document.querySelector('.setup-region').scrollTop < " + arrow.before)
+    result.nativeScrollbarArrow = "PASS"
+  }
+  const beforeCheck = preparationFixture.connections.length, releaseCheck = holdNextPreparation()
+  const checkButton = await js("(()=>{const e=[...document.querySelectorAll('.connection-setup button')].find(e=>e.textContent==='다시 확인');e.scrollIntoView({block:'nearest'});const r=e.getBoundingClientRect();return {x:Math.round(r.left+r.width/2),y:Math.round(r.top+r.height/2)}})()")
+  contents.sendInputEvent({ type: "mouseMove", ...checkButton }); await wait(60)
+  contents.sendInputEvent({ type: "mouseDown", button: "left", clickCount: 1, ...checkButton })
+  contents.sendInputEvent({ type: "mouseUp", button: "left", clickCount: 1, ...checkButton })
+  await until("[...document.querySelectorAll('.connection-setup button')].some(e=>e.textContent==='확인 중…' && e.disabled)")
+  assert(preparationFixture.connections.length === beforeCheck + 1, "Native check button invoked metadata connection once")
+  releaseCheck(); await until("document.querySelector('.connection-setup summary').textContent==='연결됨'")
+  assert(ignored === false, "Chat retains mouse input after scrolling and a native button click")
+  window.setIgnoreMouseEvents = setIgnore
+  await js("document.querySelector('.context-info').open=false")
+  result.nativeSetupScrollAndCheck = "PASS (injected Electron input; no model calls)"
+
   await preferences.save({ consentVersion: SIDE_CHAT_CONSENT_VERSION })
   service.setCandidates([{ threadId: "parent", title: "캐릭터 제작스킬에서 이미지 넣을때 조건이 있었나? 그리고 이미지 넣으면 어떤식으로 가공해주냐? ".repeat(3).slice(0, 120), cwd: project, activityId: activity.entries[0].activityId }], "parent")
   await wait(60)
