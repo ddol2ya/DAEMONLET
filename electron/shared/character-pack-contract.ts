@@ -1,5 +1,6 @@
+import type { PackUpdateSource } from "./pack-update-contract"
 /** Application-owned data contract, not a third-party model format. */
-export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1"] } as const
+export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1", "hf-pack-updates-v1"] } as const
 export const PACK_LIMITS = {
   archiveBytes: 256 * 1024 * 1024, payloadBytes: 384 * 1024 * 1024,
   fileBytes: 32 * 1024 * 1024, jsonBytes: 2 * 1024 * 1024, files: 256,
@@ -21,14 +22,14 @@ export function comparePackVersions(a: string, b: string): number {
 export type PackFile = { path: string; bytes: number; sha256: string }
 export type CharacterPackManifest = {
   packFormatVersion: 1; id: string; version: string; name: string; author?: string
-  entry: "character.json"; thumbnail?: string
+  entry: "character.json"; thumbnail?: string; update?: PackUpdateSource
   runtime: { engine: "anime25d"; assetApiVersion: 1; capabilities: string[] }
   profile?: "trial" | "full"; unsupportedReactions?: string[]; files: PackFile[]
 }
 export type CharacterEntry = {
   id: string; name: string; source: "builtin" | "external"; version: string; revision: string
   manifestUrl: string; status: "ready" | "pending" | "disabled"; error?: string; author?: string
-  thumbnailUrl?: string; bytes: number; poseCount: number; previousVersion?: string
+  thumbnailUrl?: string; bytes: number; poseCount: number; previousVersion?: string; update?: PackUpdateSource
   profile?: "trial" | "full"; unsupportedReactions?: string[]
 }
 export type CharacterSnapshot = { generation: number; entries: CharacterEntry[]; storageBytes: number; storageLimitBytes: number; warning?: string }

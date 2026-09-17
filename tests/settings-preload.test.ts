@@ -14,9 +14,11 @@ describe("Settings preload", () => {
     const updateApi = mocks.expose.mock.calls.find(([name]) => name === "updateDesktop")![1]
     expect(Object.isFrozen(updateApi)).toBe(true)
     expect(Object.keys(updateApi).sort()).toEqual(["act", "onChanged", "onOpen", "snapshot"])
+    expect(Object.isFrozen(api.packUpdates)).toBe(true)
+    expect(Object.keys(api.packUpdates).sort()).toEqual(["act", "list", "onChanged"])
     expect(Object.isFrozen(api.characters)).toBe(true)
     expect(Object.keys(api.characters).sort()).toEqual(["list", "select", "onChanged", "onProgress", "chooseImport", "commitImport", "cancelImport", "remove", "rollback"].sort())
-    expect(Object.keys(api).sort()).toEqual(["characters", "getStatus", "refreshStatus", "prepareConnection", "chooseCodexExecutable", "chooseCodexHome", "planHooks", "applyHookPlan", "discardHookPlan", "runHostSelfTest", "reportHookReview", "startLiveObservation", "stopLiveObservation", "reportDesktopStopAttempt", "dismissOnboarding", "getSettings", "updateSettings", "resetPetPosition", "setBubblePlacement", "restartAdapter", "exportDiagnostics", "onStatusChanged", "onSettingsChanged"].sort())
+    expect(Object.keys(api).sort()).toEqual(["packUpdates", "characters", "getStatus", "refreshStatus", "prepareConnection", "chooseCodexExecutable", "chooseCodexHome", "planHooks", "applyHookPlan", "discardHookPlan", "runHostSelfTest", "reportHookReview", "startLiveObservation", "stopLiveObservation", "reportDesktopStopAttempt", "dismissOnboarding", "getSettings", "updateSettings", "resetPetPosition", "setBubblePlacement", "restartAdapter", "exportDiagnostics", "onStatusChanged", "onSettingsChanged"].sort())
     for (const forbidden of ["invoke", "ipcRenderer", "shell", "readFile", "writeFile", "protocol", "reportReady", "setMousePassthrough"]) expect(api).not.toHaveProperty(forbidden)
     await api.setBubblePlacement("adjust")
     expect(mocks.invoke).toHaveBeenCalledWith(SETUP_IPC.bubblePlacement, "adjust")

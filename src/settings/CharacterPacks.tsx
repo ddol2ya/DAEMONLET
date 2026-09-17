@@ -1,3 +1,5 @@
+import { PackUpdateCard } from "./PackUpdateCard"
+import type { PackUpdateState } from "../../electron/shared/pack-update-contract"
 import { useT } from "../i18n/useLanguage"
 import { useEffect, useRef, useState } from "react"
 import { PACK_ERRORS, type CharacterEntry, type CharacterSnapshot, type ImportPreview, type PackProgress } from "../../electron/shared/character-pack-contract"
@@ -6,6 +8,20 @@ import type { SettingsPageProps } from "./SettingsApp"
 const size = (bytes: number) => bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`
 export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPageProps, "api" | "run" | "busy"> & { selected: string }) {
   const t = useT()
+  const [updates, setUpdates] = useState<PackUpdateState[]>([])
+  const [checkingAll, setCheckingAll] = useState(false)
+  useEffect(() => {
+    let live = true
+    const receive = (value: PackUpdateState[]) => { if (live) setUpdates(value) }
+    const off = api.packUpdates.onChanged(receive)
+    void api.packUpdates.list().then(receive).catch(() => {})
+    return () => { live = false; off() }
+  }, [api])
+  const checkAll = async () => {
+    setCheckingAll(true)
+    try { for (const state of updates) await api.packUpdates.act({ action: "check", packId: state.packId }).catch(() => {}) }
+    finally { setCheckingAll(false) }
+  }
   const [snapshot, setSnapshot] = useState<CharacterSnapshot | null>(null)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [installed, setInstalled] = useState<CharacterEntry | null>(null)
@@ -45,6 +61,7 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
   }
   return <div className="character-packs">
     <div className="pack-toolbar"><h2>{t("캐릭터")}</h2><button ref={trigger} className="button secondary small" disabled={Boolean(busy)} onClick={() => void choose()}>{t("＋ 캐릭터 추가")}</button></div>
+    {updates.length > 0 && <button className="text-button" disabled={checkingAll} onClick={() => void checkAll()}>{t(checkingAll ? "업데이트 확인 중…" : "표시된 HF 출처에서 모든 팩 확인")}</button>}
     {snapshot?.warning && <div className="notice warning" role="status">{t(snapshot.warning)}</div>}
     {installed && <div className="notice success pack-progress" role="status"><span>{t`${installed.name} ${installed.version} 버전이 준비됐어요.`}</span><button className="button primary small" disabled={Boolean(busy)} onClick={() => apply(installed)}>{t("지금 적용")}</button></div>}
     <div className="pack-list" role="radiogroup" aria-label={t("캐릭터 선택")}>{snapshot?.entries.map(entry => <article className={`pack-card${selected === entry.id ? " selected" : ""}`} key={entry.id}>
@@ -56,7 +73,7 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
         <button className="text-button" disabled={Boolean(busy)} onClick={() => void choose()}>{t("수정본 가져오기")}</button>
         {entry.previousVersion && <button className="text-button" disabled={Boolean(busy)} onClick={() => void run("이전 버전 복원", () => api.characters.rollback({ id: entry.id, revision: entry.revision }))}>{t("이전 버전 복원")}</button>}
         <button className="text-button danger-text" disabled={Boolean(busy)} onClick={() => void run("캐릭터 제거", () => api.characters.remove({ id: entry.id, revision: entry.revision }))}>{t("제거")}</button>
-      </div></div>}
+      </div>{entry.update ? <PackUpdateCard entry={entry} state={updates.find(u => u.packId === entry.id)} api={api.packUpdates} selected={selected === entry.id} /> : <p className="fine-print">{t("온라인 업데이트를 사용하려면 출처가 포함된 같은 외형의 팩을 한 번 가져오세요.")}</p>}</div>}
     </article>)}</div>
     {!snapshot && <p role="status">{t("캐릭터 목록 불러오는 중…")}</p>}
     {snapshot && <p className="pack-storage">{t("외부 캐릭터 저장량 ")}<strong>{size(snapshot.storageBytes)}</strong> / {size(snapshot.storageLimitBytes)}</p>}

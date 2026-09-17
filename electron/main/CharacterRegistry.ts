@@ -100,7 +100,7 @@ export class CharacterRegistry {
   private entryFor(pack: ValidatedPack, previous?: ValidatedPack): CharacterEntry {
     const m = pack.manifest
     return { id: m.id, name: m.name, source: "external", version: m.version, revision: pack.revision, manifestUrl: packAssetUrl(m.id, pack.revision, m.entry), status: "ready", bytes: pack.bytes, poseCount: pack.poseCount,
-      ...(m.author ? { author: m.author } : {}), ...(m.thumbnail ? { thumbnailUrl: packAssetUrl(m.id, pack.revision, m.thumbnail) } : {}),
+      ...(m.update ? { update: m.update } : {}), ...(m.author ? { author: m.author } : {}), ...(m.thumbnail ? { thumbnailUrl: packAssetUrl(m.id, pack.revision, m.thumbnail) } : {}),
       ...(previous ? { previousVersion: previous.manifest.version } : {}), ...(m.profile ? { profile: m.profile } : {}), ...(m.unsupportedReactions ? { unsupportedReactions: m.unsupportedReactions } : {}),
     }
   }
@@ -113,6 +113,7 @@ export class CharacterRegistry {
     })
     return structuredClone({ generation: this.index.generation + this.viewGeneration, entries: [...this.builtin.values(), ...external], storageBytes: this.usedBytes, storageLimitBytes: PACK_LIMITS.storageBytes, ...(this.warning ? { warning: this.warning } : {}) })
   }
+  manifest(id: string) { const e = this.index.entries.find(e => e.id === id); return e ? structuredClone(this.inventories.get(this.key(id, e.current))?.manifest) : undefined }
   get(id: string): CharacterEntry | undefined { return this.snapshot().entries.find(e => e.id === id) }
   isAvailable = (id: string): boolean => this.get(id)?.status === "ready"
   requireSelection(selection: CharacterSelection): CharacterEntry {
@@ -183,6 +184,11 @@ export class CharacterRegistry {
     })
   }
 
+  preparedManifest(token: string, owner: string) {
+    const p = this.pending
+    if (!p?.pack || p.token !== token || p.owner !== owner || p.expiresAt <= Date.now() || p.controller.signal.aborted) throw Error("PACK_TRANSACTION")
+    return structuredClone(p.pack.manifest)
+  }
   async commitImport(token: string, owner: string): Promise<CharacterEntry> {
     return this.exclusive(async () => {
       const pending = this.pending

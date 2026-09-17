@@ -72,6 +72,7 @@ export type SetupResponse<T> = { ok: true; value: T } | { ok: false; code: strin
 
 export interface SettingsDesktopApi {
   setBubblePlacement(action: "adjust" | "auto" | "reset"): Promise<void>
+  packUpdates: import("./pack-update-contract").PackUpdateApi
   characters: CharacterManageApi
   getStatus(): Promise<PublicSetupStatus>
   refreshStatus(): Promise<PublicSetupStatus>

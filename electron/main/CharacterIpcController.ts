@@ -18,7 +18,7 @@ export class CharacterIpcController {
   private rates = new Map<number, { start: number; count: number }>()
   constructor(private readonly options: {
     registry: CharacterRegistry; settings: SettingsWindowController; pet: () => BrowserWindow | null; lab: () => BrowserWindow | null
-    devServerUrl?: string; select: (value: CharacterSelection) => Promise<void>; selected: () => string
+    mutationAllowed?: () => boolean; devServerUrl?: string; select: (value: CharacterSelection) => Promise<void>; selected: () => string
   }) {}
   private bind(channel: string, arity: number, mutation: boolean, action: (owner: string, args: unknown[]) => unknown | Promise<unknown>) {
     this.channels.push(channel)
@@ -31,6 +31,7 @@ export class CharacterIpcController {
       else if (++rate.count > 24) return { ok: false, code: "PACK_BUSY" }
       const owner = trustedSettings ? o.settings.currentOwner() : String(event.sender.id)
       if (!owner) return { ok: false, code: "PACK_TRANSACTION" }
+      if (mutation && (!applicationInputAllowed() || o.mutationAllowed?.() === false)) return { ok: false, code: "PACK_BUSY" }
       try { return { ok: true, value: await action(owner, args) } } catch (error) { return { ok: false, code: packErrorCode(error) } }
     })
   }

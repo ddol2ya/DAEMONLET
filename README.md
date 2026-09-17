@@ -151,3 +151,5 @@ Electron 준비에는 lockfile에 고정된 로컬 설치 스크립트를 사용
 ### 앱 업데이트 (개발 후보 0.7.2)
 
 메뉴 또는 설정 → 업데이트에서 새 버전을 확인합니다. 자동 확인은 기본 OFF이며 다운로드·재시작은 사용자 선택입니다. 기존 공개 0.7.1에서는 최초 한 번 수동 설치가 필요합니다. [지원 설치 형태·서명 조건·검증 절차](docs/app-updates.md)를 확인해 주세요.
+
+Character pack updates: [HF source, manual download/apply and rollback](docs/character-pack-updates.md). Appearance labels are independent from pack SemVer; initial import is required for older packs without an update source.

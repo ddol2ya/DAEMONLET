@@ -1,3 +1,6 @@
+import { PackUpdateService } from "./pack-updates/PackUpdateService"
+import { PackUpdateIpcController } from "./pack-updates/PackUpdateIpcController"
+import { PACK_UPDATE_IPC } from "../shared/pack-update-contract"
 declare const __APP_QA__: boolean
 import { RELEASE_ROOT } from "./updates/ReleasePolicy"
 import { UpdateService } from "./updates/UpdateService"
@@ -104,6 +107,9 @@ export class AppController {
   private readonly integration: CodexIntegrationController
   private readonly settingsWindow: SettingsWindowController
   private readonly settingsIpc: SettingsIpcController
+  private readonly packUpdates: PackUpdateService
+  private packApplyTarget: string | null = null
+  private readonly packUpdateIpc: PackUpdateIpcController
   private readonly characterIpc: CharacterIpcController
   private unavailableSelection: string | null = null
   private lastReady: CharacterSelection | null = null
@@ -186,7 +192,8 @@ export class AppController {
       },
       onClosed: (owner) => {
         this.integration.windowClosed(owner)
-        void this.characters.cancelImport(owner)
+        void this.packUpdates?.cancel(owner)
+        if (!this.packUpdates?.applying()) void this.characters.cancelImport(owner)
         if (this.settingsPoll) clearInterval(this.settingsPoll)
         this.settingsPoll = null
       },
@@ -215,8 +222,27 @@ export class AppController {
       resetPosition: () => this.resetPosition(), restartAdapter: () => this.restartAdapterSafely(),
       characterAllowed: this.characters.isAvailable,
     })
+    this.packUpdates = new PackUpdateService({ ...(__APP_QA__ && process.env.ELECTRON_SMOKE_PACK_UPDATES ? { provider: {
+      feed: async (...args: Parameters<import("./pack-updates/HuggingFacePackProvider").HuggingFacePackProvider["feed"]>) => (await import("./pack-updates/PackUpdateSmoke")).createPackUpdateSmokeProvider(process.env.ELECTRON_SMOKE_PACK_UPDATES!).feed(...args),
+      download: async (...args: Parameters<import("./pack-updates/HuggingFacePackProvider").HuggingFacePackProvider["download"]>) => (await import("./pack-updates/PackUpdateSmoke")).createPackUpdateSmokeProvider(process.env.ELECTRON_SMOKE_PACK_UPDATES!).download(...args),
+    } } : {}), registry: characters, dataRoot: app.getPath("userData"), appVersion: app.getVersion(),
+      owner: () => this.settingsWindow.currentOwner(), selected: () => this.settings.characterId,
+      canApply: id => !this.quitting && !this.updatePreparing && this.readyWaiters.size === 0 && !this.sideChat.snapshot().applying && (id !== this.settings.characterId || !["answering", "preparing"].includes(this.sideChat.snapshot().phase)),
+      changed: states => this.settingsWindow.send(PACK_UPDATE_IPC.changed, states),
+      apply: async (preview, owner) => {
+        const active = this.settings.characterId === preview.entry.id
+        this.packApplyTarget = preview.entry.id
+        if (active) this.sideChat.beginCharacterApply()
+        try {
+          const entry = await this.characters.commitImport(preview.token, owner)
+          if (active) await this.selectCharacter(entry)
+        } catch (error) { if (active) this.sideChat.characterFailed(); throw error }
+        finally { this.packApplyTarget = null }
+      },
+    })
+    this.packUpdateIpc = new PackUpdateIpcController(this.packUpdates, this.settingsWindow, this.devServerUrl)
     this.characterIpc = new CharacterIpcController({ registry: characters, settings: this.settingsWindow, pet: () => this.pet.window, lab: () => this.lab.window, devServerUrl: this.devServerUrl,
-      select: value => this.selectCharacter(value), selected: () => this.unavailableSelection ?? this.settings.characterId })
+      mutationAllowed: () => !this.packUpdates.applying(), select: value => { if (this.packUpdates.applying()) throw Error("PACK_BUSY"); return this.selectCharacter(value) }, selected: () => this.unavailableSelection ?? this.settings.characterId })
   }
 
   async start(): Promise<void> {
@@ -234,6 +260,8 @@ export class AppController {
     this.settingsIpc.register()
     this.updateIpc.register()
     const updateRecovery = await this.updates.start()
+    await this.packUpdates.start()
+    this.packUpdateIpc.register()
     this.characterIpc.register()
     this.sideChatIpc.register()
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
@@ -368,7 +396,7 @@ export class AppController {
   }
 
   private async confirmUpdateRestart(): Promise<boolean> {
-    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || !this.packUpdates.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
     const chat = this.sideChat.snapshot()
     const running = chat.phase === "answering" || chat.phase === "preparing"
     const answer = await dialog.showMessageBox({ type: "question", title: appText("업데이트 및 재시작"),
@@ -376,14 +404,14 @@ export class AppController {
       detail: appText("임시 대화·초안·첨부는 재시작하면 사라집니다. 설정·캐릭터팩·위치는 보존됩니다. 부모 Codex 작업은 계속 실행됩니다.") + (process.platform === "darwin" ? "\n" + appText("승인 후 Mac이 업데이트를 준비하면 다음 앱 종료 때 적용될 수 있습니다.") : ""),
       buttons: [appText("취소"), appText(running ? "자식 중단 및 재시작" : "업데이트 및 재시작")], defaultId: 0, cancelId: 0 })
     if (answer.response !== 1) return false
-    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || !this.packUpdates.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
     this.updatePreparing = true; setApplicationInputLocked(true); this.rebuildTray()
     return true
   }
 
   private async prepareUpdateExit(): Promise<void> {
     if (this.osEnding) throw Error("OS_SHUTDOWN")
-    if ((!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error("PACK_BUSY")
+    if ((!this.characters.readyForUpdate() || !this.packUpdates.readyForUpdate() || this.readyWaiters.size > 0)) throw Error("PACK_BUSY")
     this.placementOpening?.abort(); this.activityBubble.cancelPlacement(); this.petDrag.cancel()
     if (this.saveTimer) clearTimeout(this.saveTimer); this.saveTimer = null
     try { await this.store.save(this.savedSettings()) } catch { throw Error("SAVE_FAILED") }
@@ -429,6 +457,8 @@ export class AppController {
     this.taskControlIpc.dispose()
     this.settingsIpc.dispose()
     this.updateIpc.dispose()
+    this.packUpdateIpc.dispose()
+    await this.packUpdates.dispose()
     this.characterIpc.dispose()
     for (const waiter of this.readyWaiters) waiter.finish(new Error("PACK_CANCELLED"))
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe()
@@ -508,6 +538,7 @@ export class AppController {
   }
 
   private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+    if (patch.characterId && this.packApplyTarget && patch.characterId !== this.packApplyTarget) throw Error("PACK_BUSY")
     if (!applicationInputAllowed()) return structuredClone(this.settings)
     if (patch.visible === false || patch.characterId !== undefined) { this.placementOpening?.abort(); this.activityBubble.cancelPlacement() }
     if (patch.visible === false || patch.scale !== undefined || patch.characterId !== undefined) this.petDrag.cancel()
@@ -664,7 +695,7 @@ export class AppController {
 
   private trayActions(): TrayActions {
     return {
-      inputLocked: () => this.updatePreparing || this.quitting,
+      inputLocked: () => this.updatePreparing || this.quitting || this.packUpdates.applying(),
       checkUpdates: () => { this.updateIpc.open(); void this.updates.act({ action: "check" }) },
       activity: () => this.activity.snapshot(),
       openSideChat: () => { void this.openSideChat() },
@@ -797,6 +828,7 @@ export class AppController {
 
   private async finishSmoke(characterId: string): Promise<void> {
     if (__APP_QA__) {
+    const { runPackUpdateSmoke } = await import("./pack-updates/PackUpdateSmoke")
     const { runSideChatPackSmoke } = await import("./SideChatPackSmoke")
     const { runHybridBubbleSmoke } = await import("./HybridBubbleSmoke")
     const { runDialogueSmoke } = await import("./DialogueSmoke")
@@ -1118,9 +1150,15 @@ export class AppController {
       try { sideChatPackValidation = await runSideChatPackSmoke({ registry: this.characters, service: this.sideChat, resolver: this.personaResolver, pet: win, select: value => this.selectCharacter(value), output: process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS }) }
       catch { this.warn("Side chat pack switch smoke failed") }
     }
+    let packUpdateValidation = null
+    if (process.env.ELECTRON_SMOKE_PACK_UPDATES && win) {
+      try { packUpdateValidation = await runPackUpdateSmoke({ path: process.env.ELECTRON_SMOKE_PACK_UPDATES, registry: this.characters, service: this.packUpdates, settings: this.settingsWindow, pet: win, sideChat: this.sideChat, select: value => this.selectCharacter(value), selected: () => this.settings.characterId }) }
+      catch (error) { this.warn(error instanceof Error ? error.message : "Pack update QA failed") }
+    }
     const adapterDiagnostics = this.adapter.getDiagnostics()
     const protocolDiagnostics = this.protocol.getDiagnostics()
     const result = {
+      packUpdateValidation,
       appReady: app.isReady(),
       customProtocolHandled: win?.webContents.getURL().startsWith(this.devServerUrl ? "http://127.0.0.1:4173/" : "pet://app/") ?? false,
       petWindowCreated: Boolean(win && !win.isDestroyed()),

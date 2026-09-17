@@ -129,13 +129,14 @@ try {
   let timedOut = false
   const requestedNativeWait = Number(process.env.ELECTRON_SMOKE_NATIVE_WAIT_MS ?? 60000)
   const nativeWaitMs = Number.isFinite(requestedNativeWait) ? Math.max(60000, Math.min(300000, requestedNativeWait)) : 60000
-  const timeout = setTimeout(() => { timedOut = true; child.kill("SIGTERM") }, process.env.ELECTRON_SMOKE_NATIVE_CLICK === "1" ? 240_000 + 2 * nativeWaitMs : dialogueEvidence || activityEvidence || hybridEvidence ? 420_000 : 120_000)
+  const timeout = setTimeout(() => { timedOut = true; child.kill("SIGTERM") }, process.env.ELECTRON_SMOKE_NATIVE_CLICK === "1" ? 240_000 + 2 * nativeWaitMs : dialogueEvidence || activityEvidence || hybridEvidence || process.env.ELECTRON_SMOKE_PACK_UPDATES ? 420_000 : 120_000)
   const code = await new Promise((resolveExit, reject) => { child.once("error", reject); child.once("exit", resolveExit) })
   clearTimeout(timeout)
   if (timedOut) throw new Error(`Electron smoke timed out before completion\n${stderr.slice(-4000)}`)
   if (code !== 0) throw new Error(`Electron smoke failed with exit ${String(code)}\n${stderr.slice(-4000)}`)
 
   result = JSON.parse(await readFile(resultPath, "utf8"))
+  if (process.env.ELECTRON_SMOKE_PACK_UPDATES && result.packUpdateValidation?.status !== "PASS") throw new Error("Pack update transition smoke failed: " + JSON.stringify(result.warnings))
   if (process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS && result.sideChatPackValidation?.status !== "PASS") throw new Error("Side chat pack switch smoke failed")
   const activityHistory = JSON.parse(await readFile(join(smokeUserData, "activity/history.json"), "utf8"))
   result.activityHistory = {

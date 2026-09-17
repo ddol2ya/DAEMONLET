@@ -1,3 +1,4 @@
+import { parseUpdateSource, PACK_UPDATE_CAPABILITY } from "./pack-update-contract"
 import { PACK_LIMITS, PACK_RUNTIME, isCharacterId, isPackVersion, isRevision, type CharacterPackManifest } from "./character-pack-contract"
 import { validatePackPath } from "./character-pack-path"
 import { isValidEyeBlinkProfile } from "../../src/engine/anime25d/EyeBlink"
@@ -74,7 +75,7 @@ export function parseBoundedJson(bytes: Uint8Array): unknown {
 
 export function parsePackManifest(bytes: Uint8Array): CharacterPackManifest {
   const v = record(parseBoundedJson(bytes))
-  const keys = ["packFormatVersion", "id", "version", "name", "author", "entry", "thumbnail", "runtime", "files", "profile", "unsupportedReactions"]
+  const keys = ["packFormatVersion", "id", "version", "name", "author", "entry", "thumbnail", "runtime", "files", "profile", "unsupportedReactions", "update"]
   if (Object.keys(v).some(k => !keys.includes(k)) || !isCharacterId(v.id) || !isPackVersion(v.version) || v.entry !== "character.json") throw new Error("PACK_MANIFEST")
   if (v.packFormatVersion !== 1) throw new Error("PACK_INCOMPATIBLE")
   text(v.name); if (v.author !== undefined) text(v.author)
@@ -82,6 +83,9 @@ export function parsePackManifest(bytes: Uint8Array): CharacterPackManifest {
   if (v.unsupportedReactions !== undefined) array(text, 16)(v.unsupportedReactions)
   const runtime = record(v.runtime)
   if (Object.keys(runtime).some(k => !["engine", "assetApiVersion", "capabilities"].includes(k)) || runtime.engine !== PACK_RUNTIME.engine || runtime.assetApiVersion !== PACK_RUNTIME.assetApiVersion || !Array.isArray(runtime.capabilities) || runtime.capabilities.some(c => !(PACK_RUNTIME.capabilities as readonly unknown[]).includes(c))) throw new Error("PACK_INCOMPATIBLE")
+  if (new Set(runtime.capabilities as string[]).size !== (runtime.capabilities as string[]).length) throw new Error("PACK_MANIFEST")
+  if (Boolean(v.update) !== (runtime.capabilities as string[]).includes(PACK_UPDATE_CAPABILITY)) throw new Error("PACK_MANIFEST")
+  if (v.update !== undefined) v.update = parseUpdateSource(v.update)
   if (!Array.isArray(v.files) || !v.files.length || v.files.length > PACK_LIMITS.files) throw new Error("PACK_LIMIT")
   let total = 0
   const paths = new Set<string>()
