@@ -1,4 +1,4 @@
-import {mkdtemp,mkdir,writeFile,rm,readFile,symlink} from 'node:fs/promises'
+import {mkdtemp,mkdir,writeFile,rm,readFile,symlink,realpath} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {execFile} from 'node:child_process'
@@ -8,7 +8,7 @@ import {afterEach,expect,it} from 'vitest'
 import {reviewStatus,updateReview,requirePoseReviews,POSE_STAGES,DELIVERY_STAGES} from '../scripts/characters/production-review.mjs'
 const roots:string[]=[]
 async function fixture(){
- const root=await mkdtemp(join(tmpdir(),'production-review-'));roots.push(root)
+ const root=await realpath(await mkdtemp(join(tmpdir(),'production-review-')));roots.push(root)
  await mkdir(join(root,'poses/waiting/r0'),{recursive:true});await mkdir(join(root,'qa'))
  await writeFile(join(root,'models.json'),JSON.stringify({strategy:'whole-model-per-pose',models:[{id:'waiting',model:'poses/waiting/r0/model.json'}]}))
  for(const [name,value] of Object.entries({'model.json':{psd:'model.psd',bodySource:'source.png',overrides:'overrides.json',pose:'pose.json'},'pose.json':{source:'source.png',psd:'model.psd',overrides:'overrides.json'},'overrides.json':{}}))await writeFile(join(root,'poses/waiting/r0',name),JSON.stringify(value))
@@ -72,6 +72,6 @@ it('rejects source/evidence paths escaping through a symlink and empty attestati
 it('creator payload refuses an unreviewed pilot before writing output',async()=>{
  const root=await fixture(),models=['waiting','writing','head-tap'].map(id=>({id,label:id,model:'poses/waiting/r0/model.json'}))
  await writeFile(join(root,'models.json'),JSON.stringify({strategy:'whole-model-per-pose',models}))
- const output=join(root,'payload')
+ const output=root+'-payload';roots.push(output)
  await expect(promisify(execFile)(process.execPath,[resolve('skills/create-pet-character/scripts/creator.mjs'),'payload','--source',root,'--id','pilot','--label','Pilot','--profile','trial','--behavior',join(root,'behavior.json'),'--dialogue',join(root,'dialogue.json'),'--output',output])).rejects.toThrow('Production review required')
 })
