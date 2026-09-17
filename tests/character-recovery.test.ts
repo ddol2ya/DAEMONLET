@@ -2,12 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { AppController } from "../electron/main/AppController"
 import { CharacterTransitions } from "../electron/main/CharacterTransitions"
 import { SideChatService } from "../electron/main/side-chat/SideChatService"
+import { setApplicationInputLocked } from "../electron/main/updates/OperationGate"
 
-vi.mock("electron", () => ({ app: {}, ipcMain: {}, net: {}, session: {}, shell: {}, screen: {}, dialog: {}, powerMonitor: {}, BrowserWindow: class {}, Menu: {}, Tray: class {}, nativeImage: {} }))
+vi.mock("electron", () => ({ app: {}, ipcMain: {}, net: {}, session: {}, shell: {}, screen: { removeListener: vi.fn() }, dialog: {}, powerMonitor: { removeListener: vi.fn() }, BrowserWindow: class {}, Menu: {}, Tray: class {}, nativeImage: {} }))
 vi.mock("../electron/main/updates/OfficialUpdater", () => ({ createOfficialUpdateEngine: vi.fn(), detectUpdatePlatform: vi.fn() }))
 
 const owned: CharacterTransitions[] = []
-afterEach(() => { for (const t of owned.splice(0)) t.retire() })
+afterEach(() => { for (const t of owned.splice(0)) t.retire(); setApplicationInputLocked(false) })
 function fixture() {
   // Exercise the real Main recovery method without creating native windows.
   const controller = Object.create(AppController.prototype) as any
@@ -24,6 +25,30 @@ function fixture() {
   return { controller, transitions, entries, chat }
 }
 describe("Main character failure recovery", () => {
+  it("retires readiness and waits for pack cleanup before destroying chat, windows or registry", async () => {
+    const f = fixture(), c = f.controller
+    f.transitions.begin(f.entries.get("style-a")!)
+    const disposedChat = vi.fn(async () => {}), disposedRegistry = vi.fn(async () => {})
+    let finishPack!: () => void
+    for (const name of ["sideChatIpc", "activityIpc", "bubbleIpc", "taskControlIpc", "settingsIpc", "updateIpc", "packUpdateIpc", "characterIpc", "activityTitles", "protocol"]) c[name] = { dispose: vi.fn() }
+    for (const name of ["settingsWindow", "activityWindow", "pet", "lab", "tray"]) c[name] = { destroy: vi.fn() }
+    Object.assign(c, { sideChat: { dispose: disposedChat }, petDrag: { cancel: vi.fn() }, chatEntry: { cancel: vi.fn() },
+      activityBubble: { cancelPlacement: vi.fn(), destroy: vi.fn() }, updates: { dispose: vi.fn() }, subscriptions: [],
+      activity: { dispose: vi.fn(async () => {}) }, integration: { dispose: vi.fn(async () => {}) },
+      adapter: { stop: vi.fn(async () => {}) }, store: { save: vi.fn(async () => {}) }, characterTrace: { flush: vi.fn(async () => {}) },
+      packUpdates: { dispose: vi.fn(() => new Promise<void>(resolve => { finishPack = resolve })) },
+    })
+    c.characters.dispose = disposedRegistry
+    const exiting = c.cleanupForExit()
+    await vi.waitFor(() => expect(finishPack).toBeTypeOf("function"))
+    expect(f.transitions.busy).toBe(false)
+    expect(disposedChat).not.toHaveBeenCalled()
+    expect(disposedRegistry).not.toHaveBeenCalled()
+    expect(c.settingsWindow.destroy).not.toHaveBeenCalled()
+    finishPack(); await exiting
+    expect(disposedChat).toHaveBeenCalledOnce()
+    expect(disposedRegistry).toHaveBeenCalledOnce()
+  })
   it("stops after the last-ready model and built-in fallback both fail instead of alternating forever", async () => {
     const f = fixture()
     for (const id of ["style-a", "style-b", "gpichan"]) {

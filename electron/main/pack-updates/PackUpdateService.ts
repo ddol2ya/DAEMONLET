@@ -30,6 +30,7 @@ export class PackUpdateService {
   private disposed = false
   private preferenceError = false
   private downloadTask?: Promise<void>
+  private applyTask?: Promise<void>
   constructor(private readonly o: Options) {
     this.provider = o.provider ?? new HuggingFacePackProvider()
     this.preferences = o.preferences ?? new PackUpdatePreferences(join(o.dataRoot, "pack-update-preferences.json"))
@@ -174,10 +175,14 @@ export class PackUpdateService {
     if (!this.o.canApply(c.packId)) throw Error("PACK_UPDATE_CHAT_BUSY")
     if (c.preview.expiresAt <= this.now()) { await this.discard(c); throw Error("PACK_TRANSACTION") }
     c.applying = true; clearTimeout(c.timer); this.set(c.packId, { phase: "applying", error: undefined })
+    const task = this.applyTask = this.applyCandidate(c, c.preview)
+    try { await task } finally { if (this.applyTask === task) this.applyTask = undefined }
+  }
+  private async applyCandidate(c: Candidate, preview: ImportPreview) {
     try {
-      await this.o.apply(c.preview, c.registryOwner)
+      await this.o.apply(preview, c.registryOwner)
       const current = this.o.registry.get(c.packId)
-      if (current?.revision !== c.preview.entry.revision) throw Error("PACK_LOAD")
+      if (current?.revision !== preview.entry.revision) throw Error("PACK_LOAD")
       this.set(c.packId, { phase: "applied", candidateId: undefined })
     } catch (error) { this.set(c.packId, { phase: "error", candidateId: undefined, error: this.error(error) }); throw error }
     finally { await this.discard(c) }
@@ -218,6 +223,9 @@ export class PackUpdateService {
     this.disposed = true; clearTimeout(this.timer); this.unsubscribe?.()
     for (const check of this.checks.values()) check.controller.abort()
     this.checks.clear()
+    // Application is atomic: its caller retains the error, while disposal must
+    // wait for its finally/transaction cleanup before the registry can close.
+    if (this.applyTask) await this.applyTask.catch(() => {})
     if (this.candidate && !this.candidate.applying) await this.cancel(this.candidate.owner)
   }
 }

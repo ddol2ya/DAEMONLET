@@ -459,6 +459,12 @@ export class AppController {
     this.petDrag.cancel()
     this.quitting = true
     setApplicationInputLocked(true)
+    // Native quit can bypass the cached menu. Settle renderer readiness first
+    // so an active pack apply can finish cleanup without waiting for a frame
+    // from windows/side chat that teardown is about to destroy.
+    this.transitions.retire()
+    this.packUpdateIpc.dispose()
+    await this.packUpdates.dispose()
     if (forUpdate) this.updates.stopBackgroundChecks()
     else this.updates.dispose()
     this.chatEntry.cancel()
@@ -480,10 +486,7 @@ export class AppController {
     this.taskControlIpc.dispose()
     this.settingsIpc.dispose()
     this.updateIpc.dispose()
-    this.packUpdateIpc.dispose()
-    await this.packUpdates.dispose()
     this.characterIpc.dispose()
-    this.transitions.retire()
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe()
     this.activityTitles.dispose()
     await this.activity.dispose()

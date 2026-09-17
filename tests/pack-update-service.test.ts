@@ -47,6 +47,27 @@ async function fixture() {
   }
 }
 describe("pack update transactions", () => {
+  it.each([false, true])("awaits active application and disk cleanup during disposal (failure=%s)", async failure => {
+    const f = await fixture(); let release!: () => void
+    f.apply.mockImplementation(async (preview, owner) => {
+      const entry = await f.registry.commitImport(preview.token, owner)
+      await new Promise<void>(resolve => { release = resolve })
+      if (failure) { await f.registry.rollback(entry); throw Error("PACK_LOAD") }
+    })
+    await f.service.check("style-a", "window-1"); await f.service.download("style-a", "window-1")
+    const application = f.service.apply(f.state().candidateId!, "window-1").then(() => null, error => error)
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"))
+    let disposed = false
+    const disposing = f.service.dispose().then(() => { disposed = true })
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(disposed).toBe(false)
+    } finally { release(); await disposing; await application }
+    expect(f.service.applying()).toBe(false)
+    expect(await readdir(join(f.root, "data/pack-update-transactions"))).toEqual([])
+    expect(await readdir(join(f.root, "data/characters/staging"))).toEqual([])
+    expect(f.registry.get("style-a")?.version).toBe(failure ? "1.0.0" : "1.0.1")
+  })
   it.each([false, true])("publishes the released apply owner after success or recovery (failure=%s)", async failure => {
     const f = await fixture()
     if (failure) f.setFailLoad()
