@@ -4,6 +4,7 @@ import type { HookEventReceipt } from "../../adapter/codex/hooks/HookEvents"
 import type { CharacterReadApi, CharacterSelection } from "./character-pack-contract"
 import type { BubblePresentationApi } from "./bubble-presentation"
 import type { WindowDragRequest, WindowDragReply } from "./window-drag"
+import type { CharacterLoadDiagnostic } from "./character-load-diagnostics"
 
 export const IPC = {
   settingsGet: "desktop.settings.get",
@@ -78,6 +79,7 @@ export interface PetDesktopApi {
   bubble: BubblePresentationApi
   characters: CharacterReadApi
   reportCharacterLoadFailure(selection: CharacterSelection): void
+  reportCharacterLoadDiagnostic(value: CharacterLoadDiagnostic): void
   getSettings(): Promise<DesktopSettingsV1>
   updateSettings(patch: DesktopSettingsPatch): Promise<DesktopSettingsV1>
   setLayoutMode(enabled: boolean): Promise<void>

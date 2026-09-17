@@ -49,7 +49,7 @@ export class CharacterSession {
     this.interaction = this.createInteraction()
   }
 
-  async loadCharacter(id: string, signal?: AbortSignal): Promise<void> {
+  async loadCharacter(id: string, signal?: AbortSignal, stage?: (value: "catalog" | "assets" | "decode" | "gpu-commit") => void): Promise<void> {
     if (this.disposed) throw new Error("character session is disposed")
     this.loadController?.abort()
     const controller = new AbortController()
@@ -60,6 +60,7 @@ export class CharacterSession {
     const epoch = ++this.loadEpoch
     try {
       const generation = this.catalogGeneration
+      stage?.("catalog")
       const catalog = this.catalog ?? (await loadCharacterCatalog(this.catalogUrl, controller.signal)).characters
       if (this.catalogGeneration === generation) this.catalog = catalog
       const model = catalog.find((candidate) => candidate.id === id)
@@ -68,7 +69,7 @@ export class CharacterSession {
         controller.signal.throwIfAborted()
         this.dialogue.configure(createDefaultDialogueProfile(), null)
         this.behavior.prepareForModelChange()
-      })
+      }, stage)
       if (controller.signal.aborted || epoch !== this.loadEpoch) throw new DOMException("Character load cancelled", "AbortError")
       this.behavior.configure(loaded.behavior, loaded.poses.map((pose) => pose.id), false)
       this.dialogue.configure(loaded.dialogue, model.id, Object.keys(loaded.behavior.continuousReactions ?? {}).map(id => id === "PET" ? "interaction.pet" : "interaction.face-hold"))

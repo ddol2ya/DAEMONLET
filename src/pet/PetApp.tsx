@@ -13,6 +13,7 @@ import { PetCanvas } from "./PetCanvas"
 import { SpeechBubbleOverlay } from "./SpeechBubbleOverlay"
 import type { DialogueSnapshot } from "../dialogue/types"
 import type { CharacterSnapshot } from "../../electron/shared/character-pack-contract"
+import type { CharacterLoadStage } from "../../electron/shared/character-load-diagnostics"
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
 
@@ -44,6 +45,9 @@ export default function PetApp() {
     let dragging = false
     let loadFailed = false
     let loadingCharacter = false
+    let activeDiagnostic: ((stage: CharacterLoadStage) => void) | null = null
+    const contextLost = () => activeDiagnostic?.("context-lost")
+    canvas.addEventListener("webglcontextlost", contextLost)
     const session = new CharacterSession(canvas, "pet://app/characters/catalog.json")
     sessionRef.current = session
     // A native reload may abort fetch before React unmount cleanup runs. Retire
@@ -87,6 +91,12 @@ export default function PetApp() {
       const key = `${entry.id}/${entry.revision}`
       if (loadKey === key) return
       const epoch = ++loadEpoch
+      const loadId = crypto.randomUUID(), started = performance.now()
+      const stage = (value: CharacterLoadStage) => {
+        if (!disposed) desktop.reportCharacterLoadDiagnostic({ loadId, epoch, id: entry.id, revision: entry.revision, stage: value, elapsedMs: Math.round(performance.now() - started), hidden: document.hidden })
+      }
+      activeDiagnostic = stage
+      stage("start")
       loadKey = key
       drag.cancel()
       loadingCharacter = true
@@ -97,8 +107,9 @@ export default function PetApp() {
       try {
         await desktop.setMousePassthrough(false)
         if (disposed || epoch !== loadEpoch) return
-        await session.loadCharacter(next.characterId)
+        await session.loadCharacter(next.characterId, undefined, stage)
         if (disposed || epoch !== loadEpoch) return
+        stage("first-frame")
         await nextFrame()
         if (disposed || epoch !== loadEpoch) return
         successfulKey = key
@@ -107,8 +118,10 @@ export default function PetApp() {
         setLoading(false)
         updateAvailability()
         alpha.reset()
+        stage("ready")
         desktop.reportReady({ webgl: true, characterId: entry.id, revision: entry.revision, firstFrameAt: performance.now() })
       } catch (reason) {
+        stage(reason instanceof DOMException && reason.name === "AbortError" ? "aborted" : "failed")
         if (disposed || epoch !== loadEpoch || reason instanceof DOMException && reason.name === "AbortError") return
         const message = reason instanceof Error ? reason.message : String(reason)
         loadingCharacter = false
@@ -161,6 +174,8 @@ export default function PetApp() {
       document.removeEventListener("visibilitychange", updateAvailability)
       window.removeEventListener("beforeunload", unloading)
       window.removeEventListener("resize", resize)
+      canvas.removeEventListener("webglcontextlost", contextLost)
+      activeDiagnostic = null
       unsubscribeDrag()
       drag.dispose()
       alpha.dispose()

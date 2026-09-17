@@ -7,7 +7,8 @@ import { loadRigAsync } from "../engine/anime25d/loadRigAsync"
 import { loadPoseManifest, resolveManifestUrl } from "../pose/PoseManifest"
 import { PoseAssetLoader } from "../pose/PoseAssetLoader"
 
-export async function loadBuiltInCharacter(engine: Anime25DRuntime, model: LoadedCharacter, signal?: AbortSignal, beforeCommit?: () => void) {
+export async function loadBuiltInCharacter(engine: Anime25DRuntime, model: LoadedCharacter, signal?: AbortSignal, beforeCommit?: () => void, stage?: (value: "assets" | "decode" | "gpu-commit") => void) {
+  stage?.("assets")
   const [psdResponse, overrideResponse, behavior, dialogue, entries] = await Promise.all([
     fetch(model.baseUrls.psd, { cache: "no-store", signal }),
     model.baseUrls.overrides ? fetch(model.baseUrls.overrides, { cache: "no-store", signal }) : Promise.resolve(null),
@@ -20,6 +21,7 @@ export async function loadBuiltInCharacter(engine: Anime25DRuntime, model: Loade
   const overrides: RigOverrides = overrideResponse ? await overrideResponse.json() as RigOverrides : {}
   const buffer = await psdResponse.arrayBuffer()
   signal?.throwIfAborted()
+  stage?.("decode")
   const result = await loadRigAsync(engine.loader, buffer, model.baseUrls.psd.split("/").at(-1) ?? `${model.id}.psd`, overrides, signal)
   const loader = new PoseAssetLoader(engine.loader)
   const warmed = []
@@ -31,6 +33,7 @@ export async function loadBuiltInCharacter(engine: Anime25DRuntime, model: Loade
     warmed.push(await loader.load(entry.manifestUrl, result.model.rig, { signal, manifest: entry.manifest, prepared: result }))
   }
   signal?.throwIfAborted()
+  stage?.("gpu-commit")
   const poses = engine.applyPreparedCharacter(result, {
     overrides,
     sourceReferenceUrl: model.baseUrls.source,
