@@ -6,16 +6,17 @@ import { DockResidencyController } from "../electron/main/DockResidencyControlle
 afterEach(() => vi.useRealTimers())
 function fixture() {
   vi.useFakeTimers()
-  const app = Object.assign(new EventEmitter(), { setActivationPolicy: vi.fn() })
+  let dock = false
+  const app = Object.assign(new EventEmitter(), { setActivationPolicy: vi.fn((policy: string) => { dock = policy === "regular" }) })
   const window = () => Object.assign(new EventEmitter(), { visible: true, destroyed: false, isDestroyed() { return this.destroyed }, isVisible() { return this.visible }, isMinimized: () => false })
   const pet = window(), settings = window(), lab = window(); lab.visible = false
   const state = { created: true, reachable: false }
   const recovered = vi.fn()
   const controller = new DockResidencyController({ app: app as unknown as App,
     windows: () => [pet, settings, lab] as unknown as BrowserWindow[], utilityWindows: () => [settings, lab] as unknown as BrowserWindow[],
-    trayCreated: () => state.created, trayVisible: () => state.reachable, recovered })
+    dockVisible: () => dock, trayCreated: () => state.created, trayVisible: () => state.reachable, recovered })
   controller.start()
-  return { app, pet, settings, lab, state, recovered, controller }
+  return { app, pet, settings, lab, state, recovered, controller, showDockExternally: () => { dock = true } }
 }
 it("returns to menu-bar residency when the last recovery/utility window closes, with the pet still visible", async () => {
   const f = fixture(); f.controller.requestFallback()
@@ -50,4 +51,10 @@ it("keeps normal tray operation accessory and removes event/timer work on shutdo
   expect(f.app.listenerCount("browser-window-created")).toBe(0)
   expect(f.settings.listenerCount("show")).toBe(0)
   expect(f.app.setActivationPolicy).toHaveBeenCalledOnce()
+})
+
+it("reconciles native Dock visibility changed outside the cached activation policy", () => {
+  const f = fixture(); f.showDockExternally(); vi.advanceTimersByTime(2000)
+  expect(f.app.setActivationPolicy.mock.calls).toEqual([["accessory"], ["accessory"]])
+  f.controller.dispose()
 })

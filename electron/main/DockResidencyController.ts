@@ -11,6 +11,7 @@ export class DockResidencyController {
     app: Pick<App, "on" | "removeListener" | "setActivationPolicy">
     windows(): BrowserWindow[]
     utilityWindows(): Array<BrowserWindow | null>
+    dockVisible(): boolean
     trayCreated(): boolean
     trayVisible(): boolean
     recovered(): void
@@ -39,7 +40,7 @@ export class DockResidencyController {
     // A placed-but-overflowed menu item only needs Dock access while utility UI is open.
     const utilityOpen = this.options.utilityWindows().some(win => win && !win.isDestroyed() && (win.isVisible() || win.isMinimized()))
     const policy = this.fallback && (!this.options.trayCreated() || utilityOpen) ? "regular" : "accessory"
-    if (policy !== this.policy) { this.policy = policy; this.options.app.setActivationPolicy(policy) }
+    if (policy !== this.policy || this.options.dockVisible() !== (policy === "regular")) { this.policy = policy; this.options.app.setActivationPolicy(policy) }
     for (const [win, changed] of this.listeners) if (win.isDestroyed()) this.unwatch(win, changed)
   }
   private unwatch(win: BrowserWindow, changed: () => void) {

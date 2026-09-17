@@ -269,7 +269,7 @@ export class AppController {
     const packagedMac = app.isPackaged && process.platform === "darwin"
     if (packagedMac) {
       this.residentDock = new DockResidencyController({
-        app, windows: () => BrowserWindow.getAllWindows(),
+        app, windows: () => BrowserWindow.getAllWindows(), dockVisible: () => app.dock?.isVisible() ?? false,
         utilityWindows: () => [this.settingsWindow.window, this.lab.window, this.activityWindow.window],
         trayCreated: () => this.trayCreated,
         trayVisible: () => !(__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1" && process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1")
