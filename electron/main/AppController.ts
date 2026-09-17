@@ -11,6 +11,7 @@ import { connectVerifiedSideChat } from "./side-chat/SideChatPolicy"
 import { SideChatPreferences } from "./side-chat/SideChatPreferences"
 import { SideChatSetupController } from "./side-chat/SideChatSetupController"
 import { PersonaResolver } from "./side-chat/PersonaResolver"
+import { DockResidencyController } from "./DockResidencyController"
 import { WindowDragController } from "./WindowDragController"
 import { automaticBubblePlacement } from "../shared/bubble-placement"
 import { validWindowDragRequest } from "../shared/window-drag"
@@ -18,7 +19,7 @@ import { SideChatEntryController } from "./side-chat/SideChatEntryController"
 import { SideChatIpcController } from "./SideChatIpcController"
 import { appLanguage, appText, setAppLanguage } from "./AppLanguage"
 import type { StartupWindow } from "./StartupWindow"
-import { app, dialog, ipcMain, powerMonitor, screen, session, shell, net, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, powerMonitor, screen, session, shell, net, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron"
 import { join, resolve } from "node:path"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
@@ -122,6 +123,7 @@ export class AppController {
   get canExit(): boolean { return this.exitReady }
   private quitting = false
   private trayCreated = false
+  private residentDock: DockResidencyController | null = null
   private dockFallbackRestored = false
   private smokeFinishing = false
   private readonly smokeReadyCharacters = new Set<string>()
@@ -265,7 +267,17 @@ export class AppController {
       this.activityTitles.setTargets(new Map([...keys].flatMap(key => { const target = this.adapter.conversationTarget(key); return target ? [[key, target] as const] : [] })))
     }))
     const packagedMac = app.isPackaged && process.platform === "darwin"
-    if (packagedMac) app.setActivationPolicy("accessory")
+    if (packagedMac) {
+      this.residentDock = new DockResidencyController({
+        app, windows: () => BrowserWindow.getAllWindows(),
+        utilityWindows: () => [this.settingsWindow.window, this.lab.window, this.activityWindow.window],
+        trayCreated: () => this.trayCreated,
+        trayVisible: () => !(__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1" && process.env.ELECTRON_SMOKE_FORCE_TRAY_OFFSCREEN === "1")
+          && this.tray.isVisibleOn(screen.getAllDisplays().map(display => display.bounds)),
+        recovered: () => { this.dockFallbackRestored = false; this.settingsWindow.window?.setSkipTaskbar(true) },
+      })
+      this.residentDock.start()
+    }
     if (this.settings.adapterAutoStart) void this.adapter.start().catch((error) => this.warn(error instanceof Error ? error.message : String(error)))
     this.pet.create(this.settings)
     if (this.pet.window) this.activityBubble.attach(this.pet.window, this.settings)
@@ -299,9 +311,9 @@ export class AppController {
 
   private restoreResidentAccess(): void {
     this.dockFallbackRestored = true
-    if (process.platform === "darwin") app.setActivationPolicy("regular")
     const window = this.settingsWindow.open()
     window.setSkipTaskbar(false)
+    this.residentDock?.requestFallback()
     this.warn("메뉴바·트레이를 표시하지 못해 설정 창에서 접근할 수 있도록 복구했습니다.")
   }
   activate(): void { this.showPet(); if (this.dockFallbackRestored) this.restoreResidentAccess() }
@@ -404,6 +416,7 @@ export class AppController {
     this.saveTimer = null
     if (this.trayVisibilityTimer) clearTimeout(this.trayVisibilityTimer)
     this.trayVisibilityTimer = null
+    this.residentDock?.dispose(); this.residentDock = null
     if (this.settingsPoll) clearInterval(this.settingsPoll)
     this.settingsPoll = null
     this.sideChatIpc.dispose()
