@@ -71,7 +71,14 @@ The backend/startup/tool probes use the production service/backend and official
 CLI with an account-free local provider. Fixture process/catalog injection lives
 only in `scripts/side-chat/fixture-process.ts`. Positive controls deliberately
 demonstrate the prohibited effects in separate unrestricted fixtures; restricted
-children must deny them. Existing service lifecycle, F1/F2/F3, IME, receipt, epoch,
+children must deny them. Windows command-capability positive controls use a
+Node sentinel through PowerShell; the Python/build/test labels check the command
+boundary, not the presence of those separate toolchains. Startup tests wait for
+the three parent Hook events before comparing child effects. Native Windows lock
+files are reported as not inspected during store inventory; configuration, Hook
+files and explicit parent-record comparisons remain mandatory.
+
+Existing service lifecycle, F1/F2/F3, IME, receipt, epoch,
 stale-turn, parent-preservation and permission tests remain necessary.
 
 Production uses compile-time flags to remove QA imports and code, and emits

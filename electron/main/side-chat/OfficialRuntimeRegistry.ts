@@ -19,3 +19,7 @@ export const OFFICIAL_RUNTIME_REGISTRY = [{
   parentContract: "official-same-home", permissionContract: "readonly-project-companion-v1",
   verifiedHost: "Windows x64", credentials: ["file"],
 }] as const
+
+export function findOfficialRuntime(digest: string, bytes: number, platform = process.platform, arch = process.arch) {
+  return OFFICIAL_RUNTIME_REGISTRY.find(item => item.platform === platform && item.arch === arch && item.executableSha256 === digest && item.executableBytes === bytes)
+}

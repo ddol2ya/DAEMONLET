@@ -1,3 +1,4 @@
+import { findOfficialRuntime, OFFICIAL_RUNTIME_REGISTRY } from "../electron/main/side-chat/OfficialRuntimeRegistry"
 import { describe, expect, it } from "vitest"
 import { officialRuntimeEnvironment, officialSystemConfigFiles } from "../electron/main/side-chat/OfficialPlatform"
 
@@ -15,4 +16,12 @@ describe("official Windows companion environment", () => {
     expect(() => officialRuntimeEnvironment("C:\\User", "C:\\.codex", "C:\\Temp", "win32", { APPDATA: "relative" })).toThrow("CHAT_EXECUTION_POLICY")
     expect(officialRuntimeEnvironment("/user", "/user/.codex", "/tmp/chat", "darwin", { OPENAI_API_KEY: "forbidden" })).toEqual({ HOME: "/user", USERPROFILE: "/user", CODEX_HOME: "/user/.codex", TMPDIR: "/tmp/chat", TMP: "/tmp/chat", TEMP: "/tmp/chat", PATH: "/usr/bin:/bin:/usr/sbin:/sbin" })
   })
+})
+
+it("never admits another platform binary even when its hash is reviewed", () => {
+  const win = OFFICIAL_RUNTIME_REGISTRY.find(r => r.platform === "win32")!
+  expect(findOfficialRuntime(win.executableSha256, win.executableBytes, "win32", "x64")).toBe(win)
+  expect(findOfficialRuntime(win.executableSha256, win.executableBytes, "darwin", "arm64")).toBeUndefined()
+  expect(findOfficialRuntime(win.executableSha256, win.executableBytes, "win32", "arm64")).toBeUndefined()
+  expect(findOfficialRuntime(win.executableSha256, win.executableBytes + 1, "win32", "x64")).toBeUndefined()
 })

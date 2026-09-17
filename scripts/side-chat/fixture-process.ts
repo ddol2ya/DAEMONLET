@@ -1,3 +1,4 @@
+import { officialRuntimeEnvironment } from "../../electron/main/side-chat/OfficialPlatform"
 import { spawn } from "node:child_process"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -54,9 +55,11 @@ export async function launchFixtureParent(options: ChatLaunchOptions): Promise<C
   return { ...(options.execution ? { execution: { ...options.execution, cwd } } : {}), client, stop: () => stopping ??= new Promise<void>(resolve => {
     client.close()
     if (ended || !child.pid || child.exitCode !== null || child.signalCode !== null) { resolve(); return }
-    const timer = setTimeout(() => child.kill("SIGKILL"), 2000)
-    child.once("close", () => { clearTimeout(timer); resolve() })
-    child.kill("SIGTERM")
+    const graceful = setTimeout(() => child.kill("SIGTERM"), 2000)
+    const timer = setTimeout(() => child.kill("SIGKILL"), 4000)
+    child.once("close", () => { clearTimeout(graceful); clearTimeout(timer); resolve() })
+    // Let the official test parent close its Hook/MCP children before forced termination.
+    child.stdin.end()
   }) }
 }
 
@@ -70,9 +73,6 @@ export async function launchOfficialFixture(options: { executable: string; root:
   const overrides: Record<string, unknown> = { ...OFFICIAL_CHAT_OVERRIDES, model_provider: "fixture" }
   for (const name of options.disabledMcpServers) overrides["mcp_servers." + name + ".enabled"] = false
   const args = Object.entries(overrides).flatMap(([key, value]) => ["-c", key + "=" + JSON.stringify(value)])
-  const child = startChatProcess(options.executable, [...args, "app-server", "--listen", "stdio://"], cwd, {
-    HOME: options.osHome, USERPROFILE: options.osHome, CODEX_HOME: options.codexHome,
-    PATH: "/usr/bin:/bin:/usr/sbin:/sbin", TMPDIR: temp, TMP: temp, TEMP: temp,
-  })
+  const child = startChatProcess(options.executable, [...args, "app-server", "--listen", "stdio://"], cwd, officialRuntimeEnvironment(options.osHome, options.codexHome, temp))
   return { ...child, execution: { mode: "official-same-home" as const, cwd, model: SIDE_CHAT_MODEL.id, instructions: "collaboration-mode" as const, noEnvironment: true } }
 }

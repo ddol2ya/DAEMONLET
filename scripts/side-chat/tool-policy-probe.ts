@@ -45,7 +45,7 @@ for (const name of tools.filter(name => !values.tool || values.tool === name)) f
   const toolName = commandTool ? "exec_command" : name
   let armed = false, count = 0, serverCalls = 0, networkCalls = 0
   const requests: any[] = [], events: any[] = [], connections: ChatConnection[] = []
-  const trial: any = { name, restricted, result: "NOT_RUN" }
+  const trial: any = { name, restricted, result: "NOT_RUN", ...(process.platform === "win32" && commandTool ? { positiveInterpreter: "Node fixture through PowerShell; command capability boundary" } : {}) }
   const server = createServer(async (req, res) => {
     if (req.url === "/sentinel") { networkCalls++; res.writeHead(200); res.end("NETWORK_CANARY"); return }
     let raw = ""; for await (const chunk of req) raw += chunk
@@ -53,7 +53,7 @@ for (const name of tools.filter(name => !values.tool || values.tool === name)) f
     const attack = armed; armed = false
     const id = `response-${++count}`
     const input = name === "apply_patch" ? "*** Begin Patch\n*** Add File: patch-canary.txt\n+PATCH_CANARY_993eca\n*** End Patch\n" : ""
-    const cmd = name === "exec_command" ? "cat read-canary.txt; printf EXEC_CANARY_993eca > exec-canary.txt" : name === "python" ? `/usr/bin/python3 -c 'from pathlib import Path; Path("exec-canary.txt").write_text("EXEC_CANARY_993eca"); print(Path("read-canary.txt").read_text())'` : `'${process.execPath}' '${script}' ${name} http://127.0.0.1:${(server.address() as { port: number }).port}/sentinel`
+    const cmd = process.platform === "win32" ? `& '${process.execPath.replaceAll("'", "''")}' '${script.replaceAll("'", "''")}' ${name} http://127.0.0.1:${(server.address() as { port: number }).port}/sentinel` : name === "exec_command" ? "cat read-canary.txt; printf EXEC_CANARY_993eca > exec-canary.txt" : name === "python" ? `/usr/bin/python3 -c 'from pathlib import Path; Path("exec-canary.txt").write_text("EXEC_CANARY_993eca"); print(Path("read-canary.txt").read_text())'` : `'${process.execPath}' '${script}' ${name} http://127.0.0.1:${(server.address() as { port: number }).port}/sentinel`
     const args = name === "view_image" ? { path: join(cwd, "image.png") } : commandTool ? { cmd, workdir: cwd, max_output_tokens: 100 } : name === "request_user_input" ? { questions: [{ id: "confirm", header: "Fixture", question: "Synthetic question?", options: [{ label: "Yes", description: "Fixture yes" }, { label: "No", description: "Fixture no" }] }] } : { code: `require('fs').writeFileSync(${JSON.stringify(join(cwd, "exec-canary.txt"))},'forbidden')`, query: "fixture", path: join(cwd, "read-canary.txt") }
     const item = attack ? name === "apply_patch"
       ? { type: "custom_tool_call", id: `item-${count}`, call_id: `call-${count}`, name, input }
@@ -76,12 +76,12 @@ for (const name of tools.filter(name => !values.tool || values.tool === name)) f
   try {
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve))
     const port = (server.address() as { port: number }).port
-    const constraints = restricted ? FIXTURE_CONSTRAINTS : { ...FIXTURE_CONSTRAINTS, sandbox_mode: "workspace-write", features: { ...FIXTURE_CONSTRAINTS.features, shell_tool: true, view_image: true }, tools: { experimental_request_user_input: { enabled: true }, update_plan: { enabled: false } } }
+    const constraints = restricted ? FIXTURE_CONSTRAINTS : { ...FIXTURE_CONSTRAINTS, sandbox_mode: process.platform === "win32" ? "danger-full-access" : "workspace-write", features: { ...FIXTURE_CONSTRAINTS.features, shell_tool: true, view_image: true }, tools: { experimental_request_user_input: { enabled: true }, update_plan: { enabled: false } } }
     const catalog = restricted ? null : await writeFixtureCatalog(root)
     if (!restricted && catalog) await writeFile(catalog, JSON.stringify({ models: [{ ...FIXTURE_MODEL_CATALOG.models[0], shell_type: "unified_exec", apply_patch_tool_type: "freeform", input_modalities: ["text", "image"] }] }))
     await writeFile(join(state, "config.toml"), stringify({ ...constraints, ...(catalog ? { model_catalog_json: catalog } : {}), model: "gpt-5.6-luna", model_provider: "fixture", model_providers: { fixture: { name: "OpenAI", base_url: `http://127.0.0.1:${port}/v1`, wire_api: "responses", requires_openai_auth: false } } }))
     const seed = await connect(); await seed.client.initialize({ name: "daemonlet_tool_fixture", title: "Tool fixture", version: "1" }, "side-chat")
-    const { thread } = await seed.client.request("thread/start", { cwd, approvalPolicy: "never", sandbox: restricted ? "read-only" : "workspace-write", historyMode: "paginated", ...(name === "forbidden_parent_tool" ? { dynamicTools: [{ name, description: "Forbidden inherited client tool", inputSchema: { type: "object", properties: {} } }] } : {}) }) as any
+    const { thread } = await seed.client.request("thread/start", { cwd, approvalPolicy: "never", sandbox: restricted ? "read-only" : process.platform === "win32" ? "danger-full-access" : "workspace-write", historyMode: "paginated", ...(name === "forbidden_parent_tool" ? { dynamicTools: [{ name, description: "Forbidden inherited client tool", inputSchema: { type: "object", properties: {} } }] } : {}) }) as any
     const initial = await seed.client.request("turn/start", { threadId: thread.id, input: [{ type: "text", text: "Synthetic parent", text_elements: [] }], ...(restricted ? { environments: [] } : {}) }) as any
     await until(() => events.some(e => e.method === "turn/completed" && e.params.turn.id === initial.turn.id))
     const start = requests.length
@@ -92,7 +92,7 @@ for (const name of tools.filter(name => !values.tool || values.tool === name)) f
       await backend.open({ threadId: thread.id, cwd, title: "Synthetic parent" }, compilePersona("Synthetic", neutralPersona(), "ko"))
       await backend.send("Adversarial fixture. Do not execute tools.")
     } else {
-      const next = await seed.client.request("turn/start", { threadId: thread.id, ...(name === "network" ? { sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: true } } : {}), input: [{ type: "text", text: "Account-free positive tool control", text_elements: [] }], collaborationMode: { mode: name === "request_user_input" ? "plan" : "default", settings: { model: "gpt-5.6-luna", reasoning_effort: null, developer_instructions: "Synthetic positive control." } } }) as any
+      const next = await seed.client.request("turn/start", { threadId: thread.id, ...(name === "network" && process.platform !== "win32" ? { sandboxPolicy: { type: "workspaceWrite", writableRoots: [cwd], networkAccess: true } } : {}), input: [{ type: "text", text: "Account-free positive tool control", text_elements: [] }], collaborationMode: { mode: name === "request_user_input" ? "plan" : "default", settings: { model: "gpt-5.6-luna", reasoning_effort: null, developer_instructions: "Synthetic positive control." } } }) as any
       await until(() => events.some(e => e.method === "turn/completed" && e.params.turn.id === next.turn.id))
     }
     const patch = await access(join(cwd, "patch-canary.txt")).then(() => true, () => false), exec = await access(join(cwd, "exec-canary.txt")).then(() => true, () => false)

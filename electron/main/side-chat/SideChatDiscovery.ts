@@ -4,7 +4,7 @@ import { createHash } from "node:crypto"
 import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
 import { homedir } from "node:os"
 import { standardCodexExecutables } from "../../../adapter/codex/doctor/HookSetupDoctor"
-import { OFFICIAL_RUNTIME_REGISTRY } from "./OfficialRuntimeRegistry"
+import { OFFICIAL_RUNTIME_REGISTRY, findOfficialRuntime } from "./OfficialRuntimeRegistry"
 
 export function sideChatCandidates(selected?: string | null, env = process.env, home = homedir(), platform = process.platform) {
   if (selected) return [selected]
@@ -49,7 +49,7 @@ export async function inspectSideChatRuntime(selected?: string | null) {
       const after = await lstat(executable)
       if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) continue
       const digest = hash.digest("hex")
-      const runtime = OFFICIAL_RUNTIME_REGISTRY.find(item => item.executableSha256 === digest && item.executableBytes === before.size)
+      const runtime = findOfficialRuntime(digest, before.size)
       if (runtime) return { executable, runtime }
     } catch { /* Inspect the next bounded candidate, never execute an unknown file. */ }
   }
