@@ -47,6 +47,21 @@ async function fixture() {
   }
 }
 describe("pack update transactions", () => {
+  it.each([false, true])("publishes the released apply owner after success or recovery (failure=%s)", async failure => {
+    const f = await fixture()
+    if (failure) f.setFailLoad()
+    const locks: boolean[] = []
+    f.options.changed.mockImplementation(() => { locks.push(f.service.applying()) })
+    await f.service.check("style-a", "window-1"); await f.service.download("style-a", "window-1")
+    const result = f.service.apply(f.state().candidateId!, "window-1")
+    if (failure) await expect(result).rejects.toThrow("PACK_LOAD")
+    else await result
+    expect(locks).toContain(true)
+    expect(f.service.applying()).toBe(false)
+    // Cached native menus subscribe to changes; a silent release leaves their
+    // last lock snapshot true even though the service has finished applying.
+    expect(locks.at(-1)).toBe(false)
+  })
   it("keeps HF validation alive when the old page cancels its document's local import", async () => {
     const f = await fixture(); await f.service.check("style-a", "window-1")
     let release!: () => void

@@ -247,7 +247,10 @@ export class AppController {
         if (!allowed && entry) this.traceCharacter("blocked", entry)
         return allowed
       },
-      changed: states => this.settingsWindow.send(PACK_UPDATE_IPC.changed, states),
+      changed: states => {
+        this.settingsWindow.send(PACK_UPDATE_IPC.changed, states)
+        this.rebuildTray()
+      },
       apply: async (preview, owner) => {
         const active = this.settings.characterId === preview.entry.id
         this.packApplyTarget = preview.entry.id

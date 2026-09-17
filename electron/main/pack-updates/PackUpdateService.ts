@@ -186,7 +186,12 @@ export class PackUpdateService {
     clearTimeout(c.timer)
     if (c.preview) await this.o.registry.cancelImport(c.registryOwner)
     await rm(c.root, { recursive: true, force: true })
-    if (this.candidate === c) this.candidate = undefined
+    if (this.candidate === c) {
+      this.candidate = undefined
+      // Notify cached native menus only after the owning transaction has
+      // finished cleanup. Applied/error is published while this lock is held.
+      this.emit()
+    }
   }
   async cancel(owner: string, id?: string) {
     for (const [key, check] of this.checks) if (check.owner === owner && (!id || key === id)) { check.controller.abort(); this.checks.delete(key); this.set(key, { phase: "idle" }) }
