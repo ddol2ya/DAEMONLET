@@ -1,3 +1,4 @@
+import { sideChatCandidates } from "../electron/main/side-chat/SideChatDiscovery"
 import { findOfficialRuntime, OFFICIAL_RUNTIME_REGISTRY } from "../electron/main/side-chat/OfficialRuntimeRegistry"
 import { describe, expect, it } from "vitest"
 import { officialRuntimeEnvironment, officialSystemConfigFiles } from "../electron/main/side-chat/OfficialPlatform"
@@ -24,4 +25,13 @@ it("never admits another platform binary even when its hash is reviewed", () => 
   expect(findOfficialRuntime(win.executableSha256, win.executableBytes, "darwin", "arm64")).toBeUndefined()
   expect(findOfficialRuntime(win.executableSha256, win.executableBytes, "win32", "arm64")).toBeUndefined()
   expect(findOfficialRuntime(win.executableSha256, win.executableBytes + 1, "win32", "x64")).toBeUndefined()
+})
+
+it("keeps redirected and standard Windows npm installs inside the bounded scan on a long PATH", () => {
+  const PATH = Array.from({ length: 60 }, (_, i) => `C:\\Tools\\${i}`).join(";")
+  const candidates = sideChatCandidates(null, { PATH, APPDATA: "D:\\Roaming" }, "C:\\Users\\Example", "win32")
+  expect(candidates.length).toBeLessThanOrEqual(48)
+  expect(candidates[0]).toBe("D:\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe")
+  expect(candidates[1]).toContain("C:\\Users\\Example\\AppData\\Roaming\\npm")
+  expect(sideChatCandidates("C:\\selected\\codex.cmd", { PATH }, "C:\\Users\\Example", "win32")).toEqual(["C:\\selected\\codex.cmd"])
 })

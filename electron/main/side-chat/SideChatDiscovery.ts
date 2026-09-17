@@ -1,18 +1,23 @@
 import { constants, createReadStream } from "node:fs"
 import { access, lstat, realpath } from "node:fs/promises"
 import { createHash } from "node:crypto"
-import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
+import { basename, delimiter, dirname, isAbsolute, join, win32 } from "node:path"
 import { homedir } from "node:os"
 import { standardCodexExecutables } from "../../../adapter/codex/doctor/HookSetupDoctor"
 import { OFFICIAL_RUNTIME_REGISTRY, findOfficialRuntime } from "./OfficialRuntimeRegistry"
 
 export function sideChatCandidates(selected?: string | null, env = process.env, home = homedir(), platform = process.platform) {
   if (selected) return [selected]
-  const windows = platform === "win32"
+  const windows = platform === "win32", paths = windows ? win32 : { join, isAbsolute }
+  const nativeNpm = "node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe"
+  const standard = windows
+    ? [...new Set([env.APPDATA, win32.join(home, "AppData", "Roaming")].filter((value): value is string => Boolean(value && win32.isAbsolute(value))))].map(dir => win32.join(dir, "npm", nativeNpm))
+    : standardCodexExecutables(home, platform)
+  // Preserve standard GUI/npm locations even when PATH expands beyond the scan budget.
   return [...new Set([
-    ...(env.PATH ?? "").split(windows ? ";" : delimiter).filter(isAbsolute).slice(0, 32).flatMap(dir =>
-      windows ? [join(dir, "codex.exe"), join(dir, "node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe")] : [join(dir, "codex")]),
-    ...standardCodexExecutables(home, platform),
+    ...standard,
+    ...(env.PATH ?? env.Path ?? "").split(windows ? ";" : delimiter).filter(dir => paths.isAbsolute(dir)).slice(0, 32).flatMap(dir =>
+      windows ? [paths.join(dir, "codex.exe"), paths.join(dir, nativeNpm)] : [paths.join(dir, "codex")]),
   ])].slice(0, 48)
 }
 
