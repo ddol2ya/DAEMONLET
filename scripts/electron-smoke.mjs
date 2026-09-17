@@ -156,6 +156,11 @@ try {
   result.cleanup = cleanup
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, "utf8")
 
+  const expectedWarnings = process.env.ELECTRON_SMOKE_PACK_UPDATES
+    && result.packUpdateValidation?.currentAbortFailureRecovery === "PASS"
+    && result.packUpdateValidation?.activeUpdateFailureRollbackAndRetry === "PASS"
+    ? Array.from({ length: 2 }, () => ["새 캐릭터를 표시하지 못해 이전 정상 캐릭터로 돌아갑니다.", "Alpha hit test: Character load failed: Injected pack cancellation"]).flat()
+    : []
   const baseValid = result.appReady
     && result.petWindowCreated
     && result.preloadLoaded
@@ -183,7 +188,7 @@ try {
     && result.packagedResourcesPresent
     && (forceTrayOffscreen
       ? result.warnings.length === 1 && result.warnings[0].startsWith("macOS did not place the menu-bar item")
-      : result.warnings.length === 0)
+      : JSON.stringify(result.warnings) === JSON.stringify(expectedWarnings))
   if (dialogueEvidence && (!result.dialogueValidation || result.dialogueValidation.warnings.length)) throw new Error(`Dialogue smoke did not complete: ${result.warnings.filter((warning) => warning.startsWith("Dialogue ")).join("; ")}`)
   if (hybridEvidence && !result.hybridValidation) throw new Error(`Hybrid smoke did not complete: ${result.warnings.join("; ")}`)
   if (process.env.ELECTRON_SMOKE_TASK_CONTROL_EVIDENCE && !result.taskControlValidation) throw new Error("Task control smoke did not complete")

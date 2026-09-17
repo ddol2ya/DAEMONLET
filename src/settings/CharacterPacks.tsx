@@ -23,6 +23,7 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
     finally { setCheckingAll(false) }
   }
   const [snapshot, setSnapshot] = useState<CharacterSnapshot | null>(null)
+  const [snapshotError, setSnapshotError] = useState(false)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [installed, setInstalled] = useState<CharacterEntry | null>(null)
   const [choosing, setChoosing] = useState(false)
@@ -34,10 +35,12 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
   const trigger = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     let active = true
-    const receive = (s: CharacterSnapshot) => { if (active) setSnapshot(previous => !previous || s.generation >= previous.generation ? s : previous) }
+    const receive = (s: CharacterSnapshot) => { if (active) { setSnapshotError(false); setSnapshot(previous => !previous || s.generation >= previous.generation ? s : previous) } }
     const unsubscribe = api.characters.onChanged(receive)
     const unsubscribeProgress = api.characters.onProgress(value => { if (active) setProgress(value) })
-    void run("캐릭터 목록 확인", () => api.characters.list().then(receive))
+    // A read must still run when another tab owns a settings action. The
+    // shared mutation runner drops concurrent work instead of queuing it.
+    void api.characters.list().then(receive).catch(() => { if (active) setSnapshotError(true) })
     return () => {
       active = false; unsubscribe(); unsubscribeProgress()
       // A tab owns only its local picker. The settings document owns remote
@@ -83,7 +86,7 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
         <button className="text-button danger-text" disabled={Boolean(busy)} onClick={() => void run("캐릭터 제거", () => api.characters.remove({ id: entry.id, revision: entry.revision }))}>{t("제거")}</button>
       </div>{entry.update ? <PackUpdateCard entry={entry} state={updates.find(u => u.packId === entry.id)} api={api.packUpdates} selected={selected === entry.id} /> : <p className="fine-print">{t("온라인 업데이트를 사용하려면 출처가 포함된 같은 외형의 팩을 한 번 가져오세요.")}</p>}</div>}
     </article>)}</div>
-    {!snapshot && <p role="status">{t("캐릭터 목록 불러오는 중…")}</p>}
+    {!snapshot && (snapshotError ? <p role="alert">{t(PACK_ERRORS.PACK_IO)}</p> : <p role="status">{t("캐릭터 목록 불러오는 중…")}</p>)}
     {snapshot && <p className="pack-storage">{t("외부 캐릭터 저장량 ")}<strong>{size(snapshot.storageBytes)}</strong> / {size(snapshot.storageLimitBytes)}</p>}
     <dialog ref={loadingDialog} className="plan-dialog loading-dialog" aria-labelledby="pack-loading-title" aria-busy={loading} onCancel={event => { event.preventDefault(); if (choosing) void cancel() }}>
       <span className="loading-spinner" aria-hidden="true" />

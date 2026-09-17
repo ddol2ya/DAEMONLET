@@ -43,6 +43,32 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
   const state = async (id: string) => (await states()).find(s => s.packId === id)!
   await settings.webContents.executeJavaScript(`Array.from(document.querySelectorAll('button')).find(b => /캐릭터·표시|Character.*Display/.test(b.textContent))?.click()`)
   o.sideChat.configure(true, "ko")
+  const recovered = async (id: string, revision: string) => {
+    for (let n = 0; n < 600; n++) {
+      if (o.selected() === id && o.registry.get(id)?.revision === revision && !o.sideChat.snapshot().applying && o.registry.readyForUpdate()) return
+      await wait(100)
+    }
+    throw Error("Pack update QA: failed transition retained a recovery lock")
+  }
+  // Inject a real fetch cancellation into the current renderer load. This is
+  // failure-path QA, never evidence of production network/UI success.
+  const injectFailure = (id: string, preservedRevision?: string) => o.pet.webContents.executeJavaScript(`(() => {
+    const original = globalThis.fetch;
+    globalThis.__restorePackFetch = () => { globalThis.fetch = original; delete globalThis.__restorePackFetch };
+    globalThis.fetch = (input, options) => {
+      const url = String(input?.url ?? input);
+      if (url.includes('/character-packs/' + ${JSON.stringify(id)} + '/') && url.endsWith('.psd') && !url.includes(${JSON.stringify(preservedRevision ?? "no-preserved-revision")})) return Promise.reject(new DOMException('Injected pack cancellation', 'AbortError'));
+      return original(input, options);
+    };
+  })()`)
+  const restoreFetch = () => o.pet.webContents.executeJavaScript("globalThis.__restorePackFetch?.()")
+  const initial = o.registry.get(o.selected())!, failedTarget = p.entries[0].feed.packId
+  await injectFailure(failedTarget)
+  try {
+    const result = await o.select(o.registry.get(failedTarget)!).then(() => "unexpected-ready", error => String(error))
+    if (!result.includes("PACK_LOAD")) throw Error("Pack update QA: current AbortError was not reported as failure")
+  } finally { await restoreFetch() }
+  await recovered(initial.id, initial.revision)
   for (const e of p.entries) {
     const id = e.feed.packId, before = o.registry.get(id)!, other = o.registry.snapshot().entries.filter(x => x.id !== id).map(x => [x.id, x.revision])
     await o.select(before)
@@ -56,8 +82,20 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
     await invoke({ action: "cancel", packId: id }); await cancelled
     if (o.registry.get(id)?.revision !== before.revision) throw Error("Pack update QA: cancel mutated registry")
     await invoke({ action: "download", packId: id })
-    const candidate = await state(id)
+    let candidate = await state(id)
     if (candidate.phase !== "ready" || !candidate.candidateId) throw Error("Pack update QA: not validated")
+    if (e === p.entries[0]) {
+      await injectFailure(id, before.revision)
+      try {
+        const result = await invoke({ action: "apply", candidateId: candidate.candidateId }).then(() => "unexpected-ready", error => String(error))
+        if (!result.includes("PACK_LOAD")) throw Error("Pack update QA: active update failure was not reported")
+      } finally { await restoreFetch() }
+      await recovered(id, before.revision)
+      if (o.sideChat.snapshot().draft !== "QA draft stays here; never sent") throw Error("Pack update QA: recovery lost the draft")
+      await invoke({ action: "check", packId: id }); await invoke({ action: "download", packId: id })
+      candidate = await state(id)
+      if (candidate.phase !== "ready" || !candidate.candidateId) throw Error("Pack update QA: retry blocked after failure")
+    }
     await wait(150)
     await writeFile(join(p.output, `${id}-ready.png`), (await settings.webContents.capturePage()).toPNG())
     await invoke({ action: "apply", candidateId: candidate.candidateId })
@@ -72,7 +110,7 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
     rows.push({ id, before: before.version, candidate: e.feed.version, cancel: "PASS", applyThroughPreload: "PASS", rendererReady: "PASS", draftPreserved: "PASS", otherAppearancesUnchanged: "PASS", rollback: "PASS", appUpdateDownloadGate: "PASS" })
   }
   o.sideChat.configure(false, "ko")
-  const result = { status: "PASS", network: "PRIVATE_QA_TRANSPORT", rows, productionCandidate: false, os: process.platform, arch: process.arch }
+  const result = { status: "PASS", network: "PRIVATE_QA_TRANSPORT", currentAbortFailureRecovery: "PASS", activeUpdateFailureRollbackAndRetry: "PASS", rows, productionCandidate: false, os: process.platform, arch: process.arch }
   await writeFile(join(p.output, "result.json"), JSON.stringify(result, null, 2) + "\n")
   return result
 }

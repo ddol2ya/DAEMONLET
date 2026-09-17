@@ -528,9 +528,9 @@ export class AppController {
       const requested = this.characters.get(this.settings.characterId)
       if (!requested || info.characterId !== requested.id || (info.revision ?? "builtin") !== requested.revision) return
       this.lastReady = { id: requested.id, revision: requested.revision }
-      this.traceCharacter("ready", this.lastReady)
       await this.refreshPersona(this.lastReady, info.ticket)
       if (!this.transitions.ready(info.ticket)) return
+      this.traceCharacter("ready", this.lastReady)
       if (__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1") this.smokeReadyCharacters.add(info.characterId)
       this.startup?.close()
       this.pet.reportReady()
@@ -697,21 +697,27 @@ export class AppController {
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
     if (!applicationInputAllowed() || this.quitting) throw Error("PACK_BUSY")
     const intent = this.selectionIntent = {}
+    let ticket: CharacterLoadTicket | undefined
     this.petDrag.cancel()
     try {
       await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
       if (this.selectionIntent !== intent || this.quitting) throw Error("PACK_CANCELLED")
       const transition = this.transitions.begin(selection)
+      ticket = transition.ticket
       this.traceCharacter("request", selection)
       this.traceCharacter("worker-ready", selection)
       this.updateSettings({ characterId: selection.id })
       await transition.done
+    } catch (error) {
+      if (ticket) this.transitions.fail(ticket, error instanceof Error ? error : Error("PACK_LOAD"))
+      throw error
     } finally { if (this.selectionIntent === intent) this.selectionIntent = null }
   }
   private async characterLoadFailed(ticket: CharacterLoadTicket) {
     const current = this.characters.get(this.settings.characterId)
-    if (current?.id !== ticket.id || current.revision !== ticket.revision || !this.transitions.fail(ticket)) return
+    if (!this.transitions.fail(ticket)) return
     this.traceCharacter("failed", ticket, undefined, ticket.requestId)
+    if (current?.id !== ticket.id || current.revision !== ticket.revision) return
     this.warn("새 캐릭터를 표시하지 못해 이전 정상 캐릭터로 돌아갑니다.")
     if (current.source === "external" && current.previousVersion && this.lastReady?.id === current.id && this.lastReady.revision !== current.revision) {
       // Registry notification starts a new transition for the restored revision.
