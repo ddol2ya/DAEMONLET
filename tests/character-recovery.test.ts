@@ -17,28 +17,45 @@ function fixture() {
   const transitions = new CharacterTransitions({ begin: t => { chat.beginCharacterApply(t.requestId) }, failed: t => chat.characterFailed(t.requestId), timeout: t => { void controller.characterLoadFailed(t) } })
   owned.push(transitions)
   Object.assign(controller, {
-    transitions, lastReady: entries.get("style-b"), settings: { characterId: "style-a" },
+    transitions, recoveryTasks: new Set(), lastReady: entries.get("style-b"), settings: { characterId: "style-a" },
     characters: { get: (id: string) => entries.get(id), isAvailable: (id: string) => entries.has(id), rollback: vi.fn(async () => {}) },
     traceCharacter: vi.fn(), warn: vi.fn(),
     updateSettings: vi.fn(({ characterId }: { characterId: string }) => { controller.settings.characterId = characterId; transitions.begin(entries.get(characterId)!) }),
   })
   return { controller, transitions, entries, chat }
 }
+function exitFixture(c: any, disposePack: () => Promise<void> = async () => {}) {
+  const disposedChat = vi.fn(async () => {}), disposedRegistry = vi.fn(async () => {})
+  for (const name of ["sideChatIpc", "activityIpc", "bubbleIpc", "taskControlIpc", "settingsIpc", "updateIpc", "packUpdateIpc", "characterIpc", "activityTitles", "protocol"]) c[name] = { dispose: vi.fn() }
+  for (const name of ["settingsWindow", "activityWindow", "pet", "lab", "tray"]) c[name] = { destroy: vi.fn() }
+  Object.assign(c, { sideChat: { dispose: disposedChat }, petDrag: { cancel: vi.fn() }, chatEntry: { cancel: vi.fn() },
+    activityBubble: { cancelPlacement: vi.fn(), destroy: vi.fn() }, updates: { dispose: vi.fn(), stopBackgroundChecks: vi.fn() }, subscriptions: [],
+    activity: { dispose: vi.fn(async () => {}) }, integration: { dispose: vi.fn(async () => {}) },
+    adapter: { stop: vi.fn(async () => {}) }, store: { save: vi.fn(async () => {}) }, characterTrace: { flush: vi.fn(async () => {}) },
+    packUpdates: { dispose: vi.fn(disposePack) },
+  })
+  c.characters.dispose = disposedRegistry
+  return { disposedChat, disposedRegistry }
+}
 describe("Main character failure recovery", () => {
+  it("shares teardown completion with a native quit arriving during update preparation", async () => {
+    const f = fixture(), c = f.controller
+    let finishPack!: () => void
+    exitFixture(c, () => new Promise<void>(resolve => { finishPack = resolve }))
+    const preparingUpdate = c.cleanupForExit(true)
+    let nativeQuitFinished = false
+    const nativeQuit = c.cleanupForExit().then(() => { nativeQuitFinished = true })
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(c.packUpdates.dispose).toHaveBeenCalledOnce()
+      expect(nativeQuitFinished).toBe(false)
+    } finally { finishPack(); await preparingUpdate; await nativeQuit }
+  })
   it("retires readiness and waits for pack cleanup before destroying chat, windows or registry", async () => {
     const f = fixture(), c = f.controller
     f.transitions.begin(f.entries.get("style-a")!)
-    const disposedChat = vi.fn(async () => {}), disposedRegistry = vi.fn(async () => {})
     let finishPack!: () => void
-    for (const name of ["sideChatIpc", "activityIpc", "bubbleIpc", "taskControlIpc", "settingsIpc", "updateIpc", "packUpdateIpc", "characterIpc", "activityTitles", "protocol"]) c[name] = { dispose: vi.fn() }
-    for (const name of ["settingsWindow", "activityWindow", "pet", "lab", "tray"]) c[name] = { destroy: vi.fn() }
-    Object.assign(c, { sideChat: { dispose: disposedChat }, petDrag: { cancel: vi.fn() }, chatEntry: { cancel: vi.fn() },
-      activityBubble: { cancelPlacement: vi.fn(), destroy: vi.fn() }, updates: { dispose: vi.fn() }, subscriptions: [],
-      activity: { dispose: vi.fn(async () => {}) }, integration: { dispose: vi.fn(async () => {}) },
-      adapter: { stop: vi.fn(async () => {}) }, store: { save: vi.fn(async () => {}) }, characterTrace: { flush: vi.fn(async () => {}) },
-      packUpdates: { dispose: vi.fn(() => new Promise<void>(resolve => { finishPack = resolve })) },
-    })
-    c.characters.dispose = disposedRegistry
+    const { disposedChat, disposedRegistry } = exitFixture(c, () => new Promise<void>(resolve => { finishPack = resolve }))
     const exiting = c.cleanupForExit()
     await vi.waitFor(() => expect(finishPack).toBeTypeOf("function"))
     expect(f.transitions.busy).toBe(false)
@@ -47,6 +64,25 @@ describe("Main character failure recovery", () => {
     expect(c.settingsWindow.destroy).not.toHaveBeenCalled()
     finishPack(); await exiting
     expect(disposedChat).toHaveBeenCalledOnce()
+    expect(disposedRegistry).toHaveBeenCalledOnce()
+  })
+  it("awaits Main's separate rollback even after renderer failure has released the apply waiter", async () => {
+    const f = fixture(), c = f.controller, { disposedRegistry } = exitFixture(c)
+    const prior = f.entries.get("style-b")!
+    f.entries.set("style-b", { ...prior, revision: "style-b-new", previousVersion: "1.0.0" } as any)
+    c.settings.characterId = "style-b"
+    let finishRollback!: () => void
+    c.characters.rollback.mockImplementation(() => new Promise<void>(resolve => { finishRollback = resolve }))
+    const transition = f.transitions.begin(f.entries.get("style-b")!)
+    const recovery = c.characterLoadFailed(transition.ticket)
+    await expect(transition.done).rejects.toThrow("PACK_LOAD")
+    const exiting = c.cleanupForExit()
+    try {
+      await new Promise<void>(resolve => setImmediate(resolve))
+      expect(c.packUpdates.dispose).toHaveBeenCalledOnce()
+      expect(disposedRegistry).not.toHaveBeenCalled()
+      expect(c.settingsWindow.destroy).not.toHaveBeenCalled()
+    } finally { finishRollback(); await recovery; await exiting }
     expect(disposedRegistry).toHaveBeenCalledOnce()
   })
   it("stops after the last-ready model and built-in fallback both fail instead of alternating forever", async () => {

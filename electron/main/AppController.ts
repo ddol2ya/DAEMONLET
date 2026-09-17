@@ -118,6 +118,7 @@ export class AppController {
   private readonly characterIpc: CharacterIpcController
   private unavailableSelection: string | null = null
   private lastReady: CharacterSelection | null = null
+  private readonly recoveryTasks = new Set<Promise<void>>()
   private selectionIntent: object | null = null
   private readonly transitions = new CharacterTransitions({
     begin: ticket => { this.personaGeneration++; this.sideChat.beginCharacterApply(ticket.requestId) },
@@ -137,6 +138,7 @@ export class AppController {
   private readonly updateIpc: UpdateIpcController
   private exitReady = false
   private quitPromise: Promise<void> | null = null
+  private cleanupPromise: Promise<void> | null = null
   private updatePreparing = false
   private osEnding = false
   get canExit(): boolean { return this.exitReady }
@@ -452,8 +454,11 @@ export class AppController {
     await this.quitPromise
   }
 
-  private async cleanupForExit(forUpdate = false): Promise<void> {
-    if (this.quitting) return
+  private cleanupForExit(forUpdate = false): Promise<void> {
+    this.cleanupPromise ??= this.performExitCleanup(forUpdate)
+    return this.cleanupPromise
+  }
+  private async performExitCleanup(forUpdate: boolean): Promise<void> {
     this.placementOpening?.abort()
     this.activityBubble.cancelPlacement()
     this.petDrag.cancel()
@@ -465,6 +470,9 @@ export class AppController {
     this.transitions.retire()
     this.packUpdateIpc.dispose()
     await this.packUpdates.dispose()
+    // A failed renderer releases transition.done before its independent
+    // rollback finishes. Keep registry/window teardown behind both owners.
+    await Promise.allSettled([...this.recoveryTasks])
     if (forUpdate) this.updates.stopBackgroundChecks()
     else this.updates.dispose()
     this.chatEntry.cancel()
@@ -719,7 +727,16 @@ export class AppController {
       throw error
     } finally { if (this.selectionIntent === intent) this.selectionIntent = null }
   }
-  private async characterLoadFailed(ticket: CharacterLoadTicket) {
+  private characterLoadFailed(ticket: CharacterLoadTicket): Promise<void> {
+    const task = this.recoverCharacterFailure(ticket)
+    this.recoveryTasks.add(task)
+    void task.then(() => { this.recoveryTasks.delete(task) }, () => {
+      this.recoveryTasks.delete(task)
+      this.warn("캐릭터 복원을 완료하지 못했습니다.")
+    })
+    return task
+  }
+  private async recoverCharacterFailure(ticket: CharacterLoadTicket) {
     const current = this.characters.get(this.settings.characterId)
     if (!this.transitions.fail(ticket)) return
     this.traceCharacter("failed", ticket, undefined, ticket.requestId)
