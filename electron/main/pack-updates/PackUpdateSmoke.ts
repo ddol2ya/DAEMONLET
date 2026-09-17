@@ -43,6 +43,13 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
   const state = async (id: string) => (await states()).find(s => s.packId === id)!
   await settings.webContents.executeJavaScript(`Array.from(document.querySelectorAll('button')).find(b => /캐릭터·표시|Character.*Display/.test(b.textContent))?.click()`)
   o.sideChat.configure(true, "ko")
+  const excerpt = join(p.output, "unsent-excerpt.txt")
+  await writeFile(excerpt, "Synthetic local excerpt; never submitted.\n")
+  o.sideChat.setConnectionMode("official-same-home")
+  o.sideChat.setCandidates([{ threadId: "pack-update-qa-parent", title: "Pack update QA", cwd: p.output, sourceHome: process.env.CODEX_HOME! }], "pack-update-qa-parent")
+  await o.sideChat.attachFile(excerpt, 1, 1, o.sideChat.snapshot().epoch)
+  const attachments = JSON.stringify(o.sideChat.snapshot().attachments)
+  const assertAttachments = () => { if (JSON.stringify(o.sideChat.snapshot().attachments) !== attachments) throw Error("Pack update QA: unsent excerpt changed") }
   const recovered = async (id: string, revision: string) => {
     for (let n = 0; n < 600; n++) {
       if (o.selected() === id && o.registry.get(id)?.revision === revision && !o.sideChat.snapshot().applying && o.registry.readyForUpdate()) return
@@ -69,6 +76,7 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
     if (!result.includes("PACK_LOAD")) throw Error("Pack update QA: current AbortError was not reported as failure")
   } finally { await restoreFetch() }
   await recovered(initial.id, initial.revision)
+  assertAttachments()
   for (const e of p.entries) {
     const id = e.feed.packId, before = o.registry.get(id)!, other = o.registry.snapshot().entries.filter(x => x.id !== id).map(x => [x.id, x.revision])
     await o.select(before)
@@ -91,6 +99,7 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
         if (!result.includes("PACK_LOAD")) throw Error("Pack update QA: active update failure was not reported")
       } finally { await restoreFetch() }
       await recovered(id, before.revision)
+      assertAttachments()
       if (o.sideChat.snapshot().draft !== "QA draft stays here; never sent") throw Error("Pack update QA: recovery lost the draft")
       await invoke({ action: "check", packId: id }); await invoke({ action: "download", packId: id })
       candidate = await state(id)
@@ -103,11 +112,13 @@ export async function runPackUpdateSmoke(o: { path: string; registry: CharacterR
     if (JSON.stringify(other) !== JSON.stringify(o.registry.snapshot().entries.filter(x => x.id !== id).map(x => [x.id, x.revision]))) throw Error("Pack update QA: other appearance changed")
     for (let n = 0; n < 200 && o.sideChat.snapshot().applying; n++) await wait(50)
     if (o.sideChat.snapshot().draft !== "QA draft stays here; never sent") throw Error("Pack update QA: draft changed")
+    assertAttachments()
     await wait(250); await writeFile(join(p.output, `${id}-applied.png`), (await o.pet.webContents.capturePage()).toPNG())
     await o.registry.rollback(o.registry.get(id)!)
     await o.select(o.registry.get(id)!)
     if (o.registry.get(id)?.revision !== before.revision) throw Error("Pack update QA: restore failed")
-    rows.push({ id, before: before.version, candidate: e.feed.version, cancel: "PASS", applyThroughPreload: "PASS", rendererReady: "PASS", draftPreserved: "PASS", otherAppearancesUnchanged: "PASS", rollback: "PASS", appUpdateDownloadGate: "PASS" })
+    assertAttachments()
+    rows.push({ id, before: before.version, candidate: e.feed.version, cancel: "PASS", applyThroughPreload: "PASS", rendererReady: "PASS", draftPreserved: "PASS", attachmentsPreserved: "PASS", otherAppearancesUnchanged: "PASS", rollback: "PASS", appUpdateDownloadGate: "PASS" })
   }
   o.sideChat.configure(false, "ko")
   const result = { status: "PASS", network: "PRIVATE_QA_TRANSPORT", currentAbortFailureRecovery: "PASS", activeUpdateFailureRollbackAndRetry: "PASS", rows, productionCandidate: false, os: process.platform, arch: process.arch }

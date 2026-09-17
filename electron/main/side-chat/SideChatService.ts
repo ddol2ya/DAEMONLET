@@ -159,7 +159,10 @@ export class SideChatService {
     this.publish()
   }
   private resetConversation(notice: SideChatSnapshot["notice"]) {
-    this.excerpts = []; this.state.attachments = []; this.readScope = null
+    // Unsent excerpts belong to the user's draft in the selected project,
+    // not the retired AI conversation. Parent/policy changes still clear them.
+    if (notice !== "character") { this.excerpts = []; this.state.attachments = [] }
+    this.readScope = null
     this.state.acceptedSubmission = null
     this.state.epoch++; this.state.messages = []; this.state.phase = "idle"; this.state.error = null; this.state.requiresNewConversation = false; this.state.notice = notice
     if (this.state.parent) this.state.parent.contextAt = null
