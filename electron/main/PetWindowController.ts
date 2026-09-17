@@ -83,8 +83,9 @@ export class PetWindowController {
     win.webContents.on("context-menu", () => this.options.onContextMenu?.(win))
     win.webContents.on("before-mouse-event", (_event, input) => {
       if (input.type !== "mouseDown") return
-      const modifiers = input.modifiers ?? []
-      this.dragStart.record(win.getBounds(), input, input.button === "left" && modifiers.includes("alt") && !modifiers.some(m => ["control", "ctrl", "meta", "command", "cmd", ...(process.platform === "win32" ? ["right", "altgr"] : [])].includes(m)))
+      // Electron omits modifiers from before-mouse-event. The renderer checks
+      // Option/Alt and painted pixels; Main retains the native left-down origin.
+      this.dragStart.record(win.getBounds(), input, input.button === "left")
     })
     if ((typeof __APP_QA__ === "undefined" || __APP_QA__) && process.env.ELECTRON_SMOKE_TEST === "1") {
       win.webContents.on("console-message", (details) => {

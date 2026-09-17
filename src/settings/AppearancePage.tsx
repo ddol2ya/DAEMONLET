@@ -21,9 +21,10 @@ export function AppearancePage({ api, status, settings, run, busy }: SettingsPag
     <header className="page-header"><h1>{t("캐릭터·표시")}</h1></header>
     <section className="section-card"><CharacterPacks api={api} run={run} busy={busy} selected={settings.characterId} />
       <div className="preference-row"><div><strong>{t("캐릭터 크기")}</strong><p>{t`현재 ${Math.round(settings.scale * 100)}%`}</p></div><label className="visually-hidden" htmlFor="character-scale">{t("캐릭터 크기")}</label><select id="character-scale" value={settings.scale} disabled={Boolean(busy)} onChange={(event) => update({ scale: Number(event.target.value) })}>{!SCALE_PRESETS.some((value) => Math.abs(value - settings.scale) < 0.001) && <option value={settings.scale}>{t`${Math.round(settings.scale * 100)}% (현재)`}</option>}{SCALE_PRESETS.map((value) => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}</select></div>
+      <p>{status.app.platform === "darwin" ? t("Option + 드래그로 캐릭터를 이동할 수 있어요.") : t("Alt + 드래그로 캐릭터를 이동할 수 있어요.")}</p>
     </section>
     <section className="section-card"><h2>{t("말풍선 위치")}</h2>
-      <p>{status.app.platform === "darwin" ? t("Option + 드래그로 캐릭터를 이동할 수 있어요.") : t("Alt + 드래그로 캐릭터를 이동할 수 있어요.")}</p>
+      <p>{t("위치 조절을 누른 뒤 이동 손잡이를 드래그하고 적용하세요.")}</p>
       <div className="preference-row"><strong>{settings.bubblePlacement.mode === "auto" ? t("자동") : t("사용자 지정")}</strong><div className="button-row">
         <button className="button secondary small" disabled={Boolean(busy)} onClick={() => void run("말풍선 위치", () => api.setBubblePlacement("auto"))}>{t("자동")}</button>
         <button className="button secondary small" disabled={Boolean(busy)} onClick={() => void run("말풍선 위치", () => api.setBubblePlacement("adjust"))}>{t("위치 조절")}</button>
