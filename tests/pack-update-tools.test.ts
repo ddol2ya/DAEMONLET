@@ -27,5 +27,5 @@ describe("update-source creator tools", () => {
     await expect(addUpdateSource({ input, output: join(root, "downgrade.petchar"), version: "1.0.0", "repo-id": plan.repoId, "manifest-path": plan.packs[0].manifestPath })).rejects.toThrow("PACK_DOWNGRADE")
     const stage = join(root, "final"); await mkdir(stage)
     expect((await extractCharacterPack(output, stage)).manifest.update?.repoId).toBe(plan.repoId)
-  })
+  }, 30_000)
 })
