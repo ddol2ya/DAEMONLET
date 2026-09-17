@@ -124,6 +124,16 @@ describe("pack update transactions", () => {
     await expect(f.service.apply(f.state().candidateId!, "window-1")).rejects.toThrow("PACK_LOAD")
     expect(f.state().phase).toBe("error"); expect(f.registry.get("style-a")?.version).toBe("1.0.0")
   })
+  it("stays applying between registry commit and the renderer-ready result", async () => {
+    const f = await fixture(); let ready!: () => void
+    f.apply.mockImplementation(async (p, owner) => { await f.registry.commitImport(p.token, owner); await new Promise<void>(r => { ready = r }) })
+    await f.service.check("style-a", "window-1"); await f.service.download("style-a", "window-1")
+    const applying = f.service.apply(f.state().candidateId!, "window-1")
+    await vi.waitFor(() => expect(ready).toBeTypeOf("function"))
+    expect(f.registry.get("style-a")?.version).toBe("1.0.1")
+    expect(f.state().phase).toBe("applying"); expect(f.service.readyForUpdate()).toBe(false)
+    ready(); await applying; expect(f.state().phase).toBe("applied")
+  })
   it("binds candidates to owner and expiration, and never lets another owner apply", async () => {
     const f = await fixture(); await f.service.check("style-a", "window-1"); await f.service.download("style-a", "window-1")
     const id = f.state().candidateId!

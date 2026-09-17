@@ -62,7 +62,7 @@ export class PackUpdateService {
     for (const id of this.states.keys()) if (!entries.some(e => e.id === id)) this.states.delete(id)
     for (const e of entries) {
       const source = e.update!, old = this.states.get(e.id), pref = this.preferences.get(e.id, source)
-      if (!old || old.revision !== e.revision || updateSourceKey(e.id, old.source) !== updateSourceKey(e.id, source)) this.states.set(e.id, { packId: e.id, revision: e.revision, source, phase: this.preferenceError ? "error" : pref ? "idle" : "source-required", autoCheck: pref?.autoCheck ?? false, checkedAt: pref?.checkedAt, ...(this.preferenceError ? { error: "PACK_IO" } : {}) })
+      if (!old || old.revision !== e.revision || updateSourceKey(e.id, old.source) !== updateSourceKey(e.id, source)) this.states.set(e.id, { packId: e.id, revision: e.revision, source, phase: this.candidate?.applying && this.candidate.packId === e.id ? "applying" : this.preferenceError ? "error" : pref ? "idle" : "source-required", autoCheck: pref?.autoCheck ?? false, checkedAt: pref?.checkedAt, ...(this.preferenceError ? { error: "PACK_IO" } : {}) })
     }
     for (const [id, check] of this.checks) if (!this.live(id, check.revision, check.source)) { check.controller.abort(); this.checks.delete(id) }
     const c = this.candidate
