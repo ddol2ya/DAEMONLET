@@ -54,6 +54,9 @@ export class PetWindowController {
       focusable: true,
       acceptFirstMouse: true,
       webPreferences: { additionalArguments: languageArguments(),
+        // A transparent/background pet must render its first real frame even
+        // while Settings obscures it; readiness still waits for that frame.
+        backgroundThrottling: false,
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
