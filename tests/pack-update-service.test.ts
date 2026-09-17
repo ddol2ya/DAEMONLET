@@ -47,6 +47,42 @@ async function fixture() {
   }
 }
 describe("pack update transactions", () => {
+  it.each(["source", "feed", "update", "auto", "skip"] as const)("settles owned %s metadata work before disposal completes", async phase => {
+    const f = await fixture(); let release!: () => void
+    const hold = () => new Promise<void>(resolve => { release = resolve })
+    if (phase !== "source") { await f.service.check("style-a", "window-1"); f.advance() }
+    if (phase === "source") {
+      const save = f.preferences.save.bind(f.preferences)
+      vi.spyOn(f.preferences, "save").mockImplementationOnce(async value => { await hold(); await save(value) })
+    } else if (phase === "feed") {
+      const feed = f.provider.feed.getMockImplementation()!
+      f.provider.feed.mockImplementationOnce(async () => { await hold(); return feed() })
+    } else {
+      const update = f.preferences.update.bind(f.preferences)
+      vi.spyOn(f.preferences, "update").mockImplementationOnce(async (...args) => { await update(...args); await hold() })
+    }
+    const work = phase === "auto" ? f.service.auto("style-a", true, "window-1") : phase === "skip" ? f.service.skip("style-a", "window-1") : f.service.check("style-a", "window-1")
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"))
+    let disposed = false
+    const disposing = f.service.dispose().then(() => { disposed = true })
+    try { await new Promise<void>(resolve => setImmediate(resolve)); expect(disposed).toBe(false) }
+    finally { release(); await work; await disposing }
+    if (phase === "auto") expect(f.preferences.get("style-a", f.source)?.autoCheck).toBe(true)
+    if (phase === "skip") expect(f.preferences.get("style-a", f.source)?.skipped).toBe("1.0.1")
+  })
+  it("awaits initialization without subscribing or scheduling after disposal", async () => {
+    const f = await fixture(); let release!: () => void
+    vi.spyOn(f.preferences, "load").mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve }))
+    const subscribe = vi.spyOn(f.registry, "subscribe"), late = new PackUpdateService(f.options)
+    services.push(late)
+    const starting = late.start(); await vi.waitFor(() => expect(release).toBeTypeOf("function"))
+    let disposed = false
+    const disposing = late.dispose().then(() => { disposed = true })
+    try { await new Promise<void>(resolve => setImmediate(resolve)); expect(disposed).toBe(false) }
+    finally { release(); await starting; await disposing }
+    expect(subscribe).not.toHaveBeenCalled()
+    expect(late.snapshot()).toEqual([])
+  })
   it.each([false, true])("awaits active application and disk cleanup during disposal (failure=%s)", async failure => {
     const f = await fixture(); let release!: () => void
     f.apply.mockImplementation(async (preview, owner) => {

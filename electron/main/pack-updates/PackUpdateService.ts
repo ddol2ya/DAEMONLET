@@ -31,17 +31,27 @@ export class PackUpdateService {
   private preferenceError = false
   private downloadTask?: Promise<void>
   private applyTask?: Promise<void>
+  // I/O lifetime only: metadata work does not acquire the registry/apply gate.
+  private readonly tasks = new Set<Promise<void>>()
   constructor(private readonly o: Options) {
     this.provider = o.provider ?? new HuggingFacePackProvider()
     this.preferences = o.preferences ?? new PackUpdatePreferences(join(o.dataRoot, "pack-update-preferences.json"))
     this.root = join(o.dataRoot, "pack-update-transactions"); this.now = o.now ?? Date.now
   }
-  async start() {
+  private track(task: Promise<void>) {
+    this.tasks.add(task)
+    void task.then(() => { this.tasks.delete(task) }, () => { this.tasks.delete(task) })
+    return task
+  }
+  start() { return this.track(this.initialize()) }
+  private async initialize() {
+    if (this.disposed) return
     await mkdir(this.root, { recursive: true, mode: 0o700 })
     if ((await lstat(this.root)).isSymbolicLink()) throw Error("PACK_PATH")
     // Remove only UUID transactions owned by this service, never shared download/cache directories.
     for (const item of await readdir(this.root)) if (/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(item)) await rm(join(this.root, item), { recursive: true, force: true })
     await this.preferences.load().catch(() => { this.preferenceError = true })
+    if (this.disposed) return
     this.unsubscribe = this.o.registry.subscribe(() => this.reconcile())
     this.reconcile(); this.schedule()
   }
@@ -73,8 +83,10 @@ export class PackUpdateService {
   }
   private set(id: string, patch: Partial<PackUpdateState>) { const old = this.states.get(id); if (old) { this.states.set(id, { ...old, ...patch }); this.emit() } }
   private error(error: unknown) { const code = error instanceof Error ? error.message : ""; return Object.hasOwn(PACK_ERRORS, code) || Object.hasOwn(PACK_UPDATE_ERRORS, code) ? code : "PACK_UPDATE_NETWORK" }
-  async check(id: string, owner?: string) {
+  check(id: string, owner?: string) { return this.track(this.checkFeed(id, owner)) }
+  private async checkFeed(id: string, owner?: string) {
     if (owner) this.requireOwner(owner)
+    else if (this.disposed) return
     const entry = this.target(id), source = entry.update, key = updateSourceKey(id, source), automatic = !owner
     if (this.checks.has(id) || this.candidate?.packId === id) throw Error("PACK_BUSY")
     let pref = this.preferences.get(id, source)
@@ -110,7 +122,8 @@ export class PackUpdateService {
       if (current()) this.set(id, { phase: "error", error: this.error(error) })
     } finally { if (this.checks.get(id) === check) this.checks.delete(id) }
   }
-  async auto(id: string, enabled: boolean, owner: string) {
+  auto(id: string, enabled: boolean, owner: string) { return this.track(this.setAutomaticCheck(id, enabled, owner)) }
+  private async setAutomaticCheck(id: string, enabled: boolean, owner: string) {
     this.requireOwner(owner)
     const entry = this.target(id), pref = this.preferences.get(id, entry.update)
     if (!pref) throw Error("PACK_UPDATE_SOURCE")
@@ -118,13 +131,15 @@ export class PackUpdateService {
     if (!enabled && check?.automatic) { check.controller.abort(); this.checks.delete(id); this.set(id, { phase: "idle" }) }
     await this.preferences.update(id, previous => { if (!previous || updateSourceKey(id, previous.source) !== updateSourceKey(id, entry.update)) throw Error("PACK_TRANSACTION"); return { ...previous, autoCheck: enabled } }); this.set(id, { autoCheck: enabled })
   }
-  async skip(id: string, owner: string) {
+  skip(id: string, owner: string) { return this.track(this.skipVersion(id, owner)) }
+  private async skipVersion(id: string, owner: string) {
     this.requireOwner(owner)
     const entry = this.target(id), pref = this.preferences.get(id, entry.update)
     if (!pref?.feed || comparePackVersions(pref.feed.version, entry.version) <= 0) throw Error("PACK_TRANSACTION")
     await this.preferences.update(id, previous => { if (!previous || updateSourceKey(id, previous.source) !== updateSourceKey(id, entry.update)) throw Error("PACK_TRANSACTION"); return { ...previous, skipped: pref.feed!.version } }); this.set(id, { phase: "skipped" })
   }
-  async download(id: string, owner: string) {
+  download(id: string, owner: string) { return this.track(this.downloadCandidate(id, owner)) }
+  private async downloadCandidate(id: string, owner: string) {
     this.requireOwner(owner)
     if (this.candidate || this.downloadTask || !this.o.registry.readyForUpdate()) throw Error("PACK_BUSY")
     const entry = this.target(id), pref = this.preferences.get(id, entry.update), feed = pref?.feed
@@ -168,7 +183,8 @@ export class PackUpdateService {
       if (live) this.set(c.packId, { phase: c.controller.signal.aborted ? "idle" : "error", error: c.controller.signal.aborted ? undefined : this.error(error), candidateId: undefined })
     }
   }
-  async apply(candidateId: string, owner: string) {
+  apply(candidateId: string, owner: string) { return this.track(this.applyOwned(candidateId, owner)) }
+  private async applyOwned(candidateId: string, owner: string) {
     const c = this.candidate
     if (!c || c.id !== candidateId || c.owner !== owner || !c.preview || c.applying) throw Error("PACK_TRANSACTION")
     this.assertCandidate(c)
@@ -198,7 +214,8 @@ export class PackUpdateService {
       this.emit()
     }
   }
-  async cancel(owner: string, id?: string) {
+  cancel(owner: string, id?: string) { return this.track(this.cancelOwned(owner, id)) }
+  private async cancelOwned(owner: string, id?: string) {
     for (const [key, check] of this.checks) if (check.owner === owner && (!id || key === id)) { check.controller.abort(); this.checks.delete(key); this.set(key, { phase: "idle" }) }
     const c = this.candidate
     if (!c || c.owner !== owner || id && c.packId !== id || c.applying) return
@@ -227,5 +244,6 @@ export class PackUpdateService {
     // wait for its finally/transaction cleanup before the registry can close.
     if (this.applyTask) await this.applyTask.catch(() => {})
     if (this.candidate && !this.candidate.applying) await this.cancel(this.candidate.owner)
+    await Promise.allSettled([...this.tasks])
   }
 }
