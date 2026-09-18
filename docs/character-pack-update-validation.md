@@ -6,6 +6,8 @@ App version remains 0.7.2. Base: PR #20 merged main, 5963e558755b60892d4f749437c
 
 Latest runtime candidate: **b4dbbb7ab2292dd3707f3ca18e3e531423e76510**, app **0.7.2**, clean at build time. See [the F-01–F-05 findings, ownership changes, candidate boundaries and detailed results](character-pack-update-stabilization.md). PR #21 remains Draft; no merge or public app release is authorized.
 
+Following the Windows manual-check checklist, the user reported verification complete with no issues. This is recorded as user-reported Windows acceptance; it does not replace the agent's scoped evidence or independently confirm installer use, exhaustive coverage, or permission to merge/release.
+
 The original final Windows candidate `2873290` failed F-01/F-02/F-03. Later `669ab0e` reproduced first-frame timeout and a fallback cycle. Their production failures remain part of the evidence; the historical QA success below does not override them. Candidate `22b54af` passed the scoped normal UI matrix but was superseded after shutdown review findings. Commits `5d4dc97`, `ee6dfb2` and `b4dbbb7` address apply cleanup, separate Main rollback and remaining metadata/preferences I/O. The b4dbbb7 re-review reported no major issues.
 
 | Latest b4dbbb7 layer | Result |
