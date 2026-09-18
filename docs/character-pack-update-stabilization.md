@@ -1,6 +1,6 @@
 # PR #21 character-pack update stabilization
 
-Status: **b4dbbb7 fixes and scoped production verification complete; final Mac archive signed, notarized and verified. Draft, no merge or public release**. App version remains **0.7.2**. Candidate results are scoped to their embedded source commit. Failed candidates and review profiles remain evidence.
+Verification snapshot: **b4dbbb7 fixes and scoped production verification complete; final Mac archive signed, notarized and verified**. App version remains **0.7.2**. Candidate results are scoped to their embedded source commit. Failed candidates and review profiles remain evidence. Following the user acceptance below, the user separately authorized merging PR #21 and publishing v0.7.2. The pre-publication artifact states below record the verification run; current publication is shown on the [release page](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.2).
 
 User follow-up: after receiving the Windows manual-check checklist, the user reported “윈도우 검수 완료, 이상무” (Windows verification complete, no issues). This records user-reported acceptance of the Windows review, separately from the agent's automated and UI-tool evidence below. The earlier movement/capture observations remain historical evidence, not a continuing user-reported failure. No itemized results or installer-use confirmation were supplied, so this statement does not establish exhaustive pose coverage or Setup.exe installation. It does not authorize merging or publication.
 

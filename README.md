@@ -10,15 +10,15 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
 <img src="docs/images/gpichan.png" width="360" alt="Daemonlet for Codex에서 실행 중인 지피쨩">
 
-## 다운로드 — v0.7.1
+## 다운로드 — v0.7.2
 
 | 환경 | 다운로드 | 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-macOS-arm64.zip) | Developer ID 서명·Apple 공증 완료 |
-| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64-Setup.exe) | 미서명 |
-| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64.zip) | 설치 없이 압축 해제 후 실행 |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-macOS-arm64.zip) | Developer ID 서명·Apple 공증 완료 |
+| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-windows-x64-Setup.exe) | 미서명 |
+| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-windows-x64.zip) | 설치 없이 압축 해제 후 실행 |
 
-[릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.1) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/SHA256SUMS.txt)
+[릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.2) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/SHA256SUMS.txt)
 
 앱 사용에는 별도 Node.js, Python, ComfyUI, 모델 가중치 또는 제작용 GPU가 필요하지 않습니다.
 
@@ -45,9 +45,9 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
 **v0.7.1부터** **설정 → 언어 / Language** 또는 트레이 메뉴에서 한국어·영어를 선택할 수 있습니다. 선택은 저장되며 모든 앱 창에 즉시 적용됩니다. Mac 받아쓰기는 다음 녹음부터 선택 언어를 사용하고, 작성 중인 문장은 보존합니다. 캐릭터 이름과 대사는 팩의 원문을 유지하며, macOS 권한 창은 시스템 언어 설정을 따릅니다. Windows 받아쓰기는 지원하지 않습니다.
 
-## 개발 브랜치의 데스크톱 조작
+## 데스크톱 조작
 
-다음 조작은 현재 검토용 빌드에 포함되며 위의 기존 공개 v0.7.1 다운로드와 구분됩니다.
+다음 조작은 v0.7.2부터 사용할 수 있습니다.
 
 - **캐릭터 이동:** Mac은 Option, Windows는 Alt를 누른 채 캐릭터의 불투명 부분을 왼쪽 드래그합니다. 놓으면 저장하고 Esc는 시작 위치로 돌아갑니다. 일반 클릭·쓰다듬기와 기존 이동·크기 조절 메뉴는 그대로입니다.
 - **말풍선 위치:** 메뉴 또는 설정 → 캐릭터·표시 → 말풍선 위치에서 자동·위치 조절·위치 초기화를 선택합니다. 고정 문구 미리보기의 손잡이를 옮긴 뒤 적용합니다. 취소/Esc는 저장하지 않습니다. 위치 초기화는 말풍선만 자동 배치로 돌립니다.
@@ -140,16 +140,18 @@ Electron 준비에는 lockfile에 고정된 로컬 설치 스크립트를 사용
 
 위 링크는 소스 저장소 경로입니다. 설치된 앱의 고지는 Windows/Linux `resources/licenses/`, macOS 앱 패키지의 `Contents/Resources/licenses/`에 있으며 ASAR를 열지 않고 읽을 수 있습니다. 기존 MIT의 `Momo Motion Lab contributors` 표기는 권리자 변경 근거가 없어 보존합니다.
 
-### 캐릭터 대화 — PR #17 배포 후보
+### 캐릭터 대화 — v0.7.2
 
 기존 작업창의 **캐릭터에게 물어보기**로 같은 창에서 질문하고 답변을 확인합니다. 우클릭·트레이의 **캐릭터와 대화**도 이 작업창을 엽니다. 새 설치는 기본 ON이며 기존 사용자의 OFF 선택은 보존합니다. 공식 CLI·로그인 준비를 확인하고 부모 대화를 직접 선택한 뒤 질문합니다. 첫 보내기에서 맥락·선택 파일 전달과 사용량에 동의하며, 보내기 전 모델 생성은 없습니다. 화면 적용에 성공한 기존 캐릭터팩의 페르소나를 사용합니다.
 
 **공식 CLI 0.154.0 · macOS Apple Silicon · gpt-5.6-luna** 경로를 검증합니다. 같은 Codex Home의 별도 임시 자식이 부모의 성공 완료 맥락과 선택한 프로젝트 파일을 설명하고 수정안을 제시합니다. 파일 변경·명령·빌드·테스트·외부 서비스·부모 제어는 차단합니다. 펼치기·복사·숨기기는 추가 모델 호출 없이 같은 원문을 사용합니다.
 
-이번 변경은 기존 공개 v0.7.1에 포함됐다는 뜻이 아닙니다. Windows native·다른 OS/CLI·Keychain의 실제 검증과 후보 서명 상태는 PR에서 별도 표시합니다. [사용법·준비·복구·호환성](docs/side-chat.md)을 확인하세요. 앱의 대화·초안은 메모리에 보관하며 Codex의 정상 내부 저장·로그·인증 처리는 발생할 수 있습니다.
+이 기능은 v0.7.2부터 포함됩니다. [사용법·준비·복구·플랫폼별 호환성](docs/side-chat.md)을 확인하세요. 앱의 대화·초안은 메모리에 보관하며 Codex의 정상 내부 저장·로그·인증 처리는 발생할 수 있습니다.
 
-### 앱 업데이트 (개발 후보 0.7.2)
+### 앱 업데이트 — v0.7.2
 
 메뉴 또는 설정 → 업데이트에서 새 버전을 확인합니다. 자동 확인은 기본 OFF이며 다운로드·재시작은 사용자 선택입니다. 기존 공개 0.7.1에서는 최초 한 번 수동 설치가 필요합니다. [지원 설치 형태·서명 조건·검증 절차](docs/app-updates.md)를 확인해 주세요.
 
-Character pack updates: [HF source, manual download/apply and rollback](docs/character-pack-updates.md). Appearance labels are independent from pack SemVer; initial import is required for older packs without an update source.
+### 캐릭터팩 업데이트 — v0.7.2
+
+[공개 캐릭터팩](https://huggingface.co/datasets/ddol2/daemonlet-character-packs)의 `.petchar` 파일을 가져오면 설정에서 새 팩을 확인·다운로드·검증하고 직접 적용하거나 이전 버전으로 복원할 수 있습니다. 아스마 토키 v3·v4·v5는 서로 다른 외형이며 각각 독립적으로 갱신합니다. 업데이트 출처가 없는 기존 팩은 출처를 포함한 팩을 한 번 가져와야 합니다. [업데이트·취소·복원 안내](docs/character-pack-updates.md)를 확인하세요.

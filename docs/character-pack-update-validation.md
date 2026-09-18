@@ -4,7 +4,7 @@ App version remains 0.7.2. Base: PR #20 merged main, 5963e558755b60892d4f749437c
 
 ## Current stabilization evidence
 
-Latest runtime candidate: **b4dbbb7ab2292dd3707f3ca18e3e531423e76510**, app **0.7.2**, clean at build time. See [the F-01–F-05 findings, ownership changes, candidate boundaries and detailed results](character-pack-update-stabilization.md). PR #21 remains Draft; no merge or public app release is authorized.
+Latest runtime candidate: **b4dbbb7ab2292dd3707f3ca18e3e531423e76510**, app **0.7.2**, clean at build time. See [the F-01–F-05 findings, ownership changes, candidate boundaries and detailed results](character-pack-update-stabilization.md). The following results describe pre-publication verification. After Windows user acceptance, the user separately authorized merging PR #21 and publishing v0.7.2; see the [release page](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.2) for publication status.
 
 Following the Windows manual-check checklist, the user reported verification complete with no issues. This is recorded as user-reported Windows acceptance; it does not replace the agent's scoped evidence or independently confirm installer use, exhaustive coverage, or permission to merge/release.
 

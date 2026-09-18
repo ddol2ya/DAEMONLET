@@ -1,4 +1,4 @@
-# App updates (0.7.2 candidate)
+# App updates (available from 0.7.2)
 
 This is the single guide for the updater. Public release approval is separate from building or reviewing a candidate.
 

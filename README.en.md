@@ -10,15 +10,15 @@ This is not an official OpenAI product and is not affiliated with OpenAI.
 
 <img src="docs/images/gpichan.png" width="360" alt="Gpichan running in Daemonlet for Codex">
 
-## Downloads — v0.7.1
+## Downloads — v0.7.2
 
 | Platform | Download | Notes |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
-| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64-Setup.exe) | Unsigned |
-| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/Daemonlet-for-Codex-0.7.1-windows-x64.zip) | Extract and run without installation |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
+| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-windows-x64-Setup.exe) | Unsigned |
+| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-windows-x64.zip) | Extract and run without installation |
 
-[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.1) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.1/SHA256SUMS.txt)
+[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.2) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/SHA256SUMS.txt)
 
 To use the app, you do not need a separate Node.js or Python installation, ComfyUI, model weights, or a GPU for character creation.
 
@@ -45,9 +45,9 @@ For installation, recovery and removal details, see the [Mac guide](docs/install
 - **Loading feedback:** See progress while importing characters and preparing the app at startup.
 - **Mac voice input:** Use Korean or English dictation to compose a message to send to Codex.
 
-## Desktop controls in the development branch
+## Desktop controls
 
-These controls are in the review build, separate from the existing public v0.7.1 download above.
+These controls are available starting with v0.7.2.
 
 - **Move:** Option-drag on Mac or Alt-drag on Windows from a painted part of the character. Release to save; Esc restores the starting position. Ordinary clicks, petting and the existing move/resize menu remain available.
 - **Bubble position:** Use the menu or Settings → Character & Display → Bubble position. Choose Auto, Adjust position or Reset position. Drag the local preview handle and Apply; Cancel/Esc keeps the previous setting. Reset affects only bubble placement.
@@ -146,14 +146,18 @@ External code, upstream assets, models and other character packs remain subject 
 
 The links above point to files in the source repository. In an installed app, notices are available in `resources/licenses/` on Windows/Linux and `Contents/Resources/licenses/` inside the macOS app bundle; you do not need to open the ASAR archive to read them. The existing MIT credit to `Momo Motion Lab contributors` is retained because there is no basis for changing the copyright holder.
 
-### Character chat — PR #17 candidate
+### Character chat — v0.7.2
 
 Choose **Ask the character** in the existing task card to ask and read replies in that same window. **Chat with character** in the character's context menu or tray opens the same task surface. New installations default to ON; an existing OFF choice is preserved. Check official CLI/login readiness, explicitly select a parent conversation, and ask a question. The first send asks for consent to context/file transmission and usage. No model generation occurs before sending. The persona follows the character that successfully appeared on screen.
 
 The **official CLI 0.154.0 / macOS Apple Silicon / gpt-5.6-luna** path creates a separate temporary child in the parent's Codex Home. It explains successfully completed context and user-selected project excerpts and proposes changes for copying. File changes, commands, builds/tests, external services and parent controls are blocked. Expand, copy and hide reuse the original response without another model request.
 
-These changes are a review candidate, not a claim about the existing public v0.7.1 download. Actual Windows native, other OS/CLI, Keychain and candidate signing results are reported separately in the PR. See [setup, recovery and compatibility](docs/side-chat.md). App chat/drafts stay in memory; normal Codex storage, logs and authentication processing can occur.
+This feature is included starting with v0.7.2. See [setup, recovery and platform compatibility](docs/side-chat.md). App chat/drafts stay in memory; normal Codex storage, logs and authentication processing can occur.
 
-### App updates (0.7.2 development candidate)
+### App updates — v0.7.2
 
 Use the menu or Settings → Updates. Automatic checks default to OFF; downloading and restarting require user actions. Existing public 0.7.1 installations need one manual upgrade first. See [supported installations, signing requirements and verification](docs/app-updates.md).
+
+### Character pack updates — v0.7.2
+
+Import a `.petchar` file from the [public character packs](https://huggingface.co/datasets/ddol2/daemonlet-character-packs) to check, download, validate and manually apply updates in Settings, or restore the previous version. Asuma Toki v3, v4 and v5 are independent appearances with separate updates. Older packs without an update source require a one-time import of a source-enabled pack. See [updates, cancellation and rollback](docs/character-pack-updates.md).
