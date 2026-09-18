@@ -1,3 +1,11 @@
+import { PackUpdateService } from "./pack-updates/PackUpdateService"
+import { PackUpdateIpcController } from "./pack-updates/PackUpdateIpcController"
+import { CharacterTransitionTrace } from "./CharacterTransitionTrace"
+import { CharacterTransitions } from "./CharacterTransitions"
+import { CHARACTER_LOAD_REQUEST, parseCharacterLoadTicket, type CharacterLoadTicket } from "../shared/character-load"
+import { CHARACTER_LOAD_DIAGNOSTIC, parseCharacterLoadDiagnostic, type CharacterLoadDiagnostic } from "../shared/character-load-diagnostics"
+import { randomUUID } from "node:crypto"
+import { PACK_UPDATE_IPC } from "../shared/pack-update-contract"
 declare const __APP_QA__: boolean
 import { RELEASE_ROOT } from "./updates/ReleasePolicy"
 import { UpdateService } from "./updates/UpdateService"
@@ -104,10 +112,22 @@ export class AppController {
   private readonly integration: CodexIntegrationController
   private readonly settingsWindow: SettingsWindowController
   private readonly settingsIpc: SettingsIpcController
+  private readonly packUpdates: PackUpdateService
+  private packApplyTarget: string | null = null
+  private readonly packUpdateIpc: PackUpdateIpcController
   private readonly characterIpc: CharacterIpcController
   private unavailableSelection: string | null = null
   private lastReady: CharacterSelection | null = null
-  private readonly readyWaiters = new Set<{ selection: CharacterSelection; finish: (error?: Error) => void }>()
+  private readonly recoveryTasks = new Set<Promise<void>>()
+  private selectionIntent: object | null = null
+  private readonly transitions = new CharacterTransitions({
+    begin: ticket => { this.personaGeneration++; this.sideChat.beginCharacterApply(ticket.requestId) },
+    failed: ticket => { this.personaGeneration++; this.sideChat.characterFailed(ticket.requestId) },
+    timeout: ticket => { this.traceCharacter("timeout", ticket); void this.characterLoadFailed(ticket).catch(() => this.warn("캐릭터 복원에 실패했습니다.")) },
+  })
+  private readonly characterTrace = new CharacterTransitionTrace(app.getPath("userData"))
+  private readonly initialTraceId = randomUUID()
+  private traceRate = { start: 0, count: 0 }
   private readonly subscriptions: Array<() => void> = []
   private settingsPoll: ReturnType<typeof setInterval> | null = null
   private restartPending = false
@@ -118,6 +138,7 @@ export class AppController {
   private readonly updateIpc: UpdateIpcController
   private exitReady = false
   private quitPromise: Promise<void> | null = null
+  private cleanupPromise: Promise<void> | null = null
   private updatePreparing = false
   private osEnding = false
   get canExit(): boolean { return this.exitReady }
@@ -152,6 +173,7 @@ export class AppController {
       devServerUrl: this.devServerUrl,
       onBoundsChanged: (bounds) => this.captureBounds(bounds),
       onWarning: (message) => this.warn(message),
+      onRendererReset: () => { this.personaGeneration++; this.transitions.retire() },
       onCloseRequested: () => { if (!this.quitting) this.updateSettings({ visible: false }) },
       onContextMenu: (window) => { this.tray.popup(window) },
     })
@@ -186,7 +208,8 @@ export class AppController {
       },
       onClosed: (owner) => {
         this.integration.windowClosed(owner)
-        void this.characters.cancelImport(owner)
+        void this.packUpdates?.cancel(owner)
+        void this.characterIpc?.retireOwner(owner)
         if (this.settingsPoll) clearInterval(this.settingsPoll)
         this.settingsPoll = null
       },
@@ -215,8 +238,35 @@ export class AppController {
       resetPosition: () => this.resetPosition(), restartAdapter: () => this.restartAdapterSafely(),
       characterAllowed: this.characters.isAvailable,
     })
+    this.packUpdates = new PackUpdateService({ ...(__APP_QA__ && process.env.ELECTRON_SMOKE_PACK_UPDATES ? { provider: {
+      feed: async (...args: Parameters<import("./pack-updates/HuggingFacePackProvider").HuggingFacePackProvider["feed"]>) => (await import("./pack-updates/PackUpdateSmoke")).createPackUpdateSmokeProvider(process.env.ELECTRON_SMOKE_PACK_UPDATES!).feed(...args),
+      download: async (...args: Parameters<import("./pack-updates/HuggingFacePackProvider").HuggingFacePackProvider["download"]>) => (await import("./pack-updates/PackUpdateSmoke")).createPackUpdateSmokeProvider(process.env.ELECTRON_SMOKE_PACK_UPDATES!).download(...args),
+    } } : {}), registry: characters, dataRoot: app.getPath("userData"), appVersion: app.getVersion(),
+      owner: () => this.settingsWindow.currentOwner(), selected: () => this.settings.characterId,
+      canApply: id => {
+        const allowed = !this.quitting && !this.updatePreparing && !this.transitions.busy && !this.selectionIntent && !this.sideChat.snapshot().applying && (id !== this.settings.characterId || !["answering", "preparing"].includes(this.sideChat.snapshot().phase))
+        const entry = this.characters.get(id)
+        if (!allowed && entry) this.traceCharacter("blocked", entry)
+        return allowed
+      },
+      changed: states => {
+        this.settingsWindow.send(PACK_UPDATE_IPC.changed, states)
+        this.rebuildTray()
+      },
+      apply: async (preview, owner) => {
+        const active = this.settings.characterId === preview.entry.id
+        this.packApplyTarget = preview.entry.id
+        const applyOwner = active ? this.sideChat.beginCharacterApply() : undefined
+        try {
+          const entry = await this.characters.commitImport(preview.token, owner)
+          if (active) await this.selectCharacter(entry)
+        } catch (error) { if (active) this.sideChat.characterFailed(applyOwner); throw error }
+        finally { this.packApplyTarget = null }
+      },
+    })
+    this.packUpdateIpc = new PackUpdateIpcController(this.packUpdates, this.settingsWindow, this.devServerUrl)
     this.characterIpc = new CharacterIpcController({ registry: characters, settings: this.settingsWindow, pet: () => this.pet.window, lab: () => this.lab.window, devServerUrl: this.devServerUrl,
-      select: value => this.selectCharacter(value), selected: () => this.unavailableSelection ?? this.settings.characterId })
+      mutationAllowed: () => !this.packUpdates.applying(), select: value => { if (this.packUpdates.applying()) throw Error("PACK_BUSY"); return this.selectCharacter(value) }, selected: () => this.unavailableSelection ?? this.settings.characterId })
   }
 
   async start(): Promise<void> {
@@ -234,6 +284,8 @@ export class AppController {
     this.settingsIpc.register()
     this.updateIpc.register()
     const updateRecovery = await this.updates.start()
+    await this.packUpdates.start()
+    this.packUpdateIpc.register()
     this.characterIpc.register()
     this.sideChatIpc.register()
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
@@ -253,7 +305,8 @@ export class AppController {
     void this.codexApp.available().then(available => { if (!this.quitting) this.activity.setNavigation(available ? "app" : "none") })
     this.subscriptions.push(this.characters.subscribe(snapshot => {
       const active = snapshot.entries.find(e => e.id === this.settings.characterId)
-      if (active && this.lastReady?.id === active.id && this.lastReady.revision !== active.revision) { this.sideChat.beginCharacterApply(); this.personaGeneration++ }
+      const loading = this.transitions.current?.ticket
+      if (active?.status === "ready" && loading?.id === active.id && loading.revision !== active.revision) this.transitions.begin(active)
       this.pet.send(CHARACTER_IPC.changed, snapshot)
       this.settingsWindow.send(CHARACTER_IPC.changed, snapshot)
       if (this.lab.window && !this.lab.window.isDestroyed()) this.lab.window.webContents.send(CHARACTER_IPC.changed, snapshot)
@@ -368,7 +421,7 @@ export class AppController {
   }
 
   private async confirmUpdateRestart(): Promise<boolean> {
-    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || !this.packUpdates.readyForUpdate() || this.transitions.busy || this.selectionIntent !== null)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
     const chat = this.sideChat.snapshot()
     const running = chat.phase === "answering" || chat.phase === "preparing"
     const answer = await dialog.showMessageBox({ type: "question", title: appText("업데이트 및 재시작"),
@@ -376,14 +429,14 @@ export class AppController {
       detail: appText("임시 대화·초안·첨부는 재시작하면 사라집니다. 설정·캐릭터팩·위치는 보존됩니다. 부모 Codex 작업은 계속 실행됩니다.") + (process.platform === "darwin" ? "\n" + appText("승인 후 Mac이 업데이트를 준비하면 다음 앱 종료 때 적용될 수 있습니다.") : ""),
       buttons: [appText("취소"), appText(running ? "자식 중단 및 재시작" : "업데이트 및 재시작")], defaultId: 0, cancelId: 0 })
     if (answer.response !== 1) return false
-    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
+    if (this.osEnding || this.quitting || (!this.characters.readyForUpdate() || !this.packUpdates.readyForUpdate() || this.transitions.busy || this.selectionIntent !== null)) throw Error(this.osEnding ? "OS_SHUTDOWN" : "PACK_BUSY")
     this.updatePreparing = true; setApplicationInputLocked(true); this.rebuildTray()
     return true
   }
 
   private async prepareUpdateExit(): Promise<void> {
     if (this.osEnding) throw Error("OS_SHUTDOWN")
-    if ((!this.characters.readyForUpdate() || this.readyWaiters.size > 0)) throw Error("PACK_BUSY")
+    if ((!this.characters.readyForUpdate() || !this.packUpdates.readyForUpdate() || this.transitions.busy || this.selectionIntent !== null)) throw Error("PACK_BUSY")
     this.placementOpening?.abort(); this.activityBubble.cancelPlacement(); this.petDrag.cancel()
     if (this.saveTimer) clearTimeout(this.saveTimer); this.saveTimer = null
     try { await this.store.save(this.savedSettings()) } catch { throw Error("SAVE_FAILED") }
@@ -401,13 +454,25 @@ export class AppController {
     await this.quitPromise
   }
 
-  private async cleanupForExit(forUpdate = false): Promise<void> {
-    if (this.quitting) return
+  private cleanupForExit(forUpdate = false): Promise<void> {
+    this.cleanupPromise ??= this.performExitCleanup(forUpdate)
+    return this.cleanupPromise
+  }
+  private async performExitCleanup(forUpdate: boolean): Promise<void> {
     this.placementOpening?.abort()
     this.activityBubble.cancelPlacement()
     this.petDrag.cancel()
     this.quitting = true
     setApplicationInputLocked(true)
+    // Native quit can bypass the cached menu. Settle renderer readiness first
+    // so an active pack apply can finish cleanup without waiting for a frame
+    // from windows/side chat that teardown is about to destroy.
+    this.transitions.retire()
+    this.packUpdateIpc.dispose()
+    await this.packUpdates.dispose()
+    // A failed renderer releases transition.done before its independent
+    // rollback finishes. Keep registry/window teardown behind both owners.
+    await Promise.allSettled([...this.recoveryTasks])
     if (forUpdate) this.updates.stopBackgroundChecks()
     else this.updates.dispose()
     this.chatEntry.cancel()
@@ -430,7 +495,6 @@ export class AppController {
     this.settingsIpc.dispose()
     this.updateIpc.dispose()
     this.characterIpc.dispose()
-    for (const waiter of this.readyWaiters) waiter.finish(new Error("PACK_CANCELLED"))
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe()
     this.activityTitles.dispose()
     await this.activity.dispose()
@@ -440,6 +504,7 @@ export class AppController {
     this.pet.destroy()
     this.lab.destroy()
     this.tray.destroy()
+    await this.characterTrace.flush()
     screen.removeListener("display-added", this.onDisplaysChanged)
     screen.removeListener("display-removed", this.onDisplaysChanged)
     screen.removeListener("display-metrics-changed", this.onDisplaysChanged)
@@ -465,22 +530,38 @@ export class AppController {
     ipcMain.handle(IPC.resetPosition, (event) => { requirePet(event); this.resetPosition() })
     ipcMain.handle(IPC.mousePassthrough, (event, ignore: unknown) => { requirePet(event); if (typeof ignore !== "boolean") throw new Error("invalid passthrough state"); this.pet.setMousePassthrough(ignore) })
     ipcMain.on(IPC.interactionLock, (event, locked: unknown) => { if (trustedPet(event) && typeof locked === "boolean") this.pet.setInteractionLocked(locked) })
-    ipcMain.on(IPC.petReady, (event, value: unknown) => {
+    ipcMain.handle(CHARACTER_LOAD_REQUEST, (event, selection: CharacterSelection) => {
+      requirePet(event)
+      const current = this.characters.get(this.settings.characterId)
+      if (this.quitting || !selection || current?.status !== "ready" || current.id !== selection.id || current.revision !== selection.revision) return null
+      return this.transitions.begin(current).ticket
+    })
+    ipcMain.on(IPC.petReady, async (event, value: unknown) => {
       const info = validatePetReadyInfo(value)
-      if (!trustedPet(event) || !info) return
+      if (!trustedPet(event) || !info || !this.transitions.matches(info.ticket) || !this.transitions.busy) return
       const requested = this.characters.get(this.settings.characterId)
       if (!requested || info.characterId !== requested.id || (info.revision ?? "builtin") !== requested.revision) return
       this.lastReady = { id: requested.id, revision: requested.revision }
-      void this.refreshPersona(this.lastReady)
-      for (const waiter of this.readyWaiters) if (waiter.selection.id === requested.id && waiter.selection.revision === requested.revision) waiter.finish()
+      await this.refreshPersona(this.lastReady, info.ticket)
+      if (!this.transitions.ready(info.ticket)) return
+      this.traceCharacter("ready", this.lastReady)
       if (__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1") this.smokeReadyCharacters.add(info.characterId)
       this.startup?.close()
       this.pet.reportReady()
       this.pet.send(IPC.adapterStatus, this.adapter.getStatus())
       if (__APP_QA__ && process.env.ELECTRON_SMOKE_TEST === "1") void this.finishSmoke(info.characterId)
     })
+    ipcMain.on(CHARACTER_LOAD_DIAGNOSTIC, (event, value: unknown) => {
+      if (!trustedPet(event)) return
+      const load = parseCharacterLoadDiagnostic(value)
+      if (!load) return
+      const now = Date.now()
+      if (now - this.traceRate.start > 60_000) this.traceRate = { start: now, count: 0 }
+      if (++this.traceRate.count > 256) return
+      this.traceCharacter("renderer", { id: load.id, revision: load.revision }, load, load.loadId)
+    })
     ipcMain.on(IPC.alphaFailure, (event, value: unknown) => { if (trustedPet(event)) { const message = validateShortMessage(value); if (message) this.warn(`Alpha hit test: ${message}`) } })
-    ipcMain.on(CHARACTER_IPC.loadFailed, (event, value: CharacterSelection) => { if (trustedPet(event) && value && typeof value.id === "string" && typeof value.revision === "string") void this.characterLoadFailed(value).catch(() => this.warn("캐릭터 복원에 실패했습니다.")) })
+    ipcMain.on(CHARACTER_IPC.loadFailed, (event, value: unknown) => { const ticket = parseCharacterLoadTicket(value); if (trustedPet(event) && ticket) void this.characterLoadFailed(ticket).catch(() => this.warn("캐릭터 복원에 실패했습니다.")) })
     ipcMain.handle(IPC.adapterRestart, async (event) => { requirePet(event); await this.restartAdapterSafely() })
     ipcMain.handle(IPC.adapterDiagnostics, (event) => { requirePet(event); this.adapter.requestDiagnostics(); return this.adapter.getDiagnostics() })
     ipcMain.handle(IPC.petReload, (event) => { requirePet(event); this.pet.reload() })
@@ -507,7 +588,8 @@ export class AppController {
     this.pet.setLayoutMode(enabled)
   }
 
-  private updateSettings(patch: DesktopSettingsPatch): DesktopSettingsV1 {
+  private updateSettings(patch: DesktopSettingsPatch, recovery?: CharacterLoadTicket): DesktopSettingsV1 {
+    if (patch.characterId && this.packApplyTarget && patch.characterId !== this.packApplyTarget && !(recovery && this.transitions.matches(recovery) && this.transitions.current?.phase === "failed")) throw Error("PACK_BUSY")
     if (!applicationInputAllowed()) return structuredClone(this.settings)
     if (patch.visible === false || patch.characterId !== undefined) { this.placementOpening?.abort(); this.activityBubble.cancelPlacement() }
     if (patch.visible === false || patch.scale !== undefined || patch.characterId !== undefined) this.petDrag.cancel()
@@ -517,7 +599,7 @@ export class AppController {
       this.unavailableSelection = null
     }
     if (patch.characterId !== undefined && patch.characterId !== this.settings.characterId) {
-      this.activityBubble.presentation.begin(); this.sideChat.beginCharacterApply(); this.personaGeneration++
+      this.activityBubble.presentation.begin(); this.transitions.begin(this.characters.get(patch.characterId)!)
     }
     const previousScale = this.settings.scale, previousChatEnabled = this.settings.sideChatEnabled
     Object.assign(this.settings, patch)
@@ -584,13 +666,13 @@ export class AppController {
   }
 
   private savedSettings(): DesktopSettingsV1 { return { ...this.settings, characterId: this.unavailableSelection ?? this.settings.characterId } }
-  private async refreshPersona(selection: CharacterSelection) {
+  private async refreshPersona(selection: CharacterSelection, ticket?: CharacterLoadTicket) {
     const requested = this.characters.get(this.settings.characterId)
     if (requested?.id !== selection.id || requested.revision !== selection.revision) return
     const generation = ++this.personaGeneration
     try {
       const binding = await this.personaResolver.resolve(selection, this.settings.language)
-      if (generation === this.personaGeneration && this.lastReady?.id === binding.id && this.lastReady.revision === binding.revision) this.sideChat.applyPersona(binding)
+      if (generation === this.personaGeneration && (!ticket || this.transitions.matches(ticket)) && this.lastReady?.id === binding.id && this.lastReady.revision === binding.revision) this.sideChat.applyPersona(binding, ticket?.requestId)
     } catch { if (generation === this.personaGeneration) this.sideChat.personaFailed() }
   }
   private async openSideChat(key?: string, activityId?: string) {
@@ -627,28 +709,60 @@ export class AppController {
     this.sideChat.setPreparation({ hasMoreParents: catalog.hasMore, parentQuery: page.query })
   }
   private async selectCharacter(selection: CharacterSelection): Promise<void> {
+    if (!applicationInputAllowed() || this.quitting) throw Error("PACK_BUSY")
+    const intent = this.selectionIntent = {}
+    let ticket: CharacterLoadTicket | undefined
     this.petDrag.cancel()
-    await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
-    if (this.lastReady?.id === selection.id && this.lastReady.revision === selection.revision && this.settings.characterId === selection.id) { this.updateSettings({ characterId: selection.id }); return }
-    await new Promise<void>((resolveReady, reject) => {
-      const waiter = { selection, finish: (error?: Error) => { clearTimeout(timer); this.readyWaiters.delete(waiter); error ? reject(error) : resolveReady() } }
-      const timer = setTimeout(() => { waiter.finish(new Error("PACK_LOAD")); void this.characterLoadFailed(selection) }, 45_000)
-      this.readyWaiters.add(waiter)
+    try {
+      await this.characters.ensureReady(selection, value => this.settingsWindow.send(CHARACTER_IPC.progress, value))
+      if (this.selectionIntent !== intent || this.quitting) throw Error("PACK_CANCELLED")
+      const transition = this.transitions.begin(selection)
+      ticket = transition.ticket
+      this.traceCharacter("request", selection)
+      this.traceCharacter("worker-ready", selection)
       this.updateSettings({ characterId: selection.id })
-    })
+      await transition.done
+    } catch (error) {
+      if (ticket) this.transitions.fail(ticket, error instanceof Error ? error : Error("PACK_LOAD"))
+      throw error
+    } finally { if (this.selectionIntent === intent) this.selectionIntent = null }
   }
-  private async characterLoadFailed(selection: CharacterSelection) {
+  private characterLoadFailed(ticket: CharacterLoadTicket): Promise<void> {
+    const task = this.recoverCharacterFailure(ticket)
+    this.recoveryTasks.add(task)
+    void task.then(() => { this.recoveryTasks.delete(task) }, () => {
+      this.recoveryTasks.delete(task)
+      this.warn("캐릭터 복원을 완료하지 못했습니다.")
+    })
+    return task
+  }
+  private async recoverCharacterFailure(ticket: CharacterLoadTicket) {
     const current = this.characters.get(this.settings.characterId)
-    if (current?.id !== selection.id || current.revision !== selection.revision) return
-    for (const waiter of this.readyWaiters) if (waiter.selection.id === selection.id && waiter.selection.revision === selection.revision) waiter.finish(new Error("PACK_LOAD"))
-    this.personaGeneration++; this.sideChat.characterFailed()
+    if (!this.transitions.fail(ticket)) return
+    this.traceCharacter("failed", ticket, undefined, ticket.requestId)
+    if (current?.id !== ticket.id || current.revision !== ticket.revision) return
+    // Once the last working revision itself fails, it is no longer a recovery
+    // target. Otherwise it and the built-in fallback can alternate forever.
+    if (this.lastReady?.id === ticket.id && this.lastReady.revision === ticket.revision) this.lastReady = null
     this.warn("새 캐릭터를 표시하지 못해 이전 정상 캐릭터로 돌아갑니다.")
     if (current.source === "external" && current.previousVersion && this.lastReady?.id === current.id && this.lastReady.revision !== current.revision) {
-      await this.characters.rollback(selection)
+      // Registry notification starts a new transition for the restored revision.
+      await this.characters.rollback(ticket)
     } else {
       const fallback = this.lastReady && this.characters.isAvailable(this.lastReady.id) && this.lastReady.id !== current.id ? this.lastReady.id : "gpichan"
-      if (current.id !== fallback) this.updateSettings({ characterId: fallback })
+      // Only this failed transition can bypass the external apply reservation.
+      if (current.id !== fallback) this.updateSettings({ characterId: fallback }, ticket)
     }
+    this.traceCharacter("fallback", ticket, undefined, ticket.requestId)
+  }
+
+  private traceCharacter(event: Parameters<CharacterTransitionTrace["record"]>[0]["event"], target: CharacterSelection, load?: CharacterLoadDiagnostic, requestId?: string) {
+    const entry = this.settings && this.characters.get(this.settings.characterId), chat = this.sideChat.snapshot()
+    this.characterTrace.record({ event, requestId: requestId ?? this.transitions.current?.ticket.requestId ?? this.initialTraceId,
+      target: { id: target.id, revision: target.revision }, rendererGeneration: this.transitions.generation,
+      selected: entry ? { id: entry.id, revision: entry.revision } : null, lastReady: this.lastReady, ...(load ? { load } : {}),
+      locks: { waiters: Number(this.transitions.busy), chatApplying: chat.applying, chatPhase: chat.phase, packApplying: this.packUpdates?.applying() ?? false, packTarget: this.packApplyTarget,
+        quitting: this.quitting, updatePreparing: this.updatePreparing, inputAllowed: applicationInputAllowed() } })
   }
 
   private onAdapterStatus(status: AdapterStatus): void {
@@ -664,7 +778,7 @@ export class AppController {
 
   private trayActions(): TrayActions {
     return {
-      inputLocked: () => this.updatePreparing || this.quitting,
+      inputLocked: () => this.updatePreparing || this.quitting || this.packUpdates.applying(),
       checkUpdates: () => { this.updateIpc.open(); void this.updates.act({ action: "check" }) },
       activity: () => this.activity.snapshot(),
       openSideChat: () => { void this.openSideChat() },
@@ -797,6 +911,7 @@ export class AppController {
 
   private async finishSmoke(characterId: string): Promise<void> {
     if (__APP_QA__) {
+    const { runPackUpdateSmoke } = await import("./pack-updates/PackUpdateSmoke")
     const { runSideChatPackSmoke } = await import("./SideChatPackSmoke")
     const { runHybridBubbleSmoke } = await import("./HybridBubbleSmoke")
     const { runDialogueSmoke } = await import("./DialogueSmoke")
@@ -1118,9 +1233,15 @@ export class AppController {
       try { sideChatPackValidation = await runSideChatPackSmoke({ registry: this.characters, service: this.sideChat, resolver: this.personaResolver, pet: win, select: value => this.selectCharacter(value), output: process.env.ELECTRON_SMOKE_SIDE_CHAT_PACKS }) }
       catch { this.warn("Side chat pack switch smoke failed") }
     }
+    let packUpdateValidation = null
+    if (process.env.ELECTRON_SMOKE_PACK_UPDATES && win) {
+      try { packUpdateValidation = await runPackUpdateSmoke({ path: process.env.ELECTRON_SMOKE_PACK_UPDATES, registry: this.characters, service: this.packUpdates, settings: this.settingsWindow, pet: win, sideChat: this.sideChat, select: value => this.selectCharacter(value), selected: () => this.settings.characterId }) }
+      catch (error) { this.warn(error instanceof Error ? error.message : "Pack update QA failed") }
+    }
     const adapterDiagnostics = this.adapter.getDiagnostics()
     const protocolDiagnostics = this.protocol.getDiagnostics()
     const result = {
+      packUpdateValidation,
       appReady: app.isReady(),
       customProtocolHandled: win?.webContents.getURL().startsWith(this.devServerUrl ? "http://127.0.0.1:4173/" : "pet://app/") ?? false,
       petWindowCreated: Boolean(win && !win.isDestroyed()),

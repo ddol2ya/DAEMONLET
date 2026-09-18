@@ -4,6 +4,7 @@ import { CharacterIpcController } from "../electron/main/CharacterIpcController"
 import type { CharacterRegistry } from "../electron/main/CharacterRegistry"
 import type { SettingsWindowController } from "../electron/main/SettingsWindowController"
 import { CHARACTER_IPC } from "../electron/shared/character-pack-contract"
+import { randomUUID } from "node:crypto"
 
 const mocks = vi.hoisted(() => ({ handlers: new Map<string, (...args: any[]) => Promise<any>>(), picker: vi.fn(), confirm: vi.fn() }))
 vi.mock("electron", () => ({ ipcMain: { handle: (c: string, fn: (...args: any[]) => Promise<any>) => mocks.handlers.set(c, fn), removeHandler: (c: string) => mocks.handlers.delete(c) }, dialog: { showOpenDialog: mocks.picker, showMessageBox: mocks.confirm } }))
@@ -14,14 +15,14 @@ function fixture() {
   const win = (id: number, page: string) => ({ isDestroyed: () => false, webContents: { id, mainFrame: { url: `pet://app/${page}.html` } } }) as unknown as BrowserWindow
   const settings = win(1, "settings"), pet = win(2, "pet"), lab = win(3, "index")
   const entry = { id: "fresh", name: "Fresh", source: "external", status: "ready", version: "2.0.0", previousVersion: "1.0.0", revision: "a".repeat(64) }
-  const registry = { snapshot: vi.fn(() => ({ generation: 1, entries: [entry] })), get: vi.fn(() => entry), prepareImport: vi.fn(async () => ({})), commitImport: vi.fn(async () => entry), cancelImport: vi.fn(async () => {}), rollback: vi.fn(async () => {}), remove: vi.fn(async () => {}) }
+  const registry = { snapshot: vi.fn(() => ({ generation: 1, entries: [entry] })), get: vi.fn(() => entry), prepareImport: vi.fn(async (_path: string, _owner: string, _progress?: (value: unknown) => void) => ({ token: randomUUID(), expiresAt: Date.now() + 600_000 })), commitImport: vi.fn(async () => entry), cancelImport: vi.fn(async () => {}), rollback: vi.fn(async () => {}), remove: vi.fn(async () => {}) }
   const select = vi.fn(async () => {})
   const window = { window: settings, currentOwner: () => "owner-1", send: vi.fn() } as unknown as SettingsWindowController
   const controller = new CharacterIpcController({ registry: registry as unknown as CharacterRegistry, settings: window, pet: () => pet, lab: () => lab, select, selected: () => "fresh" })
   controllers.push(controller); controller.register()
   const event = (w = settings) => ({ sender: w.webContents, senderFrame: w.webContents.mainFrame }) as IpcMainInvokeEvent
   const invoke = (channel: string, args: unknown[] = [], e = event()) => mocks.handlers.get(channel)!(e, ...args)
-  return { entry, registry, settings, pet, lab, window, select, event, invoke }
+  return { entry, registry, settings, pet, lab, window, select, event, invoke, controller }
 }
 describe("character IPC authority", () => {
   it("allows Pet/Lab read and select, while only Settings can mutate packs", async () => {
@@ -44,15 +45,16 @@ describe("character IPC authority", () => {
   it("uses the native picker result and binds the preview to its current owner", async () => {
     const f = fixture()
     mocks.picker.mockResolvedValueOnce({ canceled: true, filePaths: [] })
-    expect(await f.invoke(CHARACTER_IPC.choose)).toEqual({ ok: true, value: null })
+    expect(await f.invoke(CHARACTER_IPC.choose, [randomUUID()])).toEqual({ ok: true, value: null })
     mocks.picker.mockResolvedValueOnce({ canceled: false, filePaths: ["/native/selected.petchar"] })
-    await f.invoke(CHARACTER_IPC.choose)
-    expect(f.registry.prepareImport).toHaveBeenCalledExactlyOnceWith("/native/selected.petchar", "owner-1", expect.any(Function))
+    await f.invoke(CHARACTER_IPC.choose, [randomUUID()])
+    expect(f.registry.prepareImport).toHaveBeenCalledExactlyOnceWith("/native/selected.petchar", expect.any(String), expect.any(Function))
+    expect(JSON.parse(f.registry.prepareImport.mock.calls[0][1])).toEqual(["owner-1", "local-import", expect.any(String)])
   })
   it("sends progress only to the window that owns the import", async () => {
     const f = fixture()
     mocks.picker.mockResolvedValueOnce({ canceled: false, filePaths: ["/native/selected.petchar"] })
-    await f.invoke(CHARACTER_IPC.choose)
+    await f.invoke(CHARACTER_IPC.choose, [randomUUID()])
     const progress = (f.registry.prepareImport.mock.calls[0] as unknown as [string, string, (value: unknown) => void])[2]
     progress({ phase: "rig", completed: 1, total: 3 })
     expect(f.window.send).toHaveBeenCalledExactlyOnceWith(CHARACTER_IPC.progress, { phase: "rig", completed: 1, total: 3 })
@@ -77,5 +79,37 @@ describe("character IPC authority", () => {
     mocks.confirm.mockResolvedValueOnce({ response: 1 }); f.select.mockRejectedValueOnce(new Error("PACK_LOAD"))
     expect(await f.invoke(CHARACTER_IPC.remove, [target])).toMatchObject({ ok: false, code: "PACK_LOAD" })
     expect(f.registry.remove).not.toHaveBeenCalled()
+  })
+  it("never lets a late page cancellation cancel the next local operation", async () => {
+    const f = fixture(), first = randomUUID(), second = randomUUID()
+    mocks.picker.mockResolvedValue({ canceled: false, filePaths: ["/native/selected.petchar"] })
+    await f.invoke(CHARACTER_IPC.choose, [first])
+    const ownerA = f.registry.prepareImport.mock.calls[0][1]
+    await f.invoke(CHARACTER_IPC.cancel, [first])
+    await f.invoke(CHARACTER_IPC.choose, [second])
+    const ownerB = f.registry.prepareImport.mock.calls[1][1]
+    expect(ownerB).not.toBe(ownerA)
+    f.registry.cancelImport.mockClear()
+    await f.invoke(CHARACTER_IPC.cancel, [first])
+    expect(f.registry.cancelImport).not.toHaveBeenCalled()
+    await f.invoke(CHARACTER_IPC.cancel, [second])
+    expect(f.registry.cancelImport).toHaveBeenCalledExactlyOnceWith(ownerB)
+  })
+  it("retires a picker before its late file result can start validation", async () => {
+    const f = fixture(), id = randomUUID(); let picked!: (v: unknown) => void
+    mocks.picker.mockReturnValue(new Promise(resolve => { picked = resolve }))
+    const request = f.invoke(CHARACTER_IPC.choose, [id])
+    await vi.waitFor(() => expect(mocks.picker).toHaveBeenCalled())
+    await f.controller.retireOwner("owner-1")
+    picked({ canceled: false, filePaths: ["/native/selected.petchar"] })
+    expect(await request).toMatchObject({ ok: false, code: "PACK_TRANSACTION" })
+    expect(f.registry.prepareImport).not.toHaveBeenCalled()
+  })
+  it("cannot cancel a remote registry operation or commit a foreign token", async () => {
+    const f = fixture()
+    await f.invoke(CHARACTER_IPC.cancel, [randomUUID()])
+    expect(f.registry.cancelImport).not.toHaveBeenCalled()
+    expect(await f.invoke(CHARACTER_IPC.commit, [randomUUID()])).toMatchObject({ ok: false, code: "PACK_TRANSACTION" })
+    expect(f.registry.commitImport).not.toHaveBeenCalled()
   })
 })

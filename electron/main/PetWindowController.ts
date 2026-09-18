@@ -13,6 +13,7 @@ type PetWindowOptions = {
   onWarning: (message: string) => void
   onCloseRequested: () => void
   onContextMenu?: (window: BrowserWindow) => void
+  onRendererReset?: () => void
 }
 
 export class PetWindowController {
@@ -53,6 +54,9 @@ export class PetWindowController {
       focusable: true,
       acceptFirstMouse: true,
       webPreferences: { additionalArguments: languageArguments(),
+        // A transparent/background pet must render its first real frame even
+        // while Settings obscures it; readiness still waits for that frame.
+        backgroundThrottling: false,
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
@@ -74,9 +78,11 @@ export class PetWindowController {
       if (!win.isDestroyed()) { event.preventDefault(); this.options.onCloseRequested() }
     })
     win.webContents.on("render-process-gone", (_event, details) => {
+      this.options.onRendererReset?.()
       this.failSafe(`Pet renderer exited: ${details.reason}`)
       if (!this.crashReloaded) { this.crashReloaded = true; win.webContents.reload() }
     })
+    win.webContents.on("did-start-loading", () => this.options.onRendererReset?.())
     win.webContents.on("did-fail-load", (_event, code, description, url, mainFrame) => {
       if (mainFrame) this.failSafe(`Pet load failed (${code} ${description}): ${url}`)
     })

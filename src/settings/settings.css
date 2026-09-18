@@ -196,3 +196,10 @@ select { padding: 8px 30px 8px 11px; border: 1px solid #dfe4d9; border-radius: 7
 @media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; } }
 
 .update-progress { display: block; width: 100%; margin: 16px 0; accent-color: var(--accent, #365d4f); }
+
+.pack-update { border-top: 1px solid var(--border, #deded9); margin-top: 12px; padding-top: 8px; }
+.pack-update p { margin: 6px 0; }
+.pack-update-source { overflow-wrap: anywhere; }
+.pack-update-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pack-update-auto { display: flex; align-items: flex-start; gap: 6px; margin-top: 10px; font-size: 12px; }
+.pack-update progress { width: 100%; }

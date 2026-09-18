@@ -1,3 +1,5 @@
+import { PackUpdateCard } from "./PackUpdateCard"
+import type { PackUpdateState } from "../../electron/shared/pack-update-contract"
 import { useT } from "../i18n/useLanguage"
 import { useEffect, useRef, useState } from "react"
 import { PACK_ERRORS, type CharacterEntry, type CharacterSnapshot, type ImportPreview, type PackProgress } from "../../electron/shared/character-pack-contract"
@@ -6,10 +8,26 @@ import type { SettingsPageProps } from "./SettingsApp"
 const size = (bytes: number) => bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`
 export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPageProps, "api" | "run" | "busy"> & { selected: string }) {
   const t = useT()
+  const [updates, setUpdates] = useState<PackUpdateState[]>([])
+  const [checkingAll, setCheckingAll] = useState(false)
+  useEffect(() => {
+    let live = true
+    const receive = (value: PackUpdateState[]) => { if (live) setUpdates(value) }
+    const off = api.packUpdates.onChanged(receive)
+    void api.packUpdates.list().then(receive).catch(() => {})
+    return () => { live = false; off() }
+  }, [api])
+  const checkAll = async () => {
+    setCheckingAll(true)
+    try { for (const state of updates) await api.packUpdates.act({ action: "check", packId: state.packId }).catch(() => {}) }
+    finally { setCheckingAll(false) }
+  }
   const [snapshot, setSnapshot] = useState<CharacterSnapshot | null>(null)
+  const [snapshotError, setSnapshotError] = useState(false)
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [installed, setInstalled] = useState<CharacterEntry | null>(null)
   const [choosing, setChoosing] = useState(false)
+  const localRequest = useRef<string | null>(null)
   const [progress, setProgress] = useState<PackProgress | null>(null)
   const loadingDialog = useRef<HTMLDialogElement>(null)
   const loading = choosing && progress !== null || busy === "캐릭터 적용" || busy === "이전 버전 복원"
@@ -17,11 +35,19 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
   const trigger = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     let active = true
-    const receive = (s: CharacterSnapshot) => { if (active) setSnapshot(previous => !previous || s.generation >= previous.generation ? s : previous) }
+    const receive = (s: CharacterSnapshot) => { if (active) { setSnapshotError(false); setSnapshot(previous => !previous || s.generation >= previous.generation ? s : previous) } }
     const unsubscribe = api.characters.onChanged(receive)
     const unsubscribeProgress = api.characters.onProgress(value => { if (active) setProgress(value) })
-    void run("캐릭터 목록 확인", () => api.characters.list().then(receive))
-    return () => { active = false; unsubscribe(); unsubscribeProgress(); void api.characters.cancelImport().catch(() => {}) }
+    // A read must still run when another tab owns a settings action. The
+    // shared mutation runner drops concurrent work instead of queuing it.
+    void api.characters.list().then(receive).catch(() => { if (active) setSnapshotError(true) })
+    return () => {
+      active = false; unsubscribe(); unsubscribeProgress()
+      // A tab owns only its local picker. The settings document owns remote
+      // downloads/validation, restored from the Main snapshot on tab return.
+      const request = localRequest.current; localRequest.current = null
+      if (request) void api.characters.cancelImport(request).catch(() => {})
+    }
   }, [api])
   useEffect(() => {
     if (preview && !dialog.current?.open) dialog.current?.showModal()
@@ -32,19 +58,21 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
     if (!loading && loadingDialog.current?.open) { loadingDialog.current.close(); trigger.current?.focus() }
   }, [loading])
   const choose = async () => {
+    const request = crypto.randomUUID(); localRequest.current = request
     setProgress(null); setChoosing(true); setInstalled(null)
-    try { const result = await run("캐릭터 팩 검증", () => api.characters.chooseImport()); if (result) setPreview(result) }
-    finally { setChoosing(false) }
+    try { const result = await run("캐릭터 팩 검증", () => api.characters.chooseImport(request)); if (localRequest.current === request) { if (result) setPreview(result); else localRequest.current = null } }
+    finally { if (localRequest.current === request || localRequest.current === null) setChoosing(false) }
   }
-  const cancel = async () => { await api.characters.cancelImport(); setPreview(null) }
+  const cancel = async () => { const request = localRequest.current; localRequest.current = null; if (request) await api.characters.cancelImport(request); setPreview(null); setChoosing(false) }
   const apply = (entry: CharacterEntry) => { setProgress(null); return void run("캐릭터 적용", () => api.characters.select({ id: entry.id, revision: entry.revision })) }
   const commit = async () => {
     if (!preview) return
     const result = await run("캐릭터 팩 설치", () => api.characters.commitImport(preview.token))
-    if (result) { setInstalled(result); setPreview(null) }
+    if (result) { localRequest.current = null; setInstalled(result); setPreview(null) }
   }
   return <div className="character-packs">
     <div className="pack-toolbar"><h2>{t("캐릭터")}</h2><button ref={trigger} className="button secondary small" disabled={Boolean(busy)} onClick={() => void choose()}>{t("＋ 캐릭터 추가")}</button></div>
+    {updates.length > 0 && <button className="text-button" disabled={checkingAll} onClick={() => void checkAll()}>{t(checkingAll ? "업데이트 확인 중…" : "표시된 HF 출처에서 모든 팩 확인")}</button>}
     {snapshot?.warning && <div className="notice warning" role="status">{t(snapshot.warning)}</div>}
     {installed && <div className="notice success pack-progress" role="status"><span>{t`${installed.name} ${installed.version} 버전이 준비됐어요.`}</span><button className="button primary small" disabled={Boolean(busy)} onClick={() => apply(installed)}>{t("지금 적용")}</button></div>}
     <div className="pack-list" role="radiogroup" aria-label={t("캐릭터 선택")}>{snapshot?.entries.map(entry => <article className={`pack-card${selected === entry.id ? " selected" : ""}`} key={entry.id}>
@@ -56,9 +84,9 @@ export function CharacterPacks({ api, run, busy, selected }: Pick<SettingsPagePr
         <button className="text-button" disabled={Boolean(busy)} onClick={() => void choose()}>{t("수정본 가져오기")}</button>
         {entry.previousVersion && <button className="text-button" disabled={Boolean(busy)} onClick={() => void run("이전 버전 복원", () => api.characters.rollback({ id: entry.id, revision: entry.revision }))}>{t("이전 버전 복원")}</button>}
         <button className="text-button danger-text" disabled={Boolean(busy)} onClick={() => void run("캐릭터 제거", () => api.characters.remove({ id: entry.id, revision: entry.revision }))}>{t("제거")}</button>
-      </div></div>}
+      </div>{entry.update ? <PackUpdateCard entry={entry} state={updates.find(u => u.packId === entry.id)} api={api.packUpdates} selected={selected === entry.id} /> : <p className="fine-print">{t("온라인 업데이트를 사용하려면 출처가 포함된 같은 외형의 팩을 한 번 가져오세요.")}</p>}</div>}
     </article>)}</div>
-    {!snapshot && <p role="status">{t("캐릭터 목록 불러오는 중…")}</p>}
+    {!snapshot && (snapshotError ? <p role="alert">{t(PACK_ERRORS.PACK_IO)}</p> : <p role="status">{t("캐릭터 목록 불러오는 중…")}</p>)}
     {snapshot && <p className="pack-storage">{t("외부 캐릭터 저장량 ")}<strong>{size(snapshot.storageBytes)}</strong> / {size(snapshot.storageLimitBytes)}</p>}
     <dialog ref={loadingDialog} className="plan-dialog loading-dialog" aria-labelledby="pack-loading-title" aria-busy={loading} onCancel={event => { event.preventDefault(); if (choosing) void cancel() }}>
       <span className="loading-spinner" aria-hidden="true" />

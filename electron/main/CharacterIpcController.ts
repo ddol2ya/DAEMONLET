@@ -6,6 +6,10 @@ import { CHARACTER_IPC, isCharacterId, isRevision, packErrorCode, type Character
 import { isTrustedSender } from "./SecurityPolicy"
 import type { SettingsWindowController } from "./SettingsWindowController"
 import type { CharacterRegistry } from "./CharacterRegistry"
+import { characterImportOwner } from "./CharacterImportOwner"
+
+const requestId = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v)
+type LocalImport = { document: string; request: string; registryOwner: string; token?: string; timer?: ReturnType<typeof setTimeout>; committing?: boolean }
 
 function selection(value: unknown): CharacterSelection {
   const v = value as CharacterSelection
@@ -16,9 +20,10 @@ export class CharacterIpcController {
   private channels: string[] = []
   private dialogOpen = false
   private rates = new Map<number, { start: number; count: number }>()
+  private localImport?: LocalImport
   constructor(private readonly options: {
     registry: CharacterRegistry; settings: SettingsWindowController; pet: () => BrowserWindow | null; lab: () => BrowserWindow | null
-    devServerUrl?: string; select: (value: CharacterSelection) => Promise<void>; selected: () => string
+    mutationAllowed?: () => boolean; devServerUrl?: string; select: (value: CharacterSelection) => Promise<void>; selected: () => string
   }) {}
   private bind(channel: string, arity: number, mutation: boolean, action: (owner: string, args: unknown[]) => unknown | Promise<unknown>) {
     this.channels.push(channel)
@@ -31,6 +36,7 @@ export class CharacterIpcController {
       else if (++rate.count > 24) return { ok: false, code: "PACK_BUSY" }
       const owner = trustedSettings ? o.settings.currentOwner() : String(event.sender.id)
       if (!owner) return { ok: false, code: "PACK_TRANSACTION" }
+      if (mutation && (!applicationInputAllowed() || o.mutationAllowed?.() === false)) return { ok: false, code: "PACK_BUSY" }
       try { return { ok: true, value: await action(owner, args) } } catch (error) { return { ok: false, code: packErrorCode(error) } }
     })
   }
@@ -39,23 +45,44 @@ export class CharacterIpcController {
     this.dialogOpen = true
     try { return await action() } finally { this.dialogOpen = false }
   }
+  private async cancelLocal(document: string, request?: string) {
+    const operation = this.localImport
+    if (!operation || operation.document !== document || request !== undefined && operation.request !== request) return
+    this.localImport = undefined; clearTimeout(operation.timer)
+    if (!operation.committing) await this.options.registry.cancelImport(operation.registryOwner)
+  }
+  /** Actual document retirement, never called merely for a settings tab change. */
+  retireOwner(document: string) { return this.cancelLocal(document) }
   register() {
     const o = this.options
     this.bind(CHARACTER_IPC.list, 0, false, () => o.registry.snapshot())
     this.bind(CHARACTER_IPC.select, 1, false, (_owner, [v]) => o.select(selection(v)))
-    this.bind(CHARACTER_IPC.choose, 0, true, owner => this.nativeDialog(async () => {
-      const picked = await dialog.showOpenDialog(o.settings.window!, { title: appText("캐릭터 추가"), filters: [{ name: appText("캐릭터 팩"), extensions: ["petchar", "zip"] }], properties: ["openFile"] })
-      if (picked.canceled || !picked.filePaths[0]) return null
-      if (!applicationInputAllowed() || o.settings.currentOwner() !== owner) throw new Error("PACK_TRANSACTION")
-      return o.registry.prepareImport(picked.filePaths[0], owner, value => {
-        if (o.settings.currentOwner() === owner) o.settings.send(CHARACTER_IPC.progress, value)
-      })
+    this.bind(CHARACTER_IPC.choose, 1, true, (owner, [request]) => this.nativeDialog(async () => {
+      if (!requestId(request)) throw new Error("PACK_TRANSACTION")
+      if (this.localImport) throw new Error("PACK_BUSY")
+      const operation: LocalImport = { document: owner, request, registryOwner: characterImportOwner(owner, "local-import") }
+      this.localImport = operation
+      try {
+        const picked = await dialog.showOpenDialog(o.settings.window!, { title: appText("캐릭터 추가"), filters: [{ name: appText("캐릭터 팩"), extensions: ["petchar", "zip"] }], properties: ["openFile"] })
+        if (picked.canceled || !picked.filePaths[0]) { await this.cancelLocal(owner, request); return null }
+        if (!applicationInputAllowed() || o.settings.currentOwner() !== owner || this.localImport !== operation) throw new Error("PACK_TRANSACTION")
+        const preview = await o.registry.prepareImport(picked.filePaths[0], operation.registryOwner, value => {
+          if (this.localImport === operation && o.settings.currentOwner() === owner) o.settings.send(CHARACTER_IPC.progress, value)
+        })
+        if (this.localImport !== operation || o.settings.currentOwner() !== owner) { await o.registry.cancelImport(operation.registryOwner); throw new Error("PACK_TRANSACTION") }
+        operation.token = preview.token
+        operation.timer = setTimeout(() => { void this.cancelLocal(owner, request) }, Math.max(1, preview.expiresAt - Date.now()))
+        return preview
+      } catch (error) { if (this.localImport === operation) await this.cancelLocal(owner, request); throw error }
     }))
-    this.bind(CHARACTER_IPC.commit, 1, true, (owner, [token]) => {
-      if (typeof token !== "string" || token.length !== 36) throw new Error("PACK_TRANSACTION")
-      return o.registry.commitImport(token, owner)
+    this.bind(CHARACTER_IPC.commit, 1, true, async (owner, [token]) => {
+      const operation = this.localImport
+      if (typeof token !== "string" || token.length !== 36 || !operation || operation.document !== owner || operation.token !== token) throw new Error("PACK_TRANSACTION")
+      operation.committing = true; clearTimeout(operation.timer)
+      try { return await o.registry.commitImport(token, operation.registryOwner) }
+      finally { if (this.localImport === operation) this.localImport = undefined; await o.registry.cancelImport(operation.registryOwner) }
     })
-    this.bind(CHARACTER_IPC.cancel, 0, true, owner => o.registry.cancelImport(owner))
+    this.bind(CHARACTER_IPC.cancel, 1, true, (owner, [request]) => { if (!requestId(request)) throw new Error("PACK_TRANSACTION"); return this.cancelLocal(owner, request) })
     for (const [channel, mode] of [[CHARACTER_IPC.remove, "remove"], [CHARACTER_IPC.rollback, "rollback"]] as const) this.bind(channel, 1, true, (owner, [v]) => this.nativeDialog(async () => {
       const target = selection(v), entry = o.registry.get(target.id)
       if (!entry || entry.source !== "external" || entry.revision !== target.revision) throw new Error("PACK_UNAVAILABLE")
@@ -72,5 +99,5 @@ export class CharacterIpcController {
       return true
     }))
   }
-  dispose() { for (const channel of this.channels) ipcMain.removeHandler(channel); this.channels = []; this.rates.clear() }
+  dispose() { if (this.localImport) void this.retireOwner(this.localImport.document); for (const channel of this.channels) ipcMain.removeHandler(channel); this.channels = []; this.rates.clear() }
 }

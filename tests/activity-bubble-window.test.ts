@@ -89,6 +89,21 @@ describe("native activity window arbitration", () => {
     expect(f.win.visible).toBe(false); expect(settings).toMatchObject({ taskBubblesEnabled: false, speechBubblesEnabled: false, sideChatEnabled: false })
     f.c.destroy()
   })
+  it.each([false, true])("does not recurse when Windows hide emits before visibility settles (locked=%s)", async locked => {
+    const f = await fixture()
+    if (locked) f.c.setInteractionLocked(true, true)
+    let hides = 0
+    f.win.hide.mockImplementation(() => {
+      if (++hides > 8) throw Error("recursive native hide")
+      // A native notification can arrive before isVisible changes. Repeated
+      // release notifications must not create another synchronous hide chain.
+      f.win.emit("hide"); f.win.visible = false
+    })
+    expect(() => f.c.presentation.begin()).not.toThrow()
+    expect(f.c.presentation.interactionLocked).toBe(false)
+    expect(f.win.visible).toBe(false); expect(hides).toBeLessThanOrEqual(2)
+    f.c.destroy()
+  })
   it("shows loaded activity even when a hidden window never emits ready-to-show", async () => {
     const f = await fixture(false)
     expect(f.win.visible).toBe(false)

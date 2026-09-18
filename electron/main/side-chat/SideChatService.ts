@@ -74,12 +74,17 @@ export class SideChatService {
     this.publish()
   }
   /** Called at selection intent; replies are withheld until the renderer's ready result. */
-  beginCharacterApply() { this.state.applying = true; this.publish() }
-  characterFailed() { this.state.applying = false; const deferred = this.deferred; this.deferred = null; deferred?.(); this.publish() }
-  applyPersona(binding: PersonaBinding) {
+  private applyOwner: string | null = null
+  beginCharacterApply(owner: string = randomUUID()) { this.applyOwner = owner; this.state.applying = true; this.publish(); return owner }
+  characterFailed(owner?: string) {
+    if (owner !== undefined && this.applyOwner !== owner) return
+    this.applyOwner = null; this.state.applying = false; const deferred = this.deferred; this.deferred = null; deferred?.(); this.publish()
+  }
+  applyPersona(binding: PersonaBinding, owner?: string) {
+    if (owner !== undefined && this.applyOwner !== owner) return
     const changed = this.persona && (this.persona.id !== binding.id || this.persona.revision !== binding.revision || this.persona.compiled.bindingHash !== binding.compiled.bindingHash)
     if (changed) this.resetConversation("character")
-    this.persona = binding; this.state.character = { id: binding.id, label: binding.label }; this.state.applying = false
+    this.persona = binding; this.state.character = { id: binding.id, label: binding.label }; this.applyOwner = null; this.state.applying = false
     const deferred = this.deferred; this.deferred = null; if (!changed) deferred?.()
     this.publish()
   }
@@ -154,7 +159,10 @@ export class SideChatService {
     this.publish()
   }
   private resetConversation(notice: SideChatSnapshot["notice"]) {
-    this.excerpts = []; this.state.attachments = []; this.readScope = null
+    // Unsent excerpts belong to the user's draft in the selected project,
+    // not the retired AI conversation. Parent/policy changes still clear them.
+    if (notice !== "character") { this.excerpts = []; this.state.attachments = [] }
+    this.readScope = null
     this.state.acceptedSubmission = null
     this.state.epoch++; this.state.messages = []; this.state.phase = "idle"; this.state.error = null; this.state.requiresNewConversation = false; this.state.notice = notice
     if (this.state.parent) this.state.parent.contextAt = null

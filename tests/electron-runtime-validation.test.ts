@@ -11,7 +11,9 @@ describe("Electron IPC runtime validation", () => {
   it("rejects server frames, injection fields, and invalid ready reports", () => {
     expect(validateProtocolClientCommand({ protocolVersion: 1, frameType: "event", requestId: "r" })).toBeNull()
     expect(validateProtocolClientCommand({ protocolVersion: 1, commandType: "snapshot.request", requestId: "r", reason: "initial", endpoint: "ws://evil" })).toBeNull()
-    expect(validatePetReadyInfo({ webgl: true, characterId: "gpichan", firstFrameAt: 1 })).toEqual({ webgl: true, characterId: "gpichan", firstFrameAt: 1 })
+    const ready = { webgl: true, characterId: "gpichan", revision: "builtin", firstFrameAt: 1, ticket: { id: "gpichan", revision: "builtin", requestId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", rendererGeneration: 1 } }
+    expect(validatePetReadyInfo(ready)).toEqual(ready)
+    expect(validatePetReadyInfo({ webgl: true, characterId: "gpichan", firstFrameAt: 1 })).toBeNull()
     expect(validatePetReadyInfo({ webgl: false, characterId: "gpichan", firstFrameAt: 1 })).toBeNull()
   })
 })

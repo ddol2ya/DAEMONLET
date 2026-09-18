@@ -7,6 +7,7 @@ description: Create a Daemonlet character or poses as an external .petchar pack,
 
 ## Choose the task first
 
+- **Update source only:** Existing pack + confirmed public Hugging Face Dataset/feed location. Read [updates.md](references/updates.md), inspect the internal ID/version, and use `add-update-source` / `create-update-feed` / `publish-update-packs`. Preserve payload bytes and original packs; skip image, pose, persona and GPU questions. Recheck archive/install/distribution acceptance without claiming a new visual review.
 - **Persona only:** Existing pack + personality/source material, with no new artwork or poses. Read [persona.md](references/persona.md) and use `validate-persona` / `upgrade-persona`. Skip all image, framing, pose-count, ComfyUI, Python and GPU questions below. Preserve the original archive and every visual/rig/dialogue byte. Do not rerun the independent payload builder.
 - **New character or poses:** Follow the production inputs below. Use the same confirmed personality for pose/reaction planning, fixed dialogue and `persona.json`; read [persona.md](references/persona.md) before packaging. New packs include a validated persona unless the user explicitly requests omission.
 

@@ -101,6 +101,7 @@ export class Anime25DRuntime {
   private poseDiagnostics: PoseRuntimeDiagnostics = emptyPoseDiagnostics()
   private animationFrame = 0
   private modelRevision = 0
+  private renderedModelRevision: number | null = null
   private running = false
   private lastFrame = performance.now()
   private lastDiagnosticEmit = 0
@@ -771,6 +772,7 @@ export class Anime25DRuntime {
   getModelRevision() {
     return this.modelRevision
   }
+  hasRenderedModel(revision: number) { return Boolean(this.model) && this.modelRevision === revision && this.renderedModelRevision === revision }
 
   getBaseFaceGeometry() {
     if (!this.model) return null
@@ -866,6 +868,7 @@ export class Anime25DRuntime {
     const showNeutral = this.qualityMode === "RIG_NEUTRAL"
     const renderedParameters = showNeutral ? DEFAULT_PARAMETERS : parameters
     this.renderer.render(renderedParameters, now, showNeutral)
+    this.renderedModelRevision = this.model ? this.modelRevision : null
     this.diagnostics = { ...this.diagnostics, parameters: renderedParameters, fps: this.renderer.fps }
     if (now - this.lastDiagnosticEmit > 120) {
       this.lastDiagnosticEmit = now

@@ -15,7 +15,9 @@ const subscription = <T>(channel: string, listener: (value: T) => void) => {
   return () => ipcRenderer.removeListener(channel, wrapped)
 }
 
+import { PACK_UPDATE_IPC, type PackUpdateApi } from "../shared/pack-update-contract"
 const api: SettingsDesktopApi = {
+  packUpdates: Object.freeze<PackUpdateApi>({ list: () => ipcRenderer.invoke(PACK_UPDATE_IPC.list), act: value => ipcRenderer.invoke(PACK_UPDATE_IPC.act, value), onChanged: listener => subscription(PACK_UPDATE_IPC.changed, listener) }),
   characters: characterManageApi(),
   getStatus: () => request(SETUP_IPC.status),
   refreshStatus: () => request(SETUP_IPC.refresh),

@@ -39,13 +39,14 @@ try {
     const needsVariants = character.poses.length > tools.PACK_LIMITS.poses || behavior && tools.behaviorUsesPoseVariants(behavior)
     const dialogue = character.dialogue ? tools.parseDialogueManifest(JSON.parse(await tools.boundedFile(stage,
       tools.resolvePackReference(character.dialogue, 'character.json', new Set(files.map(f => f.path)))))) : undefined
+    const update = values['repo-id'] || values['manifest-path'] ? tools.parseUpdateSource({ schemaVersion: 1, provider: 'huggingface', repoType: 'dataset', repoId: values['repo-id'], manifestPath: values['manifest-path'] }) : preserved.update
     const runtime = preserved.runtime
-      ? { ...preserved.runtime, capabilities: [...new Set([...preserved.runtime.capabilities, ...(character.persona ? ['side-chat-persona-v1'] : [])])] }
+      ? { ...preserved.runtime, capabilities: [...new Set([...preserved.runtime.capabilities, ...(character.persona ? ['side-chat-persona-v1'] : []), ...(update ? ['hf-pack-updates-v1'] : [])])] }
       : { ...tools.PACK_RUNTIME, capabilities: tools.PACK_RUNTIME.capabilities.filter(c =>
-        (c !== 'side-chat-persona-v1' || Boolean(character.persona)) && (c !== 'pose-variants' || needsVariants) && (c !== 'pose-dialogue' || dialogue?.poseLines)) }
+        (c !== 'hf-pack-updates-v1' || Boolean(update)) && (c !== 'side-chat-persona-v1' || Boolean(character.persona)) && (c !== 'pose-variants' || needsVariants) && (c !== 'pose-dialogue' || dialogue?.poseLines)) }
     let provenance = {}
     try { provenance = JSON.parse(await readFile(join(stage, 'provenance.json'), 'utf8')) } catch { /* Optional. */ }
-    const manifest = { ...preserved, packFormatVersion: 1, id: character.id, name: character.label, version: values.version, entry: 'character.json', runtime, files,
+    const manifest = { ...preserved, packFormatVersion: 1, id: character.id, name: character.label, version: values.version, entry: 'character.json', runtime, files, ...(update ? { update } : {}),
       ...(values.author ? { author: values.author } : {}), ...(values.thumbnail ? { thumbnail: values.thumbnail } : {}),
       ...(values.profile || preserved.profile || provenance.profile ? { profile: values.profile ?? preserved.profile ?? provenance.profile } : {}), ...(preserved.unsupportedReactions || provenance.unsupportedReactions ? { unsupportedReactions: preserved.unsupportedReactions ?? provenance.unsupportedReactions } : {}),
     }
@@ -63,6 +64,6 @@ try {
 
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-const { values } = parseArgs({ options: { 'character-root': { type: 'string' }, version: { type: 'string' }, output: { type: 'string' }, author: { type: 'string' }, thumbnail: { type: 'string' }, profile: { type: 'string' } } })
+const { values } = parseArgs({ options: { 'character-root': { type: 'string' }, version: { type: 'string' }, output: { type: 'string' }, author: { type: 'string' }, thumbnail: { type: 'string' }, profile: { type: 'string' }, 'repo-id': { type: 'string' }, 'manifest-path': { type: 'string' } } })
 console.log(JSON.stringify(await exportPack(values), null, 2))
 }

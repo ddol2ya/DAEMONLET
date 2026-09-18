@@ -1,4 +1,6 @@
 import { exposeAppLanguage } from "./app-language"
+import { CHARACTER_LOAD_DIAGNOSTIC } from "../shared/character-load-diagnostics"
+import { CHARACTER_LOAD_REQUEST } from "../shared/character-load"
 exposeAppLanguage()
 import { contextBridge, ipcRenderer } from "electron"
 import { IPC, type AdapterStatus, type PetDesktopApi, type ProtocolBridgeStatus, type ProtocolConnectResult, type SanitizedAdapterDiagnostics } from "../shared/ipc-contract"
@@ -28,7 +30,9 @@ const api: PetDesktopApi = {
   onDragCancelled: listener => subscription(IPC.dragCancelled, listener),
   bubble: { begin: () => ipcRenderer.invoke(BUBBLE_IPC.begin), report: value => ipcRenderer.invoke(BUBBLE_IPC.report, value) },
   characters: characterReadApi(),
+  requestCharacterLoad: selection => ipcRenderer.invoke(CHARACTER_LOAD_REQUEST, selection),
   reportCharacterLoadFailure: selection => ipcRenderer.send(CHARACTER_IPC.loadFailed, selection),
+  reportCharacterLoadDiagnostic: value => ipcRenderer.send(CHARACTER_LOAD_DIAGNOSTIC, value),
   getSettings: () => ipcRenderer.invoke(IPC.settingsGet) as Promise<DesktopSettingsV1>,
   updateSettings: (patch: DesktopSettingsPatch) => ipcRenderer.invoke(IPC.settingsPatch, patch) as Promise<DesktopSettingsV1>,
   setLayoutMode: (enabled: boolean) => ipcRenderer.invoke(IPC.layoutSet, enabled) as Promise<void>,
