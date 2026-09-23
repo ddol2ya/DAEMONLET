@@ -18,6 +18,16 @@ Run `npm install --ignore-scripts` then `npm run build` in that installer projec
 
 ## macOS arm64
 
+The macOS `llama-server` input is Developer ID signed before its exact bytes are
+pinned in `runtime-catalog.json`. Reuse that pinned signed input when staging the
+runtime; the old ad-hoc input does not match. The app packager preserves its
+signature instead of changing its timestamp. Final candidate verification checks
+both the exact runtime inventory/hashes and every nested code signature against
+the selected release certificate. When changing that runtime, verify the prior
+pinned source before signing a copy, update its byte/hash entry, commit the source,
+and rebuild both app artifacts. Never weaken the runtime hash gate for signing.
+
+
 `npm run electron:package` produces an unsigned development package. To build a signed candidate, use a clean committed checkout on macOS with a valid Developer ID Application identity. Set `MACOS_SIGNING_IDENTITY` and `MACOS_EXPECTED_TEAM_ID`; never commit keys or credential files.
 
 ```sh

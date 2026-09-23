@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { readFileSync } from "node:fs"
 import base from "../forge.config.mjs"
-import { APP_NAME, BUNDLE_ID, JIT_ENTITLEMENT, AUDIO_INPUT_ENTITLEMENT, isDictationCode, entitlementRole, assertCanSubmit, assertEntitlements, assertProduction, assertUploadApproval, notaryStatus, parseSignature, publicSummary, requireMac, selectIdentity, signedForgeConfig } from "../scripts/macos/policy.mjs"
+import { APP_NAME, BUNDLE_ID, JIT_ENTITLEMENT, AUDIO_INPUT_ENTITLEMENT, isDictationCode, isPinnedChatRuntime, entitlementRole, assertCanSubmit, assertEntitlements, assertProduction, assertUploadApproval, notaryStatus, parseSignature, publicSummary, requireMac, selectIdentity, signedForgeConfig } from "../scripts/macos/policy.mjs"
 
 const fingerprint = "A".repeat(40)
 const team = "ABCDEFGHIJ"
@@ -13,6 +13,11 @@ const display = `Identifier=${BUNDLE_ID}\nflags=0x10000(runtime)\nAuthority=${na
 afterEach(() => vi.unstubAllEnvs())
 
 describe("explicit signing policy", () => {
+  it("preserves only the pinned pre-signed chat executable", () => {
+    expect(isPinnedChatRuntime('/candidate/App.app/Contents/Resources/local-llm/llama-server')).toBe(true)
+    for (const file of ['/candidate/llama-server', '/candidate/App.app/Contents/Resources/local-llm/other', '/candidate/App.app/Contents/MacOS/llama-server']) expect(isPinnedChatRuntime(file)).toBe(false)
+  })
+
   it("keeps ordinary Forge packaging unsigned even with credential variables present", async () => {
     vi.stubEnv("MACOS_SIGNING_IDENTITY", name)
     vi.stubEnv("MACOS_EXPECTED_TEAM_ID", team)

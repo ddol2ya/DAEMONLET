@@ -15,8 +15,8 @@
       },
       "files": {
         "llama-server": {
-          "bytes": 17687456,
-          "sha256": "9652de214408ba2bf956af37988c38086ae0d2b39a88c637f05de9e0282db927"
+          "bytes": 17603296,
+          "sha256": "7bd3c66f41055c85bcf6c0f983f0c185d2238c2b7d304308d55211a402e7c129"
         },
         "licenses/Gemma4-Apache-2.0.txt": {
           "bytes": 11358,
