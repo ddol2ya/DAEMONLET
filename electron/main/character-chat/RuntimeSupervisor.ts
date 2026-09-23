@@ -125,13 +125,30 @@ export class RuntimeSupervisor {
   if(!r.ok)throw Error('추론 서버 응답 오류');return r.json()
  }
  async api(endpoint:string,data?:unknown){return this.sessionApi(this.requireSession(),endpoint,data)}
- async count(messages:ModelMessage[]){const session=this.requireSession();const r=await this.sessionApi(session,'/apply-template',{messages,add_generation_prompt:true,chat_template_kwargs:{enable_thinking:false},reasoning_effort:'none'});if(typeof r.prompt!=='string')throw Error('대화 템플릿 오류');const t=await this.sessionApi(session,'/tokenize',{content:r.prompt,add_special:true,parse_special:true});return t.tokens.length as number}
+ private async renderPrompt(session:Launch,messages:ModelMessage[]){const r=await this.sessionApi(session,'/apply-template',{messages,add_generation_prompt:true,chat_template_kwargs:{enable_thinking:false},reasoning_effort:'none'});if(typeof r.prompt!=='string'||!r.prompt)throw Error('대화 템플릿 오류');return r.prompt}
+ async count(messages:ModelMessage[]){const session=this.requireSession();const prompt=await this.renderPrompt(session,messages);const t=await this.sessionApi(session,'/tokenize',{content:prompt,add_special:true,parse_special:true});return t.tokens.length as number}
  async generate(messages:ModelMessage[],onText:(text:string)=>void){
- const session=this.requireSession();if(this.generation)throw Error('이미 생성 중입니다.');const controller=this.generation=new AbortController();const timeout=setTimeout(()=>controller.abort(),180000);let raw='',done=false,finish='';
- try{const response=await fetch(session.url+'/v1/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json'},body:JSON.stringify({messages,max_tokens:512,temperature:1,top_p:.95,top_k:64,min_p:0,repeat_penalty:1,presence_penalty:0,frequency_penalty:0,reasoning_budget_tokens:0,cache_prompt:true,reasoning_effort:'none',chat_template_kwargs:{enable_thinking:false},samplers:['top_k','top_p','temperature'],response_format:{type:'json_schema',json_schema:{name:'character_reply',strict:true,schema:CHAT_REPLY_SCHEMA}},stream:true}),signal:AbortSignal.any([controller.signal,session.abort.signal])});
- if(!response.ok||!response.body)throw Error('대사를 생성하지 못했습니다.');const parser=new ChatSSEDecoder(data=>{if(data==='[DONE]'){done=true;return}const event=JSON.parse(data);if(event.error)throw Error('추론 오류');const delta=event.choices?.[0]?.delta;finish=event.choices?.[0]?.finish_reason||finish;if(delta?.reasoning_content?.trim())throw Error('비추론 설정 위반으로 응답을 중단했습니다.');if(delta?.content){raw+=delta.content;if(raw.length>32000)throw Error('응답 크기 초과');const visible=dialoguePrefix(raw);if(/<\/?(?:think|thought)|<\|/i.test(visible))throw Error('생각 태그가 포함된 응답을 중단했습니다.');if(visible)onText(visible)}});
- for await(const bytes of streamChunks(response.body))parser.push(bytes);parser.end();if(!done||finish!=='stop')throw Error(finish==='length'?'응답 길이 제한에 도달했습니다. 다시 시도해 주세요.':'응답이 비정상 종료되었습니다.');return parseChatReply(raw)
- }finally{clearTimeout(timeout);if(this.generation===controller)this.generation=null}
+ const session=this.requireSession();if(this.generation)throw Error('이미 생성 중입니다.');const controller=this.generation=new AbortController();const timeout=setTimeout(()=>controller.abort(),180000);let raw='',done=false;
+ try{
+ // The pinned Gemma chat endpoint's schema grammar permits an optional thought
+ // channel even with thinking disabled. Apply the official template unchanged,
+ // then constrain sampling to the reply JSON from the first generated token.
+ const prompt=await this.renderPrompt(session,messages);controller.signal.throwIfAborted();
+ const response=await fetch(session.url+'/completion',{method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json'},body:JSON.stringify({prompt,n_predict:512,temperature:1,top_p:.95,top_k:64,min_p:0,repeat_penalty:1,presence_penalty:0,frequency_penalty:0,reasoning_budget_tokens:0,cache_prompt:true,samplers:['top_k','top_p','temperature'],json_schema:CHAT_REPLY_SCHEMA,stream:true}),signal:AbortSignal.any([controller.signal,session.abort.signal])});
+ if(!response.ok||!response.body)throw Error('대사를 생성하지 못했습니다.');const parser=new ChatSSEDecoder(data=>{
+  if(data==='[DONE]'){if(!done)throw Error('응답이 비정상 종료되었습니다.');return}
+  const event=JSON.parse(data);if(event.error)throw Error('추론 오류');
+  if(event.reasoning_content?.trim()||event.choices?.[0]?.delta?.reasoning_content?.trim())throw Error('비추론 설정 위반으로 응답을 중단했습니다.');
+  if(done||typeof event.content!=='string'||typeof event.stop!=='boolean')throw Error('응답이 비정상 종료되었습니다.');
+  raw+=event.content;if(raw.length>32000)throw Error('응답 크기 초과');
+  if(raw.trimStart()&&!raw.trimStart().startsWith('{'))throw Error('JSON 이외의 응답을 중단했습니다.');
+  const visible=dialoguePrefix(raw);if(/<\/?(?:think|thought)|<\|/i.test(visible))throw Error('생각 태그가 포함된 응답을 중단했습니다.');
+  if(event.truncated)throw Error('입력이 잘려 응답을 중단했습니다.');
+  if(event.stop){if(event.stop_type==='limit')throw Error('응답 길이 제한에 도달했습니다. 다시 시도해 주세요.');if(!['eos','word'].includes(event.stop_type))throw Error('응답이 비정상 종료되었습니다.');done=true}
+  if(visible)onText(visible)
+ });
+ for await(const bytes of streamChunks(response.body))parser.push(bytes);parser.end();if(!done)throw Error('응답이 비정상 종료되었습니다.');return parseChatReply(raw)
+ }finally{controller.abort();clearTimeout(timeout);if(this.generation===controller)this.generation=null}
  }
  async cancel(){this.generation?.abort();const session=this.current;if(!session)return;if(!session.ready){await this.closeSession(session);return}const deadline=performance.now()+4000;while(performance.now()<deadline){try{const slots=await this.sessionApi(session,'/slots',undefined,Math.min(500,deadline-performance.now()));if(slots.length===1&&!slots[0].is_processing)return}catch{break}await delay(50)}await this.closeSession(session)}
  private cleanup(session:Launch):Promise<void> {

@@ -36,3 +36,20 @@ npm run electron:package
 모델 카탈로그에는 공식 revision·파일 크기·SHA-256만 둔다. 자료/이미지/개인 대화/모델 파일은 공개 Git에 두지 않는다. native/runtime 및 모델 고지는 `distribution/licenses/character-chat`에 있고 패키지의 runtime에도 포함된다. 특정 캐릭터 자산의 공개 배포 권리는 별도이며 이 기능 변경은 해당 권리를 부여하지 않는다.
 
 대화창 이름은 팩의 `chat.json.profile.displayName`을 우선 사용하며, 없는 기존 팩은 관리용 팩 이름을 표시한다. 캐릭터 선택 목록은 버전을 구분할 수 있도록 팩 이름을 유지한다. 작업 말풍선과 Side Chat 입력 안내도 같은 대화 표시 이름을 사용한다.
+
+### Strict non-thinking generation
+
+The pinned llama.cpp Gemma 4 chat schema grammar allows an optional thought channel
+regardless of the disabled-thinking template option. This could surface as a
+non-thinking guard error after an otherwise successful reply on both platforms.
+The app now renders the model's own template through `/apply-template` with
+thinking disabled, then sends that same prompt to native `/completion` with
+`json_schema`. This constrains generation to the reply JSON from the first token;
+it does not hide or discard a generated reasoning channel. Token counting uses
+the same rendered prompt. Model files, sampling settings and the output schema
+are unchanged.
+
+Native SSE completion requires an explicit successful terminal event. Input
+truncation, output limits, reasoning fields/tags, non-JSON prefixes and malformed
+streams remain failures. The request transport is aborted on all exit paths,
+including parser failures, so rejected output cannot leave generation running.
