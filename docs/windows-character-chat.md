@@ -3,6 +3,7 @@
 This extends PR #22 from `6f5de4e`; it does not change model selection, persona,
 semantic pose IDs or the Mac Metal binary. Windows support targets x64 NVIDIA
 CUDA. Native acceptance and build/test success must be reported separately.
+See [recorded validation and limitations](windows-character-chat-validation.md).
 
 ## Runtime and packaging
 
