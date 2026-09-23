@@ -31,6 +31,7 @@ export class CharacterChatService {
   private data: StoredChats = {version:2,model:'E4B',characterId:'gpichan',conversations:[],memories:{}}
   private durable: StoredChats | null = null
   private requestAbort: AbortController | null = null
+  private requestVersion = 0
   private listeners = new Set<() => void>()
   private job: Promise<void> | null = null
   private serial: Promise<unknown> = Promise.resolve()
@@ -68,7 +69,7 @@ export class CharacterChatService {
     if (this.lifecycle === 'closing' || this.lifecycle === 'closed') return Promise.reject(Error('대화를 종료하는 중입니다.'))
     if (this.initialization) return this.initialization
     this.lifecycle='initializing'
-    this.initialization=(async () => {
+    const attempt: Promise<void> = Promise.resolve().then(async () => {
       try {
         const loaded=await this.store.load()
         const data=loaded.value || structuredClone(this.data)
@@ -78,6 +79,7 @@ export class CharacterChatService {
         const installed=await this.models.installed(), available=await this.runtime.available()
         // A close that overlaps reading must never persist partially initialized defaults.
         if (this.lifecycle !== 'initializing') return
+        this.assertCurrentRevision(prepared.entry)
         const previousCharacterId=data.characterId
         data.characterId=entry.id
         if ((data.current!==undefined||previousCharacterId!==entry.id)&&!data.conversations.some(c=>c.id===data.current && c.characterId===entry.id)) {
@@ -91,10 +93,12 @@ export class CharacterChatService {
         this.loaded=true;this.lifecycle='loaded';this.emit()
       } catch (error) {
         if (this.lifecycle === 'initializing') this.lifecycle='failed'
+        if (this.initialization===attempt) this.initialization=null
         throw error
       }
-    })()
-    return this.initialization
+    })
+    this.initialization=attempt
+    return attempt
   }
   private requireLoaded() {if (this.lifecycle !== 'loaded') throw Error('대화 준비가 완료되지 않았습니다. 창을 다시 열어 주세요.')}
   private assertOwner(data=this.data, character=this.state.character) {
@@ -126,20 +130,27 @@ export class CharacterChatService {
     data.conversations.unshift(c);data.current=c.id
   }
   private async cancelGeneration() {
+    const job=this.job
+    ++this.requestVersion
     this.requestAbort?.abort();++this.state.epoch
     this.state.phase='idle';this.state.meaning=null
     const last=this.state.conversation?.messages.at(-1)
     if (last?.status==='streaming') {last.status='stopped';this.dirty=true}
     this.emit()
     await this.runtime.stop()
-    await this.job?.catch(()=>{})
+    await job?.catch(()=>{})
   }
-  async stop() {
-    const stopping=this.cancelGeneration()
-    await this.serial.catch(()=>{})
-    await stopping
-    await this.persistLive()
-    this.emit()
+  stop(): Promise<void> {
+    // Install the barrier before emitting cancellation; later sends queue after cleanup.
+    // This work never waits on its own serial queue.
+    let stopping: Promise<void>
+    const stopped=this.enqueue(async()=>{
+      await stopping
+      await this.persistLive()
+      this.emit()
+    })
+    stopping=this.cancelGeneration()
+    return stopped
   }
   private enqueue<T>(work: () => Promise<T>): Promise<T> {
     const result=this.serial.then(work)
@@ -147,7 +158,7 @@ export class CharacterChatService {
     return result
   }
   private change(action: (data: StoredChats) => Promise<PreparedCharacter | void>) {
-    this.requireLoaded();this.pendingChanges++
+    this.requireLoaded();this.pendingChanges++;++this.requestVersion
     return this.enqueue(async () => {
       this.requireLoaded()
       // Cancellation is independent from saving. A failed write must not block deletion.
@@ -229,7 +240,9 @@ export class CharacterChatService {
   send(text: string) {return this.submit(text)}
   private submit(text: string | undefined): Promise<void> {
     try {this.requireRequest()} catch(e) {return Promise.reject(e)}
+    const acceptedVersion=this.requestVersion
     return this.enqueue(async () => {
+      if(acceptedVersion!==this.requestVersion)return
       this.requireRequest()
       if (this.job || ['loading','generating','replying'].includes(this.state.phase)) throw Error('답변 생성 중입니다.')
       const draft=structuredClone(this.data)
@@ -257,18 +270,18 @@ export class CharacterChatService {
       if (Buffer.byteLength(encodeStoredChats(draft))+65536>CHAT_STORAGE_LIMITS.bytes) throw Error('대화 저장 용량 한도에 도달했습니다. 이전 대화를 정리해 주세요.')
       await this.save(draft)
       this.commit(draft);this.dirty=false
-      if (this.lifecycle!=='loaded' || epoch!==this.state.epoch) {assistant.status='stopped';this.dirty=true;return}
+      if (this.lifecycle!=='loaded' || acceptedVersion!==this.requestVersion || epoch!==this.state.epoch) {assistant.status='stopped';this.dirty=true;return}
       this.state.error=null;this.state.meaning=null;this.state.semanticWarning=prepared.warning;this.state.phase='loading';this.emit()
       const abort=this.requestAbort=new AbortController()
-      this.job=this.generate(character,c,assistant,prepared,epoch,abort).finally(()=>{this.job=null})
+      this.job=this.generate(character,c,assistant,prepared,epoch,acceptedVersion,abort).finally(()=>{this.job=null})
     })
   }
-  private requestCurrent(character: CharacterEntry, c: ChatConversation, assistant: ChatMessage, epoch: number) {
+  private requestCurrent(character: CharacterEntry, c: ChatConversation, assistant: ChatMessage, epoch: number, acceptedVersion: number) {
     const current=this.registry.get(character.id)
-    return this.lifecycle==='loaded' && epoch===this.state.epoch && this.state.character?.id===character.id && this.state.character.revision===character.revision && current?.status!=='disabled' && current?.revision===character.revision && this.state.conversation===c && c.characterId===character.id && assistant.binding?.characterId===character.id && assistant.binding.conversationId===c.id && assistant.binding.revision===character.revision && assistant.binding.epoch===epoch
+    return this.lifecycle==='loaded' && acceptedVersion===this.requestVersion && epoch===this.state.epoch && this.state.character?.id===character.id && this.state.character.revision===character.revision && current?.status!=='disabled' && current?.revision===character.revision && this.state.conversation===c && c.characterId===character.id && assistant.binding?.characterId===character.id && assistant.binding.conversationId===c.id && assistant.binding.revision===character.revision && assistant.binding.epoch===epoch
   }
-  private async generate(character: CharacterEntry, c: ChatConversation, assistant: ChatMessage, prepared: PreparedCharacter, epoch: number, abort: AbortController) {
-    const current=()=>this.requestCurrent(character,c,assistant,epoch)
+  private async generate(character: CharacterEntry, c: ChatConversation, assistant: ChatMessage, prepared: PreparedCharacter, epoch: number, acceptedVersion: number, abort: AbortController) {
+    const current=()=>this.requestCurrent(character,c,assistant,epoch,acceptedVersion)
     try {
       const model=await this.models.verify(this.state.model,abort.signal)
       if (!current()) return

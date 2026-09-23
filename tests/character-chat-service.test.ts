@@ -308,3 +308,69 @@ it('legacy empty conversations actually decrease on deletion, including the last
  vi.spyOn(reopened.service.runtime,'generate').mockResolvedValue({text:'after deletion',meaning:neutralMeaning()});await reopened.service.send('still works');await complete(reopened.service)
  expect(reopened.service.snapshot().conversations).toHaveLength(1)
 })
+
+it.each(['load','persona'])('R1: retries a transient %s initialization failure without changing saved bytes',async fault=>{
+ const {service,store,registry}=await fixture(undefined,{initialize:false});await store.save(chats(1));const before=await readFile(store.file)
+ if(fault==='load')vi.spyOn(store,'load').mockRejectedValueOnce(Error('temporary read failure'))
+ else vi.spyOn(registry,'readPersonaAsset').mockRejectedValueOnce(Error('temporary persona failure'))
+ const first=service.initialize();await expect(first).rejects.toThrow('temporary')
+ const retry=service.initialize();expect(retry).not.toBe(first);await retry
+ expect(service.snapshot().conversations).toHaveLength(1);expect((await readFile(store.file)).equals(before)).toBe(true)
+})
+it('R2: same-tick stop cancels an accepted but not yet executed send',async()=>{
+ const {service}=await fixture();const generate=vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'must not run',meaning:neutralMeaning()})
+ const sending=service.send('queued'),stopping=service.stop();await Promise.all([sending,stopping])
+ expect(service.runtime.start).not.toHaveBeenCalled();expect(generate).not.toHaveBeenCalled();expect((service as any).job).toBeNull();expect(service.snapshot().phase).toBe('idle');expect(service.snapshot().conversation?.messages).toHaveLength(0)
+})
+it('R1: concurrent initialization shares one read, then retry uses the latest selection/revision',async()=>{
+ const {service,store,registry}=await fixture(undefined,{initialize:false});await store.save(chats(1));const before=await readFile(store.file)
+ const gate=deferred();const load=vi.spyOn(store,'load').mockImplementationOnce(async()=>{await gate.promise;throw Error('temporary')})
+ const first=service.initialize(),same=service.initialize();expect(same).toBe(first)
+ const failed=expect(first).rejects.toThrow('temporary');gate.resolve();await failed
+ ;(registry.snapshot().entries[1] as any).revision='latest'
+ await service.initialize('synthetic-b');expect(load).toHaveBeenCalledTimes(2);expect(service.snapshot().character?.id).toBe('synthetic-b');expect(service.snapshot().character?.revision).toBe('latest');expect((await readFile(store.file)).equals(before)).toBe(true)
+})
+it('R1: close overlapping a failed attempt forbids retries and preserves original data',async()=>{
+ const {service,store}=await fixture(undefined,{initialize:false});await store.save(chats(1));const before=await readFile(store.file)
+ const gate=deferred();vi.spyOn(store,'load').mockImplementationOnce(async()=>{await gate.promise;throw Error('temporary')})
+ const first=service.initialize(),failed=expect(first).rejects.toThrow('temporary'),closed=service.close();gate.resolve();await Promise.all([failed,closed])
+ await expect(service.initialize()).rejects.toThrow('종료');expect((await readFile(store.file)).equals(before)).toBe(true)
+})
+it('R2: queued retry then stop preserves the completed pair and starts nothing',async()=>{
+ const {service}=await fixture();const generate=vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'kept',meaning:neutralMeaning()})
+ await service.send('original');await complete(service);const before=service.snapshot().conversation!.messages
+ generate.mockClear();vi.mocked(service.runtime.start).mockClear()
+ await Promise.all([service.retry(),service.stop()]);expect(generate).not.toHaveBeenCalled();expect(service.runtime.start).not.toHaveBeenCalled();expect(service.snapshot().conversation!.messages).toEqual(before)
+})
+it('R2: a send accepted after stop waits for cleanup and remains valid',async()=>{
+ const {service}=await fixture();const cleanup=deferred()
+ vi.mocked(service.runtime.stop).mockImplementationOnce(()=>cleanup.promise)
+ const generate=vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'fresh answer',meaning:neutralMeaning()})
+ const old=service.send('cancel me'),stopped=service.stop(),fresh=service.send('keep me')
+ await old;expect(service.runtime.start).not.toHaveBeenCalled();cleanup.resolve();await Promise.all([stopped,fresh]);await complete(service)
+ expect(generate).toHaveBeenCalledTimes(1);expect(service.snapshot().conversation!.messages.map(m=>m.text)).toEqual(['keep me','fresh answer'])
+})
+it.each(['stop','close'] as const)('R2: %s during an initial save still prevents model startup',async action=>{
+ const {service,store}=await fixture();const entered=deferred(),finish=deferred(),save=store.save.bind(store)
+ vi.spyOn(store,'save').mockImplementationOnce(async data=>{entered.resolve();await finish.promise;return save(data)})
+ const generate=vi.spyOn(service.runtime,'generate');const send=service.send('saving');await entered.promise;const stopped=service[action]();finish.resolve();await Promise.all([send,stopped])
+ expect(service.runtime.start).not.toHaveBeenCalled();expect(generate).not.toHaveBeenCalled();expect((await store.load()).value?.conversations[0].messages.at(-1)?.status).toBe('stopped')
+})
+it.each(['verify','start'] as const)('R2: stop while awaiting runtime %s drops later generation',async stage=>{
+ const {service}=await fixture();const entered=deferred(),finish=deferred()
+ if(stage==='verify')vi.mocked(service.models.verify).mockImplementationOnce(async()=>{entered.resolve();await finish.promise;return '/unused'})
+ else vi.mocked(service.runtime.start).mockImplementationOnce(async()=>{entered.resolve();await finish.promise})
+ const generate=vi.spyOn(service.runtime,'generate');await service.send('cancel pending');await entered.promise;const stopped=service.stop();finish.resolve();await stopped
+ expect(generate).not.toHaveBeenCalled();expect((service as any).job).toBeNull();expect(service.snapshot().phase).toBe('idle')
+})
+it.each(['model','character'] as const)('R2: %s transition invalidates previously queued sends',async target=>{
+ const {service}=await fixture();const generate=vi.spyOn(service.runtime,'generate')
+ const old=service.send('cancel before transition'),transition=target==='model'?service.selectModel('12B'):service.selectCharacter('synthetic-b')
+ await Promise.all([old,transition]);expect(generate).not.toHaveBeenCalled();expect(service.runtime.start).not.toHaveBeenCalled()
+})
+it('R2: rapid send/stop boundaries only permit the last explicitly accepted request',async()=>{
+ const {service}=await fixture();const generate=vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'final',meaning:neutralMeaning()})
+ const work:Promise<void>[]=[];for(let i=0;i<3;i++){work.push(service.send('old '+i));work.push(service.stop())}
+ work.push(service.send('new'));await Promise.all(work);await complete(service)
+ expect(generate).toHaveBeenCalledTimes(1);expect(service.snapshot().conversation!.messages.map(m=>m.text)).toEqual(['new','final'])
+})

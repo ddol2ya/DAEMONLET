@@ -27,7 +27,15 @@ export class CharacterChatWindow {
  private positionWindow:(()=>void)|null=null
  private layoutSaveTimer:ReturnType<typeof setTimeout>|null=null
  private async saveLayout(){if(this.layoutSaveTimer)clearTimeout(this.layoutSaveTimer);this.layoutSaveTimer=null;try{await this.layout.save()}catch{this.service.setError(Error('말풍선 위치를 저장하지 못했습니다.'))}}
- private initialize(){return this.initialized??=Promise.all([this.service.initialize(this.hooks.selected()),this.layout.load()]).then(()=>{})}
+ private initialize():Promise<void>{
+  if(this.disposed)return Promise.reject(Error('대화를 종료하는 중입니다.'));
+  if(this.initialized)return this.initialized;
+  // Drain both readers before a retry so a late layout/service result cannot cross attempts.
+  const attempt=Promise.allSettled([this.service.initialize(this.hooks.selected()),this.layout.load()]).then(results=>{
+   const failed=results.find(result=>result.status==='rejected');if(failed?.status==='rejected')throw failed.reason;
+  }).catch(error=>{if(this.initialized===attempt)this.initialized=null;throw error});
+  this.initialized=attempt;return attempt;
+ }
  private presentation():LocalChatPresentation{const s=this.service.snapshot();return {active:!!this.window,epoch:s.epoch,characterId:s.character?.id??null,revision:s.character?.revision??null,phase:s.phase==='loading'?'generating':s.phase,definition:this.service.definition,meaning:s.meaning??null}}
  private publish(){const pet=this.hooks.pet();if(pet&&!pet.isDestroyed())pet.webContents.send(LOCAL_CHAT_IPC.presentation,this.presentation())}
  async open(){if(this.disposed)return;this.hooks.reveal();if(this.window){this.window.show();this.window.focus();return}await this.initialize();if(this.disposed)return;const selected=this.registry.get(this.hooks.selected()),current=this.service.snapshot().character;if(selected&&(current?.id!==selected.id||current.revision!==selected.revision))await this.service.selectCharacter(selected.id);if(this.disposed)return;const reopened=this.window as BrowserWindow|null;if(reopened){reopened.show();reopened.focus();return}const win=this.window=new BrowserWindow({...this.layout.value.size,minWidth:CHAT_WINDOW_MIN.width,minHeight:CHAT_WINDOW_MIN.height,maxWidth:CHAT_WINDOW_MAX.width,maxHeight:CHAT_WINDOW_MAX.height,title:'DAEMONLET 캐릭터챗 말풍선',frame:false,transparent:true,hasShadow:false,resizable:true,movable:true,maximizable:false,fullscreenable:false,skipTaskbar:true,alwaysOnTop:true,backgroundColor:'#00000000',show:false,webPreferences:{preload:join(this.dirname,'character-chat-preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false,webSecurity:true,webviewTag:false}});
