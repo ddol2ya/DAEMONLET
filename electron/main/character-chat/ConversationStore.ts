@@ -1,4 +1,5 @@
-import {mkdir,readFile,rename,writeFile,copyFile,stat,rm} from 'node:fs/promises'
+import {replaceFile} from './replaceFile'
+import {mkdir,readFile,writeFile,copyFile,stat,rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {randomUUID} from 'node:crypto'
 import type {ChatConversation,ChatMessage,LocalModelId} from '../../shared/character-chat-contract'
@@ -48,7 +49,7 @@ export class ConversationStore {
    const temp=this.file+'.tmp-'+randomUUID()
    try {
     await mkdir(this.root,{recursive:true,mode:0o700})
-    await writeFile(temp,bytes,{mode:0o600});await rename(temp,this.file)
+    await writeFile(temp,bytes,{mode:0o600});await replaceFile(temp,this.file)
    }finally{await rm(temp,{force:true}).catch(()=>{})}
   })
   this.queue=next;return next

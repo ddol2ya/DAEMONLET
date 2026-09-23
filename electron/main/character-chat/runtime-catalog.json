@@ -1,16 +1,170 @@
 {
-  "platform": "darwin-arm64",
-  "commit": "391fac16460f15233a7740550d858ac96df3419d",
-  "build": {
-    "configuration": "Release",
-    "sharedLibraries": false,
-    "openssl": false,
-    "metal": true,
-    "embeddedMetalLibrary": true,
-    "deploymentTarget": "13.0",
-    "validatedHost": "Apple Silicon / macOS 27.0"
-  },
-  "files": {
-    "llama-server": "9652de214408ba2bf956af37988c38086ae0d2b39a88c637f05de9e0282db927"
+  "schemaVersion": 2,
+  "targets": {
+    "darwin-arm64": {
+      "platform": "darwin-arm64",
+      "commit": "391fac16460f15233a7740550d858ac96df3419d",
+      "build": {
+        "configuration": "Release",
+        "sharedLibraries": false,
+        "openssl": false,
+        "metal": true,
+        "embeddedMetalLibrary": true,
+        "deploymentTarget": "13.0",
+        "validatedHost": "Apple Silicon / macOS 27.0"
+      },
+      "files": {
+        "llama-server": {
+          "bytes": 17687456,
+          "sha256": "9652de214408ba2bf956af37988c38086ae0d2b39a88c637f05de9e0282db927"
+        },
+        "licenses/Gemma4-Apache-2.0.txt": {
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        "licenses/cpp-httplib-MIT.txt": {
+          "bytes": 1075,
+          "sha256": "4b45cbe16d7b71b89ae6127e26e0d90a029198ca5e958ad8e3d0b8bbed364d8b"
+        },
+        "licenses/llama.cpp-MIT.txt": {
+          "bytes": 1078,
+          "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+        },
+        "licenses/nlohmann-json-MIT.txt": {
+          "bytes": 1097,
+          "sha256": "f7e0709209991311ff91cb43b46bdb422d45c593f549597e696b9e13cb4650d4"
+        },
+        "licenses/rotate-bits-CC0.txt": {
+          "bytes": 1088,
+          "sha256": "ca0b44aec101afb6b46f4c39b23369fa06a64fb9c0add37c2689d702156fee55"
+        },
+        "licenses/sha256-MIT.txt": {
+          "bytes": 41,
+          "sha256": "b81d0022ca6367918c67b57e9647d3513ee58809fd4b0ef0b3492f1356bced25"
+        },
+        "licenses/subprocess-Unlicense.txt": {
+          "bytes": 1331,
+          "sha256": "a2150552e0e2bba5b4a749eaaf11f10d3f781933c6dff2b4a88eaa387f26f6e6"
+        },
+        "licenses/xxhash-BSD.txt": {
+          "bytes": 1389,
+          "sha256": "6ffedbc0f7878612d2b23589f1ff2ab15633e1df7963a5d9fc750ec5500c7e7a"
+        }
+      },
+      "executable": "llama-server",
+      "backend": "Metal"
+    },
+    "win32-x64": {
+      "platform": "win32-x64",
+      "commit": "391fac16460f15233a7740550d858ac96df3419d",
+      "executable": "llama-server.exe",
+      "launcher": "daemonlet-runtime-host.exe",
+      "backend": "CUDA",
+      "build": {
+        "configuration": "Release",
+        "sharedLibraries": true,
+        "openssl": false,
+        "openmp": false,
+        "native": false,
+        "cuda": "13.0.48",
+        "cudaArchitectures": [
+          "75",
+          "86",
+          "89"
+        ],
+        "cmake": "3.25.1-msvc1",
+        "msvc": "19.35.32215.0",
+        "msvcRuntime": "MultiThreaded",
+        "windowsSDK": "10.0.22000.0",
+        "ownerSourceSha256": "f4fe2c821ea8a4a1006bebebb0f9601c277f8e8d4ee0ccf7200b01faedf321ea",
+        "buildHost": "Windows 11 26200 / RTX 4090 / driver 610.47"
+      },
+      "files": {
+        "cublas64_13.dll": {
+          "bytes": 50288240,
+          "sha256": "5d083083cdd613577496791dd96d00fe3a78c955684b53ca46a8ffa3e0b1e170"
+        },
+        "cublasLt64_13.dll": {
+          "bytes": 477896816,
+          "sha256": "e1c26671801ecd435baf97c6e9cfe28196cf55005c2039356b48030b09ce5dd5"
+        },
+        "daemonlet-runtime-host.exe": {
+          "bytes": 154624,
+          "sha256": "4365273717198f97053e247862049d9441633ca45d7d4001751f6ce9eeaa00be"
+        },
+        "ggml-base.dll": {
+          "bytes": 840192,
+          "sha256": "62ab778596e2b77339ccdfc56a7f3b0ef8e940d4cf6ab51e70aa83d3ca85307f"
+        },
+        "ggml-cpu.dll": {
+          "bytes": 1103872,
+          "sha256": "47bb78dd915a8cb7446be2245ff0c4765013cc6ffa4c7be9c45f838d4309b268"
+        },
+        "ggml-cuda.dll": {
+          "bytes": 124820992,
+          "sha256": "48686bef578acf0da128330e458eab02729530bd02888d0a746cdfbc9577a22b"
+        },
+        "ggml.dll": {
+          "bytes": 167424,
+          "sha256": "146fb82250ed92de7151b7371026861f22d868851b0379d9df8cf7afaaf1a21f"
+        },
+        "llama-common.dll": {
+          "bytes": 3987456,
+          "sha256": "856d2bdc24bc6c10d0804a07116ae8067e37e4c934e4b40d2f833b559cccea4a"
+        },
+        "llama-server-impl.dll": {
+          "bytes": 5540864,
+          "sha256": "a5fbc77372d834acf214bbb16e4c779778c8bb525057f4ea4e5cb586e2f2ccce"
+        },
+        "llama-server.exe": {
+          "bytes": 110592,
+          "sha256": "6cedc8255cd038e8a9780ca96d293efd8d63e011b47349bf1607689407d7d5a1"
+        },
+        "llama.dll": {
+          "bytes": 2900992,
+          "sha256": "d88e5878fc572aaa2c83e35b0e91c807793b29433f0f5d2a1b21a7fe46e5f997"
+        },
+        "mtmd.dll": {
+          "bytes": 1732608,
+          "sha256": "304ac4c753b0e9fefb12d0129ea099e272c739faf2f9352db9f85b0e93da7992"
+        },
+        "licenses/Gemma4-Apache-2.0.txt": {
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        "licenses/cpp-httplib-MIT.txt": {
+          "bytes": 1075,
+          "sha256": "4b45cbe16d7b71b89ae6127e26e0d90a029198ca5e958ad8e3d0b8bbed364d8b"
+        },
+        "licenses/llama.cpp-MIT.txt": {
+          "bytes": 1078,
+          "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+        },
+        "licenses/nlohmann-json-MIT.txt": {
+          "bytes": 1097,
+          "sha256": "f7e0709209991311ff91cb43b46bdb422d45c593f549597e696b9e13cb4650d4"
+        },
+        "licenses/rotate-bits-CC0.txt": {
+          "bytes": 1088,
+          "sha256": "ca0b44aec101afb6b46f4c39b23369fa06a64fb9c0add37c2689d702156fee55"
+        },
+        "licenses/sha256-MIT.txt": {
+          "bytes": 41,
+          "sha256": "b81d0022ca6367918c67b57e9647d3513ee58809fd4b0ef0b3492f1356bced25"
+        },
+        "licenses/subprocess-Unlicense.txt": {
+          "bytes": 1331,
+          "sha256": "a2150552e0e2bba5b4a749eaaf11f10d3f781933c6dff2b4a88eaa387f26f6e6"
+        },
+        "licenses/xxhash-BSD.txt": {
+          "bytes": 1389,
+          "sha256": "6ffedbc0f7878612d2b23589f1ff2ab15633e1df7963a5d9fc750ec5500c7e7a"
+        },
+        "licenses/CUDA-13.0-EULA.txt": {
+          "bytes": 69587,
+          "sha256": "f0bd2eb0a82e7db5353a1c32084c53171b6e6792f79a4bd44515457498be74a0"
+        }
+      }
+    }
   }
 }

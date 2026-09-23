@@ -36,6 +36,7 @@ export class CharacterChatService {
   private job: Promise<void> | null = null
   private serial: Promise<unknown> = Promise.resolve()
   private pendingChanges = 0
+  private modelChange: Promise<void> | null = null
   applyingCharacterId: string | null = null
   private store: ConversationStore
 
@@ -89,6 +90,7 @@ export class CharacterChatService {
         this.durable=structuredClone(data)
         this.state.installed=installed
         this.state.runtimeAvailable=available
+        this.state.runtimeIssue=available?undefined:this.runtime.availabilityError || '이 앱 빌드에 로컬 추론 런타임이 없습니다.'
         if (loaded.recovered) this.state.error='읽지 못한 대화 파일을 별도로 보존하고 새 저장소로 시작했습니다.'
         this.loaded=true;this.lifecycle='loaded';this.emit()
       } catch (error) {
@@ -99,6 +101,31 @@ export class CharacterChatService {
     })
     this.initialization=attempt
     return attempt
+  }
+  async requireRuntimeForInstall() {
+    this.requireLoaded()
+    this.state.runtimeAvailable=await this.runtime.available()
+    this.requireLoaded()
+    this.state.runtimeIssue=this.state.runtimeAvailable?undefined:this.runtime.availabilityError || '로컬 추론 런타임을 사용할 수 없습니다.'
+    this.emit()
+    if(!this.state.runtimeAvailable)throw Error(this.state.runtimeIssue)
+  }
+  installModel(id:LocalModelId, source?:string) {return this.updateModel(async()=>{
+    await this.requireRuntimeForInstall()
+    if(source)await this.models.importFile(id,source)
+    else await this.models.download(id)
+  })}
+  removeModel(id:LocalModelId) {return this.updateModel(()=>this.models.remove(id))}
+  private updateModel(operation:()=>Promise<void>) {
+    this.requireLoaded()
+    if(this.modelChange)throw Error('모델 설치 또는 삭제가 진행 중입니다.')
+    const task=Promise.resolve().then(async()=>{
+      await this.stop()
+      this.requireLoaded()
+      await operation()
+    }).finally(async()=>{try{await this.refreshModels()}finally{if(this.modelChange===task)this.modelChange=null}})
+    this.modelChange=task
+    return task
   }
   private requireLoaded() {if (this.lifecycle !== 'loaded') throw Error('대화 준비가 완료되지 않았습니다. 창을 다시 열어 주세요.')}
   private assertOwner(data=this.data, character=this.state.character) {
@@ -227,6 +254,7 @@ export class CharacterChatService {
   deleteMemory(id: string) {return this.change(async data=>{data.memories[data.characterId]=(data.memories[data.characterId]||[]).filter(m=>m.id!==id)})}
   private requireRequest() {
     this.requireLoaded()
+    if (this.modelChange) throw Error('모델 설치 또는 삭제가 끝난 뒤 다시 보내 주세요.')
     if (this.pendingChanges) throw Error('캐릭터 또는 대화를 변경하는 중입니다. 잠시 후 다시 보내 주세요.')
     if (this.selectionBlocked) throw Error('캐릭터 표시를 복원하지 못했습니다. 캐릭터를 다시 선택해 주세요.')
     this.assertOwner()
@@ -260,7 +288,7 @@ export class CharacterChatService {
       if (!c) {this.addConversation(draft);c=draft.conversations.find(item=>item.id===draft.current)!}
       if (c.messages.length+2>CHAT_STORAGE_LIMITS.messages) throw Error('이 대화의 메시지 한도에 도달했습니다. 새 대화를 시작해 주세요.')
       if (!this.state.installed.includes(draft.model)) throw Error('선택한 모델을 먼저 설치해 주세요.')
-      if (!this.state.runtimeAvailable) throw Error('이 앱 빌드에 로컬 추론 런타임이 없습니다.')
+      if (!this.state.runtimeAvailable) throw Error(this.state.runtimeIssue || '이 앱 빌드에 로컬 추론 런타임이 없습니다.')
       const epoch=++this.state.epoch
       const assistant: ChatMessage={id:randomUUID(),role:'assistant',text:'',status:'streaming',createdAt:new Date().toISOString(),binding:{conversationId:c.id,characterId:character.id,revision:character.revision,personaHash:createHash('sha256').update(JSON.stringify(prepared.binding)).digest('hex'),semanticHash:createHash('sha256').update(JSON.stringify(prepared.definition)).digest('hex'),modelId:draft.model,requestId:randomUUID(),epoch}}
       assistant.binding!.requestId=assistant.id
@@ -349,7 +377,7 @@ export class CharacterChatService {
         await this.serial.catch(()=>{})
         await cancelled
         await this.persistLive()
-      } finally {await this.models.cancel();this.lifecycle='closed'}
+      } finally {await this.models.cancel();await this.modelChange?.catch(()=>{});this.lifecycle='closed'}
     })()
     return this.closing
   }

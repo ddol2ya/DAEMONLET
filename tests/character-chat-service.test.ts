@@ -374,3 +374,21 @@ it('R2: rapid send/stop boundaries only permit the last explicitly accepted requ
  work.push(service.send('new'));await Promise.all(work);await complete(service)
  expect(generate).toHaveBeenCalledTimes(1);expect(service.snapshot().conversation!.messages.map(m=>m.text)).toEqual(['new','final'])
 })
+it('model replacement waits for owned runtime cleanup and blocks new sends until verified installation finishes',async()=>{
+ const {service}=await fixture(),cleanup=deferred(),install=deferred()
+ vi.mocked(service.runtime.stop).mockImplementationOnce(()=>cleanup.promise)
+ const importer=vi.spyOn(service.models,'importFile').mockImplementation(async()=>{await install.promise})
+ const task=service.installModel('E4B','/read-only-original.gguf')
+ await expect(service.send('during installation')).rejects.toThrow('모델 설치')
+ await Promise.resolve();expect(importer).not.toHaveBeenCalled()
+ cleanup.resolve();await vi.waitFor(()=>expect(importer).toHaveBeenCalledWith('E4B','/read-only-original.gguf'))
+ install.resolve();await task
+ expect(service.snapshot().installed).toContain('E4B')
+})
+it('unsupported runtime rejects download before any model transfer starts',async()=>{
+ const {service}=await fixture()
+ vi.mocked(service.runtime.available).mockResolvedValue(false);service.runtime.availabilityError='NVIDIA CUDA unavailable'
+ const download=vi.spyOn(service.models,'download')
+ await expect(service.installModel('E4B')).rejects.toThrow('NVIDIA CUDA unavailable')
+ expect(download).not.toHaveBeenCalled();expect(service.snapshot().runtimeAvailable).toBe(false)
+})

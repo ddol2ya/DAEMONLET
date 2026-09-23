@@ -1,3 +1,4 @@
+import {verifyRuntime} from '../../electron/main/character-chat/runtime-artifacts.mjs'
 import { APP_NAME, BUNDLE_ID } from "../../electron/shared/app-identity.mjs"
 // Prepare an isolated NSIS build project from an already verified Windows app.
 // Only the staged application is passed to --prepackaged; this repository and
@@ -16,11 +17,13 @@ if (!values.app || !values.output) throw new Error('Usage: npm run release:insta
 const root = resolve(import.meta.dirname, '../..'), app = resolve(values.app), output = resolve(values.output)
 const checks = await checkCandidate(join(app, 'resources/app.asar'))
 await checkExternalNotices(join(app, 'resources/licenses'))
+await verifyRuntime(join(app, 'resources/local-llm'), 'win32-x64')
 await mkdir(output) // Existing build projects are never overwritten.
 await cp(join(root, 'electron/assets/appIcon.ico'), join(output, 'appIcon.ico'))
 if (Boolean(values.publisher) !== Boolean(values["certificate-sha1"]) || values["certificate-sha1"] && !/^[A-Fa-f0-9]{40}$/.test(values["certificate-sha1"])) throw Error("Both publisher and certificate SHA1 are required for a signed installer")
 const staged = join(output, 'runtime')
 await cp(app, staged, { recursive: true })
+await verifyRuntime(join(staged, 'resources/local-llm'), 'win32-x64')
 const updateConfig = { provider: "github", owner: "ddol2ya", repo: "DAEMONLET", private: false, updaterCacheDirName: "daemonlet-for-codex-updater", ...(values.publisher ? { publisherName: [values.publisher] } : {}) }
 if (values.publisher) {
   if (process.platform !== "win32") throw Error("Verify signed installer input on Windows")

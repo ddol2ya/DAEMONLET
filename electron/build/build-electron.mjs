@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { createHash } from 'node:crypto'
+import {runtimeTarget, verifyRuntime} from '../main/character-chat/runtime-artifacts.mjs'
 import { build } from "esbuild"
 import { sourceIdentity, assertSameSource } from "../../scripts/release/validation.mjs"
 import { requireElectronRuntime } from "../../scripts/release/electron-runtime.mjs"
@@ -16,13 +16,11 @@ if (production) assertSameSource(source, JSON.parse(await readFile(resolve(root,
 const setupSmoke = process.argv.includes("--setup-smoke")
 await rm(outdir, { recursive: true, force: true })
 await mkdir(resolve(outdir, "codex"), { recursive: true })
-const chatRuntime = resolve(root, ".generated/character-chat-runtime-package")
+const chatTarget = runtimeTarget(process.env.PET_BUILD_PLATFORM || process.platform, process.env.PET_BUILD_ARCH || process.arch)
+const chatRuntime = resolve(root, '.generated/character-chat-runtime-package', chatTarget)
 if (existsSync(chatRuntime)) {
- const catalog = JSON.parse(await readFile(resolve(root,"electron/main/character-chat/runtime-catalog.json"),"utf8"))
- const lock = JSON.parse(await readFile(resolve(chatRuntime,"runtime-lock.json"),"utf8"))
- if (JSON.stringify(catalog)!==JSON.stringify(lock)) throw Error("Staged character-chat runtime catalog differs")
- for (const [name,sha] of Object.entries(catalog.files)) if (createHash("sha256").update(await readFile(resolve(chatRuntime,name))).digest("hex")!==sha) throw Error("Staged character-chat runtime hash differs")
- await cp(chatRuntime,resolve(outdir,"local-llm"),{recursive:true})
+ await verifyRuntime(chatRuntime, chatTarget)
+ await cp(chatRuntime,resolve(outdir,'local-llm'),{recursive:true})
 }
 // Source-only CI may compile without native artifacts. Forge requires the pinned runtime before packaging.
 await mkdir(resolve(outdir, "licenses"), { recursive: true })

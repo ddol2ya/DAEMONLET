@@ -1,4 +1,5 @@
-import {mkdir, readFile, rename, writeFile, stat} from 'node:fs/promises'
+import {replaceFile} from './replaceFile'
+import {mkdir, readFile,  writeFile, stat, rm} from 'node:fs/promises'
 import {dirname} from 'node:path'
 import {randomUUID} from 'node:crypto'
 import {automaticBubblePlacement, parseBubblePlacement, relativeBubblePlacement, type BubblePlacement} from '../../shared/bubble-placement'
@@ -65,8 +66,10 @@ export class ChatWindowLayout {
     const next = this.saves.catch(() => {}).then(async () => {
       await mkdir(dirname(this.file), {recursive: true, mode: 0o700})
       const temp = this.file + '.tmp-' + randomUUID()
-      await writeFile(temp, bytes, {mode: 0o600})
-      await rename(temp, this.file)
+      try {
+        await writeFile(temp, bytes, {mode: 0o600})
+        await replaceFile(temp, this.file)
+      } finally {await rm(temp,{force:true}).catch(()=>{})}
       this.savedRevision=revision
     })
     this.saves = next
