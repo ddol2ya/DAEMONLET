@@ -20,6 +20,7 @@ await mkdir(output, { recursive: true })
 await writeFile(join(output, 'candidate-started.json'), JSON.stringify(values), { flag: 'wx' })
 process.chdir(root)
 process.env.PET_BUILD_PLATFORM = values.platform
+process.env.PET_BUILD_ARCH = values.arch
 const exec = promisify(execFile)
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 async function build(script) {

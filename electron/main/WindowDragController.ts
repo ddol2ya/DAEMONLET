@@ -20,10 +20,16 @@ export class WindowDragController {
     allowed(): boolean
     lock(active: boolean): void
     finish(bounds: Rectangle, committed: boolean): void
+    transform?(start: Rectangle, dx: number, dy: number): Rectangle
     now?: () => number
   }) {}
-  request(request: WindowDragRequest) {
-    if (request.action === "begin") return { id: this.begin() }
+  request(request: WindowDragRequest, alreadyReleased = false) {
+    if (request.action === "begin") {
+      const id = this.begin()
+      // Native mouse-up can arrive before the renderer's begin IPC on a busy UI.
+      if (id && alreadyReleased) { this.end(); return { id: null } }
+      return { id }
+    }
     if (!this.gesture || this.gesture.id !== request.id) return { id: null }
     if (request.action === "cancel") this.cancel()
     else if (request.action === "end") this.end()
@@ -59,7 +65,9 @@ export class WindowDragController {
     const dx = point.x - g.cursor.x, dy = point.y - g.cursor.y
     if (!g.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_DIP) return
     g.moved = true
-    g.window.setBounds({ ...g.start, x: Math.round(g.start.x + dx), y: Math.round(g.start.y + dy) }, false)
+    const bounds = this.options.transform ? this.options.transform(g.start, dx, dy)
+      : { ...g.start, x: Math.round(g.start.x + dx), y: Math.round(g.start.y + dy) }
+    g.window.setBounds(bounds, false)
   }
   private end() {
     this.move(true)

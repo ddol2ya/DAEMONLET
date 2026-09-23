@@ -97,6 +97,13 @@ Windows는 **CMD와 PowerShell**을 지원합니다. Hook 실행에 별도 Node.
 
 [버그 제보](https://github.com/ddol2ya/DAEMONLET/issues)에는 앱 버전, 운영체제, 재현 순서와 개인정보를 가린 화면을 첨부해 주세요. 계정 토큰, 원본 대화 또는 전체 Codex 설정은 올리지 마세요.
 
+## 개발 브랜치: 로컬 캐릭터챗
+
+이 브랜치에는 데스크톱 캐릭터와 말풍선으로 대화하는 로컬 캐릭터챗이 추가되어 있습니다. 현재 공개 0.7.2 배포 파일에는 포함되지 않습니다. Gemma 4 E4B/12B 설치·스트리밍·중단, 대화 저장, 팩 선언에 따른 감정 포즈를 지원하며 현재 실기 검증은 Apple Silicon/Metal에서 수행했습니다.
+
+- [사용법·빌드 방법](docs/local-character-chat.md)
+- [실제 검증 범위와 남은 확인](docs/local-character-chat-validation.md)
+
 ## 캐릭터 제작과 개발
 
 캐릭터 제작 도구는 **실험 기능**이며 일반 앱 배포 파일에 포함되지 않습니다. ComfyUI·See-through·모델은 사용자가 별도로 준비합니다.

@@ -92,3 +92,15 @@ describe("persona pack migration", () => {
     } finally { await rm(dir, { recursive: true, force: true }) }
   })
 })
+
+it("uses the pack conversation name in Side Chat and falls back for invalid optional metadata", async () => {
+ const character={schemaVersion:1,id:"demo",label:"Demo v3",base:{psd:"a.psd",source:"a.png"},poses:[],chat:"chat.json"};
+ let chat:unknown={schemaVersion:1,profile:{displayName:"Demo"},presentation:{rules:[]}};
+ const resolver=new PersonaResolver(async (_selection,path)=>bytes(path==="character.json"?character:chat));
+ const selection={id:"demo",revision:"test"};
+ const result=await resolver.resolve(selection,"ko");
+ expect(result.label).toBe("Demo");
+ expect(result.compiled.personaHash).toBe(compilePersona("Demo",neutralPersona(),"ko").personaHash);
+ chat={schemaVersion:1,profile:{displayName:""}};
+ expect((await resolver.resolve(selection,"ko")).label).toBe("Demo v3");
+})

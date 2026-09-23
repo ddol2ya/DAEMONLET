@@ -26,7 +26,7 @@ function fixture() {
 }
 function exitFixture(c: any, disposePack: () => Promise<void> = async () => {}) {
   const disposedChat = vi.fn(async () => {}), disposedRegistry = vi.fn(async () => {})
-  for (const name of ["sideChatIpc", "activityIpc", "bubbleIpc", "taskControlIpc", "settingsIpc", "updateIpc", "packUpdateIpc", "characterIpc", "activityTitles", "protocol"]) c[name] = { dispose: vi.fn() }
+  for (const name of ["characterChat", "sideChatIpc", "activityIpc", "bubbleIpc", "taskControlIpc", "settingsIpc", "updateIpc", "packUpdateIpc", "characterIpc", "activityTitles", "protocol"]) c[name] = { dispose: vi.fn() }
   for (const name of ["settingsWindow", "activityWindow", "pet", "lab", "tray"]) c[name] = { destroy: vi.fn() }
   Object.assign(c, { sideChat: { dispose: disposedChat }, petDrag: { cancel: vi.fn() }, chatEntry: { cancel: vi.fn() },
     activityBubble: { cancelPlacement: vi.fn(), destroy: vi.fn() }, updates: { dispose: vi.fn(), stopBackgroundChecks: vi.fn() }, subscriptions: [],

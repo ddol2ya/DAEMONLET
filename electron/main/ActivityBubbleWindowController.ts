@@ -19,6 +19,8 @@ import { SIDE_CHAT_IPC, type SideChatSnapshot } from "../shared/side-chat-contra
 /** One task surface for activity, explicit controls and the owned-child conversation. */
 export class ActivityBubbleWindowController {
   window: BrowserWindow | null = null
+  private localChatVisible = false
+  setLocalChatVisible(value: boolean) { this.localChatVisible = value; this.sync() }
   private pet: BrowserWindow | null = null
   private settings: DesktopSettingsV1 | null = null
   private snapshot: ActivitySnapshot | null = null
@@ -136,6 +138,7 @@ export class ActivityBubbleWindowController {
 
   sync = (): void => {
     if (this.disposed) return
+    if (this.localChatVisible) { this.window?.hide(); this.speech.sync(this.pet,this.settings,this.presentation.anchor,null,this.inLayout,null); return }
     this.syncActivity()
     this.speech.sync(this.pet, this.settings, this.presentation.anchor, this.presentation.sideChatVisible || this.placementDraft ? null : this.presentation.speech, this.inLayout, this.view === "control" ? this.window : null)
   }

@@ -44,3 +44,22 @@ The original project MIT attribution, `Momo Motion Lab contributors`, is retaine
 2026-09-13 external review: ComfyUI's recorded revision provides GPL v3 text. The See-through plugin declares MIT in pyproject.toml but has no root LICENSE file at the compatible commit. LayerDiff3D declares Apache-2.0 in its model card; the exact Marigold weights have no card/license declaration at the recorded revision. Evidence and pending status are in `skills/create-pet-character/external-dependencies.json`. None of these engines or weights are shipped, downloaded or updated by this release build.
 
 In the installed app, project/upstream legal texts and modification notes are beside this file in the external resources `licenses/` folder, with package texts in `renderer/` and `desktop/`. The source-repository paths above identify origins; the public source is https://github.com/ddol2ya/DAEMONLET .
+
+## Local Character Chat runtime and optional models
+
+The optional local-chat runtime is built from llama.cpp commit
+`391fac16460f15233a7740550d858ac96df3419d` (MIT; ggml authors).
+The staged runtime includes cpp-httplib (MIT), nlohmann/json (MIT),
+xxHash (BSD), sha256, rotate-bits and subprocess.h components. Full notices
+are in `distribution/licenses/character-chat` and the packaged runtime's
+`licenses` directory. The Windows CUDA target additionally redistributes
+NVIDIA `cublas64_13.dll` and `cublasLt64_13.dll` from CUDA Toolkit 13.0.
+Their complete NVIDIA license and third-party notices are preserved in
+`distribution/licenses/character-chat/CUDA-13.0-EULA.txt` and the Windows
+runtime's `licenses` directory. Redistribution is described by Attachment A of
+https://docs.nvidia.com/cuda/archive/13.0.0/eula/index.html . The NVIDIA driver
+and full CUDA Toolkit are not bundled. Model weights are not bundled. The two catalogued
+Google Gemma 4 QAT Q4_0 GGUF repositories declare Apache-2.0; the license
+text accompanies the model installation information. Character artwork and
+source material retain their separate rights and are not covered by these
+software/model licenses.

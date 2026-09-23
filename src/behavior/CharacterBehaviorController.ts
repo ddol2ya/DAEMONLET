@@ -62,6 +62,16 @@ export class CharacterBehaviorController {
   private readonly listeners = new Set<() => void>()
   private readonly lifecycleListeners = new Set<(event: BehaviorLifecycleEvent) => void>()
   private disconnectSource: (() => void) | null = null
+  private presentationSuspended = false
+  setPresentationSuspended(value: boolean): void {
+    if(this.presentationSuspended===value)return
+    this.presentationSuspended=value
+    this.clearAction()
+    this.runtime.clearBehaviorStateParameters(this.ownerId)
+    this.runtime.clearBehaviorActionParameters(this.ownerId)
+    this.runtime.setBehaviorSemanticState?.(value ? "NORMAL" : this.semantic.state)
+    if(value)this.stop();else this.start()
+  }
   private controlMode: BehaviorControlMode = "AUTO_BEHAVIOR"
   private poseLoadStatus: BehaviorPoseLoadStatus = "idle"
   private visualWarning: string | null = null
@@ -296,7 +306,7 @@ export class CharacterBehaviorController {
     const snapshot = this.machine.configure(profile.timing, reset)
     this.semantic = snapshot
     this.selectStatePose()
-    this.runtime.setBehaviorSemanticState?.(snapshot.state)
+    if(!this.presentationSuspended)this.runtime.setBehaviorSemanticState?.(snapshot.state)
     this.transitionHistory = []
     this.recordTransition(snapshot)
     if (reset && this.controlMode === "AUTO_BEHAVIOR") void this.runtime.exitPose()
@@ -425,7 +435,7 @@ export class CharacterBehaviorController {
     const previous = this.semantic.state
     const transitioned = force || snapshot.state !== this.semantic.state || snapshot.stateSince !== this.semantic.stateSince
     this.semantic = snapshot
-    this.runtime.setBehaviorSemanticState?.(snapshot.state)
+    if(!this.presentationSuspended)this.runtime.setBehaviorSemanticState?.(snapshot.state)
     if (!transitioned) return
     if (this.controlMode === "AUTO_BEHAVIOR" && (this.connected || force)) this.selectStatePose(snapshot)
     const now = this.clock.now()
@@ -454,6 +464,7 @@ export class CharacterBehaviorController {
   }
 
   private updateVisuals(now: number): void {
+    if(this.presentationSuspended)return
     this.rotateStatePose(now)
     this.updateStateMotion(now)
     this.updateActionMotion(now)

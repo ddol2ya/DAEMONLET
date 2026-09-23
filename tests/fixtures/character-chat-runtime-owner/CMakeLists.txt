@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.18)
+project(runtime_owner_fixture LANGUAGES CXX)
+add_executable(llama-server server.cpp)
+target_compile_features(llama-server PRIVATE cxx_std_17)
+set_property(TARGET llama-server PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded)
+target_compile_options(llama-server PRIVATE /utf-8)

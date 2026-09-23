@@ -1,3 +1,4 @@
+import { CharacterChatWindow } from './character-chat/CharacterChatWindow'
 import { PackUpdateService } from "./pack-updates/PackUpdateService"
 import { PackUpdateIpcController } from "./pack-updates/PackUpdateIpcController"
 import { CharacterTransitionTrace } from "./CharacterTransitionTrace"
@@ -69,6 +70,7 @@ const RECOVERY_SMOKE_SESSION_ID = "smoke-recovery-session"
 const RECOVERY_SMOKE_CONFIRMED_TURN_ID = "smoke-confirmed-turn"
 
 export class AppController {
+  private readonly characterChat: CharacterChatWindow
   private readonly sideChat: SideChatService = new SideChatService(parent => new CodexSideChatBackend(() => {
     const options = this.sideChatSetup.options()
     return connectVerifiedSideChat({ ...options, codexHome: parent.sourceHome ?? options.codexHome, authHome: options.codexHome })
@@ -150,6 +152,7 @@ export class AppController {
   private readonly smokeReadyCharacters = new Set<string>()
 
   constructor(private readonly dirname: string, private readonly characters: CharacterRegistry, private readonly setupSmoke?: SetupSmokeContext, private readonly startup?: StartupWindow, updateSmoke?: Partial<ConstructorParameters<typeof UpdateService>[0]>) {
+    this.characterChat = new CharacterChatWindow(dirname, characters, this.devServerUrl, {pet:()=>this.pet.window,reveal:()=>this.showPet(),active:value=>{this.activityBubble.setLocalChatVisible(value);if(value){this.chatEntry.cancel();this.sideChat.setMode("hidden")}},select:entry=>this.selectCharacter(entry),selected:()=>this.settings.characterId})
     this.adapterConfig = createDesktopAdapterRuntimeConfig()
     this.protocol = new ProtocolBridge(this.adapterConfig.protocolEndpoint)
     const preload = (name: string) => join(dirname, `${name}-preload.cjs`)
@@ -288,6 +291,7 @@ export class AppController {
     this.packUpdateIpc.register()
     this.characterIpc.register()
     this.sideChatIpc.register()
+
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
     await this.sideChatSetup.load()
     let sideChatSelection = JSON.stringify(this.integration.sideChatSelection())
@@ -305,6 +309,7 @@ export class AppController {
     void this.codexApp.available().then(available => { if (!this.quitting) this.activity.setNavigation(available ? "app" : "none") })
     this.subscriptions.push(this.characters.subscribe(snapshot => {
       const active = snapshot.entries.find(e => e.id === this.settings.characterId)
+      void this.characterChat.selectedCharacterChanged(this.settings.characterId).catch(()=>{})
       const loading = this.transitions.current?.ticket
       if (active?.status === "ready" && loading?.id === active.id && loading.revision !== active.revision) this.transitions.begin(active)
       this.pet.send(CHARACTER_IPC.changed, snapshot)
@@ -334,6 +339,7 @@ export class AppController {
     if (this.settings.adapterAutoStart) void this.adapter.start().catch((error) => this.warn(error instanceof Error ? error.message : String(error)))
     this.pet.create(this.settings)
     if (this.pet.window) this.activityBubble.attach(this.pet.window, this.settings)
+    if (process.argv.includes("--character-chat")) void this.characterChat.open().catch(()=>this.warn("캐릭터챗을 준비하지 못했습니다. 저장소 접근 권한과 캐릭터팩을 확인해 주세요."))
     this.trayCreated = this.tray.create(this.settings, this.adapter.getStatus(), this.trayActions())
     if (!this.trayCreated) this.restoreResidentAccess()
     else if (!packagedMac && app.isPackaged && this.trayCreated) app.dock?.hide()
@@ -354,7 +360,7 @@ export class AppController {
     powerMonitor.on("shutdown", this.onSystemShutdown)
     app.once("will-quit", this.onFinalQuit)
     this.pet.window?.on("query-session-end", this.onSystemShutdown)
-    if (await this.integration.start()) this.settingsWindow.open()
+    if (await this.integration.start() && !process.argv.includes("--character-chat")) this.settingsWindow.open()
     if (updateRecovery) this.updateIpc.open()
     if (__SETUP_SMOKE__ && this.setupSmoke) void this.setupSmoke.run({
       settings: this.settingsWindow, integration: this.integration, pet: this.pet, adapter: this.adapter,
@@ -484,6 +490,7 @@ export class AppController {
     this.residentDock?.dispose(); this.residentDock = null
     if (this.settingsPoll) clearInterval(this.settingsPoll)
     this.settingsPoll = null
+    await this.characterChat.dispose()
     this.sideChatIpc.dispose()
     await this.sideChat.dispose()
     this.settingsWindow.destroy()
@@ -603,6 +610,7 @@ export class AppController {
     }
     const previousScale = this.settings.scale, previousChatEnabled = this.settings.sideChatEnabled
     Object.assign(this.settings, patch)
+    if(patch.characterId)void this.characterChat.selectedCharacterChanged(patch.characterId).catch(()=>{})
     if (patch.language !== undefined) setAppLanguage(this.settings.language)
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
     if (previousChatEnabled !== this.settings.sideChatEnabled) this.sideChatSetup.invalidate()
@@ -676,6 +684,7 @@ export class AppController {
     } catch { if (generation === this.personaGeneration) this.sideChat.personaFailed() }
   }
   private async openSideChat(key?: string, activityId?: string) {
+    this.characterChat.window?.close()
     this.placementOpening?.abort(); this.activityBubble.cancelPlacement()
     const target = key ? this.adapter.conversationTarget(key) : null
     await this.chatEntry.open(target ? { threadId: target.threadId, activityId } : undefined, Boolean(activityId))
@@ -781,6 +790,7 @@ export class AppController {
       inputLocked: () => this.updatePreparing || this.quitting || this.packUpdates.applying(),
       checkUpdates: () => { this.updateIpc.open(); void this.updates.act({ action: "check" }) },
       activity: () => this.activity.snapshot(),
+      openCharacterChat: () => { void this.characterChat.open().catch(()=>this.warn("캐릭터챗을 준비하지 못했습니다. 저장소 접근 권한과 캐릭터팩을 확인해 주세요.")) },
       openSideChat: () => { void this.openSideChat() },
       openTaskControl: () => { this.updateSettings({ visible: true, taskBubblesEnabled: true }); this.activityBubble.setView("control", false) },
       openActivity: () => {

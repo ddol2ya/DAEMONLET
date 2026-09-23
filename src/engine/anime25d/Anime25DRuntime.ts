@@ -878,6 +878,8 @@ export class Anime25DRuntime {
     this.animationFrame = requestAnimationFrame(this.tick)
   }
 
+  private chatMotionPolicy: "chat-safe" | "pose-approved" | null = null
+  setChatMotionPolicy(policy: "chat-safe" | "pose-approved" | null) { this.chatMotionPolicy = policy }
   private updateAutomaticSources(now: number, dt: number) {
     const transition = this.poseTransition.sample(now)
     let crossfade = this.crossfadeMix(now)
@@ -901,7 +903,7 @@ export class Anime25DRuntime {
     this.hitResolver = pose.mix >= 0.5 ? this.poseCrossfade && crossfade < .5 ? this.poseCrossfade.hitResolver : this.poseHitResolver : this.baseHitResolver
     if (pose.active) {
       const elapsedMs = pose.state === "ACTIVE_LOOP" ? now - this.poseLoopStartedAt : 0
-      const definition = this.poseAsset?.manifest.motion
+      const definition = this.chatMotionPolicy === "chat-safe" ? undefined : this.poseAsset?.manifest.motion
       const continuous = definition?.transition === "continuous"
       const motion = continuous ? this.poseMotionPlayback.sample(definition, pose, now) : samplePoseMotion(definition, elapsedMs)
       let values = continuous ? motion.parameters : Object.fromEntries(Object.entries(motion.parameters).map(([name, value]) => [name, (value as number) * pose.progress])) as Partial<Anime25DParameterState>

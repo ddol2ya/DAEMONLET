@@ -1,0 +1,3 @@
+import {contextBridge,ipcRenderer} from 'electron'
+import {LOCAL_CHAT_IPC,type LocalChatApi} from '../shared/character-chat-contract'
+contextBridge.exposeInMainWorld('characterChat',Object.freeze({gesture:(kind,request)=>ipcRenderer.invoke(LOCAL_CHAT_IPC.gesture,kind,request),action:value=>ipcRenderer.invoke(LOCAL_CHAT_IPC.action,value),subscribe:listener=>{const receive=(_event:Electron.IpcRendererEvent,value:Parameters<typeof listener>[0])=>listener(value);ipcRenderer.on(LOCAL_CHAT_IPC.changed,receive);return()=>ipcRenderer.removeListener(LOCAL_CHAT_IPC.changed,receive)}} satisfies LocalChatApi))

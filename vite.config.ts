@@ -26,6 +26,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        characterChat: resolve(import.meta.dirname, "character-chat.html"),
         lab: resolve(import.meta.dirname, "index.html"),
         pet: resolve(import.meta.dirname, "pet.html"),
         settings: resolve(import.meta.dirname, "settings.html"),

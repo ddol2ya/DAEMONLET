@@ -16,7 +16,7 @@ import { builtinFixture, writePack } from "./helpers/character-pack"
 const roots: string[] = [], services: PackUpdateService[] = [], registries: CharacterRegistry[] = []
 afterEach(async () => { setApplicationInputLocked(false); for (const s of services.splice(0)) await s.dispose(); for (const r of registries.splice(0)) await r.dispose(); await Promise.all(roots.splice(0).map(p => rm(p, { recursive: true, force: true }))) })
 const sourceFor = (id: string): PackUpdateSource => ({ schemaVersion: 1, provider: "huggingface", repoType: "dataset", repoId: "fixture/characters", manifestPath: `updates/${id}/stable.json` })
-const runtime = { ...PACK_RUNTIME, capabilities: PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1") }
+const runtime = { ...PACK_RUNTIME, capabilities: PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1" && c !== "character-chat-v1") }
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "pack-updates-")); roots.push(root)
   let validationHold: (() => Promise<void>) | undefined
