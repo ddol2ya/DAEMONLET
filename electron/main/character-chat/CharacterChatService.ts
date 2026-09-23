@@ -78,10 +78,10 @@ export class CharacterChatService {
         const installed=await this.models.installed(), available=await this.runtime.available()
         // A close that overlaps reading must never persist partially initialized defaults.
         if (this.lifecycle !== 'initializing') return
+        const previousCharacterId=data.characterId
         data.characterId=entry.id
-        if (!data.conversations.some(c=>c.id===data.current && c.characterId===entry.id)) {
+        if ((data.current!==undefined||previousCharacterId!==entry.id)&&!data.conversations.some(c=>c.id===data.current && c.characterId===entry.id)) {
           data.current=data.conversations.find(c=>c.characterId===entry.id)?.id
-          if (!data.current && data.conversations.length<CHAT_STORAGE_LIMITS.conversations) this.addConversation(data)
         }
         this.commit(data,prepared)
         this.durable=structuredClone(data)
@@ -185,15 +185,15 @@ export class CharacterChatService {
       const entry=this.registry.get(id)
       if (!entry || entry.status==='disabled') throw Error('캐릭터를 찾지 못했습니다.')
       const candidate=await this.prepareCharacter(await this.registry.ensureReady(entry))
+      const previousCharacterId=data.characterId
       data.characterId=id
-      if (!data.conversations.some(c=>c.id===data.current && c.characterId===id)) data.current=data.conversations.find(c=>c.characterId===id)?.id
-      if (!data.current) this.addConversation(data)
+      if ((data.current!==undefined||previousCharacterId!==id)&&!data.conversations.some(c=>c.id===data.current && c.characterId===id)) data.current=data.conversations.find(c=>c.characterId===id)?.id
       return candidate
     })
   }
   attention(active: boolean) {if (this.lifecycle==='loaded' && !this.pendingChanges && ['idle','attentive'].includes(this.state.phase)) {this.state.phase=active?'attentive':'idle';this.emit()}}
   selectModel(id: LocalModelId) {return this.change(async data=>{data.model=id})}
-  newChat() {return this.change(async data=>{this.addConversation(data)})}
+  newChat() {return this.change(async data=>{data.current=undefined})}
   selectConversation(id: string) {return this.change(async data=>{
     const c=data.conversations.find(c=>c.id===id)
     if (!c || c.characterId!==data.characterId) throw Error('대화가 현재 캐릭터와 다릅니다.')
@@ -205,7 +205,6 @@ export class CharacterChatService {
     data.conversations=data.conversations.filter(c=>c.id!==id)
     if (data.current===id) {
       data.current=data.conversations.find(c=>c.characterId===data.characterId)?.id
-      if (!data.current) this.addConversation(data)
     }
   })}
   saveMemory(text: string, id?: string) {return this.change(async data=>{
@@ -233,16 +232,19 @@ export class CharacterChatService {
     return this.enqueue(async () => {
       this.requireRequest()
       if (this.job || ['loading','generating','replying'].includes(this.state.phase)) throw Error('답변 생성 중입니다.')
-      const draft=structuredClone(this.data), c=draft.conversations.find(c=>c.id===draft.current)
+      const draft=structuredClone(this.data)
+      let c=draft.conversations.find(c=>c.id===draft.current)
       const character=this.state.character, prepared=this.prepared
-      if (!character || !c || !prepared) throw Error('캐릭터를 선택하고 새 대화를 만들어 주세요.')
+      if (!character || !prepared) throw Error('캐릭터를 선택해 주세요.')
       if (text===undefined) {
+        if (!c) return
         if (c.messages.at(-1)?.role==='assistant') c.messages.pop()
         const user=c.messages.at(-1)
         if (user?.role!=='user') return
         text=user.text;c.messages.pop()
       }
       if (typeof text!=='string' || !text.trim() || text.length>6000) throw Error('메시지는 1~6000자로 입력해 주세요.')
+      if (!c) {this.addConversation(draft);c=draft.conversations.find(item=>item.id===draft.current)!}
       if (c.messages.length+2>CHAT_STORAGE_LIMITS.messages) throw Error('이 대화의 메시지 한도에 도달했습니다. 새 대화를 시작해 주세요.')
       if (!this.state.installed.includes(draft.model)) throw Error('선택한 모델을 먼저 설치해 주세요.')
       if (!this.state.runtimeAvailable) throw Error('이 앱 빌드에 로컬 추론 런타임이 없습니다.')

@@ -36,7 +36,10 @@ async function fixture(displayName?:string, options:{root?:string;initialize?:bo
   vi.spyOn(service.runtime, 'count').mockResolvedValue(1000)
   vi.spyOn(service.models, 'installed').mockResolvedValue(['E4B', '12B'])
   vi.spyOn(service.models, 'verify').mockResolvedValue('/unused-test-model')
-  if(options.initialize!==false)await service.initialize()
+  if(options.initialize!==false){
+    if(!options.root){const seed=chats(1);seed.memories={};await (service as any).store.save(seed)}
+    await service.initialize()
+  }
   return {service, root, registry, store:(service as any).store as ConversationStore}
 }
 it('legacy packs without persona keep memories separate; deletion persists without deleting other characters', async () => {
@@ -72,7 +75,7 @@ it('character switching discards late chunks and metadata, then retry replaces t
   await service.send('first')
   await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
   await service.selectCharacter('synthetic-b')
-  expect(service.snapshot().conversation!.messages).toEqual([])
+  expect(service.snapshot().conversation).toBeNull()
   expect(service.snapshot().meaning).toBeNull()
   generate.mockImplementation(async (_messages, onText) => {
     onText('new reply')
@@ -222,22 +225,22 @@ it('F2: ownership mismatches and unannounced revision changes cannot reach retry
 })
 it('F3: 499→500 succeeds, 501 is rejected without mutation, and deletion still works',async()=>{
  const {service,store}=await fixture(undefined,{initialize:false});await store.save(chats(499));await service.initialize()
- await service.newChat();const before=await readFile(store.file)
- await expect(service.newChat()).rejects.toThrow('500');expect(service.snapshot().conversations).toHaveLength(500);expect((await readFile(store.file)).equals(before)).toBe(true)
- await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversations).toHaveLength(499)
+ await service.newChat();vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'ok',meaning:neutralMeaning()});await service.send('conversation 500');await complete(service);const last=service.snapshot().conversation!.id
+ await service.newChat();const before=await readFile(store.file);await expect(service.send('conversation 501')).rejects.toThrow('500');expect(service.snapshot().conversations).toHaveLength(500);expect((await readFile(store.file)).equals(before)).toBe(true)
+ await service.deleteConversation(last);expect(service.snapshot().conversations).toHaveLength(499)
 })
 it('F3: message limit rejects the extra pair without changing memory or disk and still allows deleting',async()=>{
  const {service,store}=await fixture(undefined,{initialize:false});await store.save(chats(1,3998));await service.initialize()
  vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'last',meaning:neutralMeaning()});await service.send('last user');await complete(service)
  expect(service.snapshot().conversation?.messages).toHaveLength(4000);const before=await readFile(store.file)
  await expect(service.send('too many')).rejects.toThrow('메시지 한도');expect((await readFile(store.file)).equals(before)).toBe(true)
- await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversation?.messages).toHaveLength(0)
+ await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversation).toBeNull()
 })
 it.each(['ENOSPC','EACCES'])('F3: %s write failure rolls back new conversation and permits subsequent deletion',async code=>{
- const {service,store}=await fixture();await service.saveMemory('durable');await service.newChat();const before=await readFile(store.file),snapshot=service.snapshot()
+ const {service,store}=await fixture();await service.saveMemory('durable');const before=await readFile(store.file),snapshot=service.snapshot()
  vi.spyOn(store,'save').mockRejectedValueOnce(Object.assign(Error(code),{code}))
  await expect(service.newChat()).rejects.toThrow('저장하지');expect(service.snapshot().conversations).toEqual(snapshot.conversations);expect((await readFile(store.file)).equals(before)).toBe(true)
- await service.deleteConversation(snapshot.conversation!.id);expect(service.snapshot().conversations).toHaveLength(1)
+ await service.deleteConversation(snapshot.conversation!.id);expect(service.snapshot().conversations).toHaveLength(0)
 })
 it('F3: failed send and failed final response saves preserve a valid prior state, then deletion works',async()=>{
  const {service,store}=await fixture();await service.saveMemory('keep');const before=await readFile(store.file)
@@ -245,7 +248,7 @@ it('F3: failed send and failed final response saves preserve a valid prior state
  await expect(service.send('unsaved')).rejects.toThrow('저장하지');expect(service.snapshot().conversation?.messages).toHaveLength(0);expect((await readFile(store.file)).equals(before)).toBe(true)
  vi.spyOn(service.runtime,'generate').mockImplementation(async()=>{save.mockRejectedValueOnce(Error('ENOSPC'));return {text:'unsaved reply',meaning:neutralMeaning()}})
  await service.send('accepted');await complete(service);expect(service.snapshot().error).toContain('저장하지');expect(service.snapshot().conversation?.messages.at(-1)?.status).toBe('stopped')
- await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversation?.messages).toHaveLength(0)
+ await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversation).toBeNull()
 })
 it.each([{intensity:2},{emotion:'unknown'},{intent:'unknown'},{gesture:'unknown'},{}])('F4: invalid/missing meaning %j preserves complete dialogue and next-turn context',async patch=>{
  const {service,store}=await fixture();const requests:any[]=[]
@@ -285,4 +288,23 @@ it('F2: a revision replaced during generation discards subsequent chunks and com
  await service.send('hello');await entered.promise
  ;(registry.snapshot().entries[0] as any).revision='new';gate.resolve();await complete(service)
  expect(service.snapshot().conversation?.messages.at(-1)?.text).toBe('partial');expect(service.snapshot().conversation?.messages.at(-1)?.status).toBe('stopped')
+})
+
+it('empty drafts are not saved and repeated new-chat clicks never create rows',async()=>{
+ const {service,store}=await fixture(undefined,{initialize:false});await service.initialize()
+ expect(service.snapshot().conversation).toBeNull();expect(service.snapshot().conversations).toHaveLength(0)
+ for(let i=0;i<4;i++)await service.newChat()
+ expect((await store.load()).value?.conversations).toHaveLength(0)
+ vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'reply',meaning:neutralMeaning()})
+ await service.send('first message');await complete(service);expect(service.snapshot().conversations).toHaveLength(1)
+ await service.newChat();await service.newChat();expect(service.snapshot().conversations).toHaveLength(1);expect(service.snapshot().conversation).toBeNull()
+})
+it('legacy empty conversations actually decrease on deletion, including the last one and after restart',async()=>{
+ const {service,store,root}=await fixture(undefined,{initialize:false});const data=chats(3);await store.save(data);await service.initialize()
+ for(const row of data.conversations)await service.deleteConversation(row.id)
+ expect(service.snapshot().conversation).toBeNull();expect(service.snapshot().conversations).toHaveLength(0)
+ expect((await store.load()).value?.memories).toEqual(data.memories)
+ await service.close();const reopened=await fixture(undefined,{root});expect(reopened.service.snapshot().conversations).toHaveLength(0);expect(reopened.service.snapshot().conversation).toBeNull()
+ vi.spyOn(reopened.service.runtime,'generate').mockResolvedValue({text:'after deletion',meaning:neutralMeaning()});await reopened.service.send('still works');await complete(reopened.service)
+ expect(reopened.service.snapshot().conversations).toHaveLength(1)
 })
