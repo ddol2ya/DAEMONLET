@@ -37,3 +37,10 @@ it('Windows child PATH excludes toolkit, developer folders and inherited backend
  expect(env.PATH).toBe('C:\\runtime;C:\\Windows\\System32;C:\\Windows');expect(env).not.toHaveProperty('Path');expect(env).not.toHaveProperty('HF_TOKEN');expect(env).not.toHaveProperty('GGML_BACKEND_DL_PATH')
 })
 it('Windows graceful stop closes the lifetime pipe before escalating to forced termination',async()=>{vi.useFakeTimers();const c=child(),end=vi.fn();(c as any).stdin={end};const stopped=stopOwnedProcess(c,'win32');expect(end).toHaveBeenCalledOnce();expect(c.kill).not.toHaveBeenCalled();c.emit('exit',0,null);await stopped;await vi.advanceTimersByTimeAsync(8000);expect(c.kill).not.toHaveBeenCalled()})
+it('a cancelled availability probe does not misclassify the GPU as unavailable',async()=>{
+ const runtime=new RuntimeSupervisor('/runtime/llama-server'),entered=deferred()
+ runtime.availabilityError='previous diagnostic'
+ vi.spyOn(runtime as any,'probe').mockImplementation(async(...args:unknown[])=>{const signal=args[0] as AbortSignal;entered.resolve();await new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}))})
+ const available=runtime.available().catch(e=>e);await entered.promise;await runtime.stop()
+ expect((await available).name).toBe('AbortError');expect(runtime.availabilityError).toBe('previous diagnostic')
+})

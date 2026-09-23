@@ -62,7 +62,7 @@
       "backend": "CUDA",
       "build": {
         "configuration": "Release",
-        "sharedLibraries": true,
+        "sharedLibraries": false,
         "openssl": false,
         "openmp": false,
         "native": false,
@@ -92,41 +92,9 @@
           "bytes": 154624,
           "sha256": "4365273717198f97053e247862049d9441633ca45d7d4001751f6ce9eeaa00be"
         },
-        "ggml-base.dll": {
-          "bytes": 840192,
-          "sha256": "62ab778596e2b77339ccdfc56a7f3b0ef8e940d4cf6ab51e70aa83d3ca85307f"
-        },
-        "ggml-cpu.dll": {
-          "bytes": 1103872,
-          "sha256": "47bb78dd915a8cb7446be2245ff0c4765013cc6ffa4c7be9c45f838d4309b268"
-        },
-        "ggml-cuda.dll": {
-          "bytes": 124820992,
-          "sha256": "48686bef578acf0da128330e458eab02729530bd02888d0a746cdfbc9577a22b"
-        },
-        "ggml.dll": {
-          "bytes": 167424,
-          "sha256": "146fb82250ed92de7151b7371026861f22d868851b0379d9df8cf7afaaf1a21f"
-        },
-        "llama-common.dll": {
-          "bytes": 3987456,
-          "sha256": "856d2bdc24bc6c10d0804a07116ae8067e37e4c934e4b40d2f833b559cccea4a"
-        },
-        "llama-server-impl.dll": {
-          "bytes": 5540864,
-          "sha256": "a5fbc77372d834acf214bbb16e4c779778c8bb525057f4ea4e5cb586e2f2ccce"
-        },
         "llama-server.exe": {
-          "bytes": 110592,
-          "sha256": "6cedc8255cd038e8a9780ca96d293efd8d63e011b47349bf1607689407d7d5a1"
-        },
-        "llama.dll": {
-          "bytes": 2900992,
-          "sha256": "d88e5878fc572aaa2c83e35b0e91c807793b29433f0f5d2a1b21a7fe46e5f997"
-        },
-        "mtmd.dll": {
-          "bytes": 1732608,
-          "sha256": "304ac4c753b0e9fefb12d0129ea099e272c739faf2f9352db9f85b0e93da7992"
+          "bytes": 137254400,
+          "sha256": "af31ccd31894c286c3d11f50a490d3da7f4f5df6c271352a969eefcedf1b33d6"
         },
         "licenses/Gemma4-Apache-2.0.txt": {
           "bytes": 11358,

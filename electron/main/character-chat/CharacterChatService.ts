@@ -77,7 +77,9 @@ export class CharacterChatService {
         const entry=this.registry.get(preferredCharacterId || data.characterId) || this.registry.get('gpichan')
         if (!entry) throw Error('캐릭터를 찾지 못했습니다.')
         const prepared=await this.prepareCharacter(await this.registry.ensureReady(entry))
-        const installed=await this.models.installed(), available=await this.runtime.available()
+        const installed=await this.models.installed()
+        if (this.lifecycle !== 'initializing') return
+        const available=await this.runtime.available()
         // A close that overlaps reading must never persist partially initialized defaults.
         if (this.lifecycle !== 'initializing') return
         this.assertCurrentRevision(prepared.entry)
@@ -120,9 +122,13 @@ export class CharacterChatService {
     this.requireLoaded()
     if(this.modelChange)throw Error('모델 설치 또는 삭제가 진행 중입니다.')
     const task=Promise.resolve().then(async()=>{
+      this.state.error=null
       await this.stop()
       this.requireLoaded()
       await operation()
+    }).catch(error=>{
+      // An explicit cancel is a normal installation outcome, not a stale UI error.
+      if (!(error instanceof Error) || error.name!=='AbortError') throw error
     }).finally(async()=>{try{await this.refreshModels()}finally{if(this.modelChange===task)this.modelChange=null}})
     this.modelChange=task
     return task

@@ -20,9 +20,9 @@ replying에서 emotion+intent → emotion → neutral의 intent → phase 기본
 
 ## 런타임과 빌드
 
-현재 실측 대상은 Apple Silicon/Metal이다. Windows NVIDIA/CUDA의 배포 runtime과 실기 검증은 아직 제공하지 않는다. macOS 최소 OS/최소 메모리도 이 개발 호스트만으로 확정하지 않는다.
+Apple Silicon/Metal과 Windows x64/NVIDIA CUDA의 고정 런타임 카탈로그를 제공한다. Windows 빌드·의존성·검증 방법은 [Windows 안내](windows-character-chat.md)를 따른다. 실제 UI 인수, 설치형 생성, 소비자 장비 검증은 별도로 기록하며 고사양 개발 호스트만으로 최소사양을 확정하지 않는다.
 
-llama.cpp commit과 binary hash는 제품용 runtime catalog에 고정한다. 정적 Release/Metal 빌드로 Homebrew 동적 라이브러리 의존성을 제거한다. native runtime은 앱 resource에 포함하고 GGUF는 포함하지 않는다. 빌드하는 개발자는 고정 catalog와 일치하는 native binary 디렉터리를 한 번 stage한다:
+llama.cpp commit과 binary hash는 제품용 runtime catalog에 고정한다. Mac은 기존 정적 Release/Metal 바이너리를 유지한다. Windows는 검증된 EXE·DLL 묶음과 수명 관리 실행기를 사용한다. native runtime은 앱 resource에 포함하고 GGUF는 포함하지 않는다. 빌드하는 개발자는 고정 catalog와 일치하는 native binary 디렉터리를 한 번 stage한다:
 
 ```sh
 node scripts/stage-chat-runtime.mjs /ABS/pinned-runtime-bin

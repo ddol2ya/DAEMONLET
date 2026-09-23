@@ -59,7 +59,7 @@ export class RuntimeSupervisor {
   if(entry.backend==='Metal' ? !/MTL0|Metal/.test(devices) : !/CUDA\d+.*(?:NVIDIA|GeForce|RTX|Tesla|Quadro)/i.test(devices))throw Error(entry.backend==='Metal'?'Apple Silicon / Metal을 사용할 수 없습니다.':'NVIDIA CUDA 장치를 사용할 수 없습니다. 그래픽 드라이버를 확인해 주세요.')
   return {entry,help:h.stdout+h.stderr}
  }
- async available(){const controller=new AbortController();this.availabilityProbe?.abort();this.availabilityProbe=controller;try{await this.probe(AbortSignal.any([controller.signal,AbortSignal.timeout(60000)]));this.availabilityError=null;return true}catch(e){const message=e instanceof Error?e.message:'';this.availabilityError=/^(?:NVIDIA|Apple|지원하지|모델 준비)/.test(message)?message:'로컬 대화 실행 파일을 확인하지 못했습니다. 앱 패키지를 다시 준비해 주세요.';return false}finally{if(this.availabilityProbe===controller)this.availabilityProbe=null}}
+ async available(){const controller=new AbortController();this.availabilityProbe?.abort();this.availabilityProbe=controller;try{await this.probe(AbortSignal.any([controller.signal,AbortSignal.timeout(60000)]));this.availabilityError=null;return true}catch(e){if(controller.signal.aborted)throw controller.signal.reason;const message=e instanceof Error?e.message:'';this.availabilityError=/^(?:NVIDIA|Apple|지원하지|모델 준비)/.test(message)?message:'로컬 대화 실행 파일을 확인하지 못했습니다. 앱 패키지를 다시 준비해 주세요.';return false}finally{if(this.availabilityProbe===controller)this.availabilityProbe=null}}
  start(model:string):Promise<void> {
   if(this.current?.model===model && !this.current.abort.signal.aborted && !this.current.failure && this.current.child?.exitCode===null && !this.current.child.signalCode)return this.current.preparation
   const previous=[...this.owned]

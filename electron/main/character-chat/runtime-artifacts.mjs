@@ -12,6 +12,9 @@ export function runtimeTarget(platform = process.platform, arch = process.arch) 
 export function selectRuntime(target = runtimeTarget(), trusted = catalog) {
   const entry = trusted.targets[target]
   if (!entry || entry.platform !== target) throw Error(`No validated character-chat runtime for ${target}`)
+  // llama passes FILE/CRT-owned objects across its internal libraries. Separate
+  // static CRT instances in shared DLLs fail at model IO on Windows.
+  if (target === 'win32-x64' && entry.build?.sharedLibraries && entry.build?.msvcRuntime === 'MultiThreaded') throw Error('Unsupported shared-library/static-CRT runtime combination')
   return entry
 }
 /** @param {string} root @param {string} target @param {{signal?: AbortSignal, trusted?: typeof catalog}} options */

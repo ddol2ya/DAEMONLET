@@ -15,17 +15,23 @@ No local lock or newly built binary can establish its own trusted hash.
 The pinned llama.cpp source remains
 `391fac16460f15233a7740550d858ac96df3419d`. The Windows artifact was built with
 CUDA 13.0.48, MSVC 19.35, CMake 3.25.1 and SDK 10.0.22000.0, Release, static MSVC
-CRT, shared llama/ggml libraries, OpenMP/OpenSSL disabled, non-native CPU settings
+CRT in a single statically linked llama/ggml executable, OpenMP/OpenSSL disabled, non-native CPU settings
 and CUDA architectures 75/86/89. These build targets do not establish tested
 minimum GPU requirements. The observed build host is Windows 11 build 26200,
 Ryzen 7 5800X, approximately 96 GiB RAM and RTX 4090 24 GiB, driver 610.47.
 
-Actual `dumpbin /DEPENDENTS` inspection found the llama/ggml/mtmd DLLs in the
-catalog and the transitive `cublas64_13.dll` → `cublasLt64_13.dll` dependency.
-The CRT/CUDA runtime in these artifacts is statically linked; no separate CRT or
-cudart DLL was required by the inspected dependency graph. `nvcuda.dll` belongs
-to the installed NVIDIA driver and is not shipped. Dynamic loader verification
-and a consumer machine without the Toolkit remain separate native checks.
+The first shared-library/static-CRT candidate failed during model loading. A
+three-byte native file test reproduced the same `0xc0000409` failure when a
+`FILE*` from ggml-base.dll crossed into a different static CRT; the single-CRT
+control succeeded. The replacement links llama/ggml statically into one EXE.
+The selector rejects the known shared-library/static-CRT combination.
+
+Inspect the actual `dumpbin /DEPENDENTS` graph for every artifact. The remaining
+NVIDIA dependency is `cublas64_13.dll` → `cublasLt64_13.dll`; the installed driver
+supplies `nvcuda.dll`, which is never shipped. The lifetime owner uses Win32
+handles across processes, not CRT file objects across DLLs. Dynamic loader
+verification and a consumer machine without the Toolkit are separate native
+checks, not implied by a cleaned child PATH.
 
 The Windows-only lifetime host launches only its fixed sibling llama-server,
 using Unicode argument quoting and a non-inherited kill-on-close Job Object.
@@ -85,6 +91,7 @@ installation isolation: use a separate Windows user/VM or approved test identity
 - [Pinned CUDA CMake rules](https://github.com/ggml-org/llama.cpp/blob/391fac16460f15233a7740550d858ac96df3419d/ggml/src/ggml-cuda/CMakeLists.txt)
 - [CUDA 13.0 Windows compiler support](https://docs.nvidia.com/cuda/archive/13.0.0/cuda-installation-guide-microsoft-windows/index.html)
 - [CUDA 13.0 EULA, Attachment A](https://docs.nvidia.com/cuda/archive/13.0.0/eula/index.html): cuBLAS redistributables; retain the complete installed EULA/notices in the Windows runtime.
+- [Microsoft CRT object boundaries](https://learn.microsoft.com/en-us/cpp/c-runtime-library/potential-errors-passing-crt-objects-across-dll-boundaries?view=msvc-170)
 - [Microsoft Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
 
 The CUDA notice is byte-preserved using Git attributes. It is part of the Windows

@@ -49,10 +49,16 @@ In the installed app, project/upstream legal texts and modification notes are be
 
 The optional local-chat runtime is built from llama.cpp commit
 `391fac16460f15233a7740550d858ac96df3419d` (MIT; ggml authors).
-The staged static runtime contains cpp-httplib (MIT), nlohmann/json (MIT),
+The staged runtime includes cpp-httplib (MIT), nlohmann/json (MIT),
 xxHash (BSD), sha256, rotate-bits and subprocess.h components. Full notices
 are in `distribution/licenses/character-chat` and the packaged runtime's
-`licenses` directory. Model weights are not bundled. The two catalogued
+`licenses` directory. The Windows CUDA target additionally redistributes
+NVIDIA `cublas64_13.dll` and `cublasLt64_13.dll` from CUDA Toolkit 13.0.
+Their complete NVIDIA license and third-party notices are preserved in
+`distribution/licenses/character-chat/CUDA-13.0-EULA.txt` and the Windows
+runtime's `licenses` directory. Redistribution is described by Attachment A of
+https://docs.nvidia.com/cuda/archive/13.0.0/eula/index.html . The NVIDIA driver
+and full CUDA Toolkit are not bundled. Model weights are not bundled. The two catalogued
 Google Gemma 4 QAT Q4_0 GGUF repositories declare Apache-2.0; the license
 text accompanies the model installation information. Character artwork and
 source material retain their separate rights and are not covered by these
