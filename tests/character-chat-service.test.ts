@@ -1,10 +1,12 @@
 import {afterEach, expect, it, vi} from 'vitest'
-import {mkdtemp, rm} from 'node:fs/promises'
+import {mkdtemp, rm, readFile, writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {CharacterChatService} from '../electron/main/character-chat/CharacterChatService'
 import {ConversationStore} from '../electron/main/character-chat/ConversationStore'
-import {neutralMeaning} from '../electron/shared/character-chat-semantics'
+import {randomUUID} from 'node:crypto'
+import {CHAT_STORAGE_LIMITS,encodeStoredChats,type StoredChats} from '../electron/main/character-chat/ConversationStore'
+import {neutralMeaning,parseChatReply} from '../electron/shared/character-chat-semantics'
 import type {CharacterRegistry} from '../electron/main/CharacterRegistry'
 
 const roots: string[] = []
@@ -14,8 +16,8 @@ afterEach(async () => {
   for (const root of roots.splice(0)) await rm(root, {recursive: true, force: true})
   vi.restoreAllMocks()
 })
-async function fixture(displayName?:string) {
-  const root = await mkdtemp(join(tmpdir(), 'chat-service-'))
+async function fixture(displayName?:string, options:{root?:string;initialize?:boolean;apply?:(entry:any)=>Promise<void>}={}) {
+  const root = options.root || await mkdtemp(join(tmpdir(), 'chat-service-'))
   roots.push(root)
   const entries = ['gpichan', 'synthetic-b'].map(id => ({id, name: id, revision: 'revision-' + id, status: 'ready'}))
   const registry = {
@@ -26,7 +28,7 @@ async function fixture(displayName?:string) {
       base: {source: 'source.png', psd: 'model.psd'}, poses: [],
     })),
   } as unknown as CharacterRegistry
-  const service = new CharacterChatService(root, '/unused-test-runtime', registry)
+  const service = new CharacterChatService(root, '/unused-test-runtime', registry,options.apply)
   services.push(service)
   vi.spyOn(service.runtime, 'available').mockResolvedValue(true)
   vi.spyOn(service.runtime, 'start').mockResolvedValue()
@@ -34,8 +36,8 @@ async function fixture(displayName?:string) {
   vi.spyOn(service.runtime, 'count').mockResolvedValue(1000)
   vi.spyOn(service.models, 'installed').mockResolvedValue(['E4B', '12B'])
   vi.spyOn(service.models, 'verify').mockResolvedValue('/unused-test-model')
-  await service.initialize()
-  return {service, root}
+  if(options.initialize!==false)await service.initialize()
+  return {service, root, registry, store:(service as any).store as ConversationStore}
 }
 it('legacy packs without persona keep memories separate; deletion persists without deleting other characters', async () => {
   const {service, root} = await fixture()
@@ -144,4 +146,143 @@ it('uses the declared conversation name while preserving pack names and legacy f
  expect(service.snapshot().character?.name).toBe('gpichan');
  const legacy=await fixture();
  expect(legacy.service.snapshot().displayName).toBe('gpichan');
+})
+
+function deferred<T=void>() {let resolve!:(value:T)=>void;const promise=new Promise<T>(r=>{resolve=r});return {promise,resolve}}
+async function complete(service:CharacterChatService) {await vi.waitFor(()=>expect((service as any).job).toBeNull())}
+function chats(count:number,messages=0):StoredChats {
+ const conversations=Array.from({length:count},()=>({id:randomUUID(),characterId:'gpichan',title:'fixture',updatedAt:new Date().toISOString(),messages:Array.from({length:messages},(_,i)=>({id:randomUUID(),role:i%2?'assistant' as const:'user' as const,text:'synthetic',status:'complete' as const,createdAt:new Date().toISOString()}))}))
+ return {version:2,model:'E4B',characterId:'gpichan',current:conversations[0]?.id,conversations,memories:{gpichan:[{id:randomUUID(),text:'keep memory'}]}}
+}
+it('F1: reopening without initializing and repeated close preserve conversation and memory bytes',async()=>{
+ const first=await fixture();await first.service.saveMemory('keep this');await first.service.close()
+ const before=await readFile(first.store.file)
+ const unused=await fixture(undefined,{root:first.root,initialize:false})
+ const a=unused.service.close(),b=unused.service.close();expect(a).toBe(b);await a
+ expect((await readFile(first.store.file)).equals(before)).toBe(true)
+ const reopened=await fixture(undefined,{root:first.root});expect(reopened.service.snapshot().memories?.[0].text).toBe('keep this')
+ expect(reopened.service.snapshot().conversations).toHaveLength(1)
+})
+it('F1: close during initialization waits without writing a partially loaded store',async()=>{
+ const {service,store}=await fixture(undefined,{initialize:false});await store.save(chats(1));const before=await readFile(store.file)
+ const gate=deferred();const load=store.load.bind(store);vi.spyOn(store,'load').mockImplementation(async()=>{await gate.promise;return load()})
+ const init=service.initialize(),closing=service.close();gate.resolve();await Promise.all([init,closing]);expect((await readFile(store.file)).equals(before)).toBe(true)
+})
+it('F1: failed initialization never writes defaults on close',async()=>{
+ const {service,store,registry}=await fixture(undefined,{initialize:false});await store.save(chats(1));const before=await readFile(store.file)
+ vi.spyOn(registry,'readPersonaAsset').mockRejectedValue(Error('read denied'))
+ await expect(service.initialize()).rejects.toThrow();await service.close();expect((await readFile(store.file)).equals(before)).toBe(true)
+})
+it('initialization prefers the currently displayed character without changing the desktop',async()=>{
+ const apply=vi.fn();const {service}=await fixture(undefined,{initialize:false,apply})
+ await service.initialize('synthetic-b');expect(service.snapshot().character?.id).toBe('synthetic-b');expect(apply).not.toHaveBeenCalled()
+})
+it.each(['apply','persona','persona-parse','removed','revision'])('F2: %s failure retains coherent ownership and never submits another character history',async fault=>{
+ const apply=vi.fn(async()=>{});const {service,registry}=await fixture('Name',{apply})
+ const requests:any[]=[];vi.spyOn(service.runtime,'generate').mockImplementation(async(messages,onText)=>{requests.push(messages);onText('answer');return {text:'answer',meaning:neutralMeaning()}})
+ await service.send('A-private-marker');await complete(service)
+ const before=service.snapshot()
+ if(fault==='apply')apply.mockRejectedValueOnce(Error('apply failed'))
+ if(fault==='persona'){const read=registry.readPersonaAsset.bind(registry);vi.spyOn(registry,'readPersonaAsset').mockImplementation(async(e,p)=>{if(e.id==='synthetic-b')throw Error('persona failed');return read(e,p)})}
+ if(fault==='persona-parse'){const read=registry.readPersonaAsset.bind(registry);vi.spyOn(registry,'readPersonaAsset').mockImplementation(async(e,p)=>{if(e.id==='synthetic-b'){if(p==='persona.json')return Buffer.from('{}');const c=JSON.parse(new TextDecoder().decode(await read(e,p)));c.persona='persona.json';return Buffer.from(JSON.stringify(c))}return read(e,p)})}
+ if(fault==='removed')vi.spyOn(registry,'ensureReady').mockImplementation(async e=>{(registry.snapshot().entries as any[]).splice(1,1);return e as any})
+ if(fault==='revision')apply.mockImplementationOnce(async()=>{(registry.snapshot().entries[1] as any).revision='new revision'})
+ const states:any[]=[];const off=service.subscribe(()=>states.push(service.snapshot()))
+ await expect(service.selectCharacter('synthetic-b')).rejects.toThrow();off()
+ expect(service.snapshot().character).toEqual(before.character);expect(service.snapshot().conversation?.id).toBe(before.conversation?.id)
+ expect(states.every(s=>!s.conversation||s.conversation.characterId===s.character?.id)).toBe(true)
+ await service.send('still A');await complete(service)
+ expect(requests.at(-1)[0].content).not.toContain('synthetic-b')
+ expect(service.snapshot().conversation?.messages.at(-1)?.binding?.characterId).toBe('gpichan')
+})
+it('F2: transitions serialize A→B→A, block send/retry in flight, and preserve same-ID update history',async()=>{
+ const gate=deferred(),entered=deferred();const apply=vi.fn(async(e:any)=>{if(e.id==='synthetic-b'){entered.resolve();await gate.promise}})
+ const {service,registry}=await fixture(undefined,{apply});const id=service.snapshot().conversation!.id
+ const b=service.selectCharacter('synthetic-b');await entered.promise
+ await expect(service.send('blocked')).rejects.toThrow('변경');await expect(service.retry()).rejects.toThrow('변경')
+ const a=service.selectCharacter('gpichan');gate.resolve();await Promise.all([b,a]);expect(service.snapshot().conversation!.id).toBe(id)
+ ;(registry.snapshot().entries[0] as any).revision='updated';await service.selectCharacter('gpichan')
+ expect(service.snapshot().character?.revision).toBe('updated');expect(service.snapshot().conversation!.id).toBe(id)
+})
+it('F2: failed visual rollback blocks generation until a successful re-selection',async()=>{
+ const apply=vi.fn(async()=>{});const {service}=await fixture(undefined,{apply});apply.mockRejectedValue(Error('unavailable'))
+ await expect(service.selectCharacter('synthetic-b')).rejects.toThrow();await expect(service.send('blocked')).rejects.toThrow('복원')
+ apply.mockResolvedValue();await service.selectCharacter('gpichan')
+ vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'ok',meaning:neutralMeaning()});await service.send('works');await complete(service)
+})
+it('F2: ownership mismatches and unannounced revision changes cannot reach retry or generation',async()=>{
+ const {service,registry}=await fixture();const generate=vi.spyOn(service.runtime,'generate')
+ ;(service as any).data.conversations[0].characterId='synthetic-b'
+ await expect(service.send('bad')).rejects.toThrow('다릅니다');await expect(service.retry()).rejects.toThrow('다릅니다')
+ ;(service as any).data.conversations[0].characterId='gpichan'
+ ;(registry.snapshot().entries[0] as any).revision='new'
+ // Registry entries are references, so use a replaced entry rather than mutate the selected object.
+ ;(service as any).state.character={...(service as any).state.character,revision:'old'}
+ await expect(service.send('bad')).rejects.toThrow('변경');expect(generate).not.toHaveBeenCalled()
+})
+it('F3: 499→500 succeeds, 501 is rejected without mutation, and deletion still works',async()=>{
+ const {service,store}=await fixture(undefined,{initialize:false});await store.save(chats(499));await service.initialize()
+ await service.newChat();const before=await readFile(store.file)
+ await expect(service.newChat()).rejects.toThrow('500');expect(service.snapshot().conversations).toHaveLength(500);expect((await readFile(store.file)).equals(before)).toBe(true)
+ await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversations).toHaveLength(499)
+})
+it('F3: message limit rejects the extra pair without changing memory or disk and still allows deleting',async()=>{
+ const {service,store}=await fixture(undefined,{initialize:false});await store.save(chats(1,3998));await service.initialize()
+ vi.spyOn(service.runtime,'generate').mockResolvedValue({text:'last',meaning:neutralMeaning()});await service.send('last user');await complete(service)
+ expect(service.snapshot().conversation?.messages).toHaveLength(4000);const before=await readFile(store.file)
+ await expect(service.send('too many')).rejects.toThrow('메시지 한도');expect((await readFile(store.file)).equals(before)).toBe(true)
+ await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversation?.messages).toHaveLength(0)
+})
+it.each(['ENOSPC','EACCES'])('F3: %s write failure rolls back new conversation and permits subsequent deletion',async code=>{
+ const {service,store}=await fixture();await service.saveMemory('durable');await service.newChat();const before=await readFile(store.file),snapshot=service.snapshot()
+ vi.spyOn(store,'save').mockRejectedValueOnce(Object.assign(Error(code),{code}))
+ await expect(service.newChat()).rejects.toThrow('저장하지');expect(service.snapshot().conversations).toEqual(snapshot.conversations);expect((await readFile(store.file)).equals(before)).toBe(true)
+ await service.deleteConversation(snapshot.conversation!.id);expect(service.snapshot().conversations).toHaveLength(1)
+})
+it('F3: failed send and failed final response saves preserve a valid prior state, then deletion works',async()=>{
+ const {service,store}=await fixture();await service.saveMemory('keep');const before=await readFile(store.file)
+ const save=vi.spyOn(store,'save').mockRejectedValueOnce(Error('ENOSPC'))
+ await expect(service.send('unsaved')).rejects.toThrow('저장하지');expect(service.snapshot().conversation?.messages).toHaveLength(0);expect((await readFile(store.file)).equals(before)).toBe(true)
+ vi.spyOn(service.runtime,'generate').mockImplementation(async()=>{save.mockRejectedValueOnce(Error('ENOSPC'));return {text:'unsaved reply',meaning:neutralMeaning()}})
+ await service.send('accepted');await complete(service);expect(service.snapshot().error).toContain('저장하지');expect(service.snapshot().conversation?.messages.at(-1)?.status).toBe('stopped')
+ await service.deleteConversation(service.snapshot().conversation!.id);expect(service.snapshot().conversation?.messages).toHaveLength(0)
+})
+it.each([{intensity:2},{emotion:'unknown'},{intent:'unknown'},{gesture:'unknown'},{}])('F4: invalid/missing meaning %j preserves complete dialogue and next-turn context',async patch=>{
+ const {service,store}=await fixture();const requests:any[]=[]
+ vi.spyOn(service.runtime,'generate').mockImplementation(async(messages,onText)=>{requests.push(messages);onText('valid dialogue');return parseChatReply(JSON.stringify({text:'valid dialogue',...(Object.keys(patch).length?{...neutralMeaning(),...patch}:patch)}))})
+ await service.send('first');await complete(service)
+ expect(service.snapshot().conversation?.messages.at(-1)?.status).toBe('complete');expect(service.snapshot().meaning).toEqual(neutralMeaning());expect(service.snapshot().semanticWarning).toContain('기본 표정')
+ expect((await store.load()).value?.conversations[0].messages.at(-1)?.semanticDiagnostics?.length).toBe(1)
+ await service.send('second');await complete(service)
+ expect(requests[1].slice(1)).toContainEqual({role:'user',content:'first'});expect(requests[1]).toContainEqual({role:'assistant',content:'valid dialogue'})
+})
+it.each(['{"text":"cut','{"text":"<think>private</think>"}','{"text":"ok","command":"execute"}','{"text":""}'])('F4: unsafe/incomplete output remains an error: %s',async raw=>{
+ const {service}=await fixture();vi.spyOn(service.runtime,'generate').mockImplementation(async()=>parseChatReply(raw))
+ await service.send('hello');await complete(service);expect(service.snapshot().conversation?.messages.at(-1)?.status).toBe('error');expect(service.snapshot().error).not.toContain('CHAT_')
+})
+
+it('F3: a near-32MiB store rejects generation before mutation and deletion recovers space',async()=>{
+ const {service,store}=await fixture(undefined,{initialize:false});const data=chats(1,1050)
+ for(const m of data.conversations[0].messages)m.text='x'.repeat(32000)
+ while(Buffer.byteLength(JSON.stringify(data))>CHAT_STORAGE_LIMITS.bytes-2000)data.conversations[0].messages.pop()
+ // Fill to within 2 KiB of the file boundary, below the response reservation.
+ const size=Buffer.byteLength(JSON.stringify(data)),last={...data.conversations[0].messages[0],id:randomUUID(),text:''}
+ data.conversations[0].messages.push(last)
+ last.text='x'.repeat(Math.max(0,CHAT_STORAGE_LIMITS.bytes-2000-size-(Buffer.byteLength(JSON.stringify(last))+1)))
+ await store.save(data);await service.initialize();const before=await readFile(store.file)
+ const generate=vi.spyOn(service.runtime,'generate');await expect(service.send('no room')).rejects.toThrow('용량 한도');expect(generate).not.toHaveBeenCalled();expect((await readFile(store.file)).equals(before)).toBe(true)
+ await service.deleteConversation(service.snapshot().conversation!.id);expect((await readFile(store.file)).length).toBeLessThan(2000)
+})
+it('F3: storage rejects over-32MiB candidates while leaving the original file intact',async()=>{
+ const {store}=await fixture(undefined,{initialize:false});await store.save(chats(1));const before=await readFile(store.file)
+ const overflow=chats(1,1100);for(const m of overflow.conversations[0].messages)m.text='x'.repeat(32000)
+ await expect(store.save(overflow)).rejects.toThrow('용량 한도');expect((await readFile(store.file)).equals(before)).toBe(true)
+})
+
+it('F2: a revision replaced during generation discards subsequent chunks and completion',async()=>{
+ const {service,registry}=await fixture();const gate=deferred(),entered=deferred()
+ vi.spyOn(service.runtime,'generate').mockImplementation(async(_messages,onText)=>{onText('partial');entered.resolve();await gate.promise;onText('late');return {text:'late',meaning:neutralMeaning()}})
+ await service.send('hello');await entered.promise
+ ;(registry.snapshot().entries[0] as any).revision='new';gate.resolve();await complete(service)
+ expect(service.snapshot().conversation?.messages.at(-1)?.text).toBe('partial');expect(service.snapshot().conversation?.messages.at(-1)?.status).toBe('stopped')
 })

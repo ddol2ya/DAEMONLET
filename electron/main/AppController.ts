@@ -152,7 +152,7 @@ export class AppController {
   private readonly smokeReadyCharacters = new Set<string>()
 
   constructor(private readonly dirname: string, private readonly characters: CharacterRegistry, private readonly setupSmoke?: SetupSmokeContext, private readonly startup?: StartupWindow, updateSmoke?: Partial<ConstructorParameters<typeof UpdateService>[0]>) {
-    this.characterChat = new CharacterChatWindow(dirname, characters, this.devServerUrl, {pet:()=>this.pet.window,reveal:()=>this.showPet(),active:value=>{this.activityBubble.setLocalChatVisible(value);if(value){this.chatEntry.cancel();this.sideChat.setMode("hidden")}},select:entry=>this.selectCharacter(entry)})
+    this.characterChat = new CharacterChatWindow(dirname, characters, this.devServerUrl, {pet:()=>this.pet.window,reveal:()=>this.showPet(),active:value=>{this.activityBubble.setLocalChatVisible(value);if(value){this.chatEntry.cancel();this.sideChat.setMode("hidden")}},select:entry=>this.selectCharacter(entry),selected:()=>this.settings.characterId})
     this.adapterConfig = createDesktopAdapterRuntimeConfig()
     this.protocol = new ProtocolBridge(this.adapterConfig.protocolEndpoint)
     const preload = (name: string) => join(dirname, `${name}-preload.cjs`)
@@ -339,7 +339,7 @@ export class AppController {
     if (this.settings.adapterAutoStart) void this.adapter.start().catch((error) => this.warn(error instanceof Error ? error.message : String(error)))
     this.pet.create(this.settings)
     if (this.pet.window) this.activityBubble.attach(this.pet.window, this.settings)
-    if (process.argv.includes("--character-chat")) void this.characterChat.open()
+    if (process.argv.includes("--character-chat")) void this.characterChat.open().catch(()=>this.warn("캐릭터챗을 준비하지 못했습니다. 저장소 접근 권한과 캐릭터팩을 확인해 주세요."))
     this.trayCreated = this.tray.create(this.settings, this.adapter.getStatus(), this.trayActions())
     if (!this.trayCreated) this.restoreResidentAccess()
     else if (!packagedMac && app.isPackaged && this.trayCreated) app.dock?.hide()
@@ -790,7 +790,7 @@ export class AppController {
       inputLocked: () => this.updatePreparing || this.quitting || this.packUpdates.applying(),
       checkUpdates: () => { this.updateIpc.open(); void this.updates.act({ action: "check" }) },
       activity: () => this.activity.snapshot(),
-      openCharacterChat: () => { void this.characterChat.open() },
+      openCharacterChat: () => { void this.characterChat.open().catch(()=>this.warn("캐릭터챗을 준비하지 못했습니다. 저장소 접근 권한과 캐릭터팩을 확인해 주세요.")) },
       openSideChat: () => { void this.openSideChat() },
       openTaskControl: () => { this.updateSettings({ visible: true, taskBubblesEnabled: true }); this.activityBubble.setView("control", false) },
       openActivity: () => {

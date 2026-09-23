@@ -18,7 +18,13 @@ const choice=<T extends string>(v:unknown,values:readonly T[]):T=>values.include
 const number=(v:unknown,min:number,max:number):number=>typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max?v:failure('CHAT_NUMBER')
 const id=(v:unknown)=>{const s=text(v,80);return /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(s)?s:failure('CHAT_ID')}
 export function parseMeaning(v:unknown):ChatMeaning{const o=object(v,['emotion','intent','gesture','intensity']);return {emotion:choice(o.emotion,CHAT_EMOTIONS),intent:choice(o.intent,CHAT_INTENTS),gesture:choice(o.gesture,CHAT_GESTURES),intensity:number(o.intensity,0,1)}}
-export function parseChatReply(raw:string):{text:string;meaning:ChatMeaning}{const v=object(JSON.parse(raw),['text','emotion','intent','gesture','intensity']);return {text:text(v.text,4000),meaning:parseMeaning({emotion:v.emotion,intent:v.intent,gesture:v.gesture,intensity:v.intensity})}}
+export function parseChatReply(raw:string):{text:string;meaning:ChatMeaning;diagnostics?:string[]} {
+ const v=object(JSON.parse(raw),['text','emotion','intent','gesture','intensity'])
+ const dialogue=text(v.text,4000)
+ if(/<\/?(?:think|thought)|<\|/i.test(dialogue))throw Error('CHAT_UNSAFE_TEXT')
+ try {return {text:dialogue,meaning:parseMeaning({emotion:v.emotion,intent:v.intent,gesture:v.gesture,intensity:v.intensity})}}
+ catch(e){return {text:dialogue,meaning:neutralMeaning(),diagnostics:[e instanceof Error?e.message:'CHAT_MEANING']}}
+}
 export const CHAT_REPLY_SCHEMA={type:'object',additionalProperties:false,required:['text','emotion','intent','gesture','intensity'],properties:{text:{type:'string',minLength:1,maxLength:4000},emotion:{type:'string',enum:CHAT_EMOTIONS},intent:{type:'string',enum:CHAT_INTENTS},gesture:{type:'string',enum:CHAT_GESTURES},intensity:{type:'number',minimum:0,maximum:1}}} as const
 export const emptyChat=():CharacterChatDefinition=>({schemaVersion:1,profile:{canonFacts:[],relationships:[],defaultScene:'',examples:[]},presentation:{rules:[]}})
 export function validateChatDefinition(value:unknown,poseIds:readonly string[],strict=false):{value:CharacterChatDefinition;diagnostics:string[]}{

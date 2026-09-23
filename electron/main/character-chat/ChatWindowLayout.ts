@@ -34,29 +34,40 @@ export function parseChatWindowPreferences(value: unknown): ChatWindowPreference
 export class ChatWindowLayout {
   value = defaultChatWindowPreferences()
   private saves = Promise.resolve()
+  private loaded = false
+  private revision = 0
+  private savedRevision = 0
   constructor(readonly file: string) {}
   async load() {
+    this.loaded=false
     try {
-      if ((await stat(this.file)).size > 16384) return
+      if ((await stat(this.file)).size > 16384) {this.loaded=true;return}
       const bytes = await readFile(this.file)
       if (bytes.length <= 16384) this.value = parseChatWindowPreferences(JSON.parse(bytes.toString('utf8'))) ?? defaultChatWindowPreferences()
-    } catch { this.value = defaultChatWindowPreferences() }
+    } catch (error) {
+      if (!(error instanceof SyntaxError) && (error as NodeJS.ErrnoException).code!=='ENOENT') throw error
+      this.value = defaultChatWindowPreferences()
+    }
+    this.loaded=true
   }
   remember(pet: Rect, box: Rect) {
     const next = parseChatWindowPreferences({version: 1, placement: relativeBubblePlacement(pet, box), size: {
       width: Math.max(CHAT_WINDOW_MIN.width, Math.min(CHAT_WINDOW_MAX.width, Math.round(box.width))),
       height: Math.max(CHAT_WINDOW_MIN.height, Math.min(CHAT_WINDOW_MAX.height, Math.round(box.height))),
     }})
-    if (next) this.value = next
+    if (this.loaded && next) {this.value = next;this.revision++}
   }
-  reset() { this.value = defaultChatWindowPreferences() }
+  reset() { if(this.loaded){this.value = defaultChatWindowPreferences();this.revision++} }
   save() {
+    if(!this.loaded || this.revision===this.savedRevision)return this.saves
+    const revision=this.revision
     const bytes = JSON.stringify(this.value)
     const next = this.saves.catch(() => {}).then(async () => {
       await mkdir(dirname(this.file), {recursive: true, mode: 0o700})
       const temp = this.file + '.tmp-' + randomUUID()
       await writeFile(temp, bytes, {mode: 0o600})
       await rename(temp, this.file)
+      this.savedRevision=revision
     })
     this.saves = next
     return next

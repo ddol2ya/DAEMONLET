@@ -1,5 +1,5 @@
 import {expect, it} from 'vitest'
-import {mkdtemp, rm, writeFile} from 'node:fs/promises'
+import {mkdtemp, rm, writeFile, readFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {ChatWindowLayout, defaultChatWindowPreferences, parseChatWindowPreferences} from '../electron/main/character-chat/ChatWindowLayout'
@@ -60,4 +60,15 @@ it('recovers malformed preferences and saves successive changes in order', async
     await reopened.load()
     expect(reopened.value).toEqual(layout.value)
   } finally { await rm(root, {recursive: true, force: true}) }
+})
+
+it('F1: unused or merely read layouts never overwrite existing geometry, including malformed bytes',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'chat-layout-unopened-'))
+ try {
+  const file=join(root,'layout.json'),saved=JSON.stringify({...defaultChatWindowPreferences(),size:{width:620,height:720}})
+  await writeFile(file,saved)
+  const unused=new ChatWindowLayout(file);await unused.save();expect(await readFile(file,'utf8')).toBe(saved)
+  await unused.load();await unused.save();expect(await readFile(file,'utf8')).toBe(saved)
+  await writeFile(file,'malformed original');const bad=new ChatWindowLayout(file);await bad.load();await bad.save();expect(await readFile(file,'utf8')).toBe('malformed original')
+ }finally{await rm(root,{recursive:true,force:true})}
 })
