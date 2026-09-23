@@ -98,3 +98,9 @@ Verify blink/mouth/smile at eleven intermediate values, combined gaze/head state
 Build a payload outside `public/characters`, export `.petchar`, and import through the app UI. Check selection, reactions and restart. Never overwrite frozen runs or mutate the built-in catalog to install a new character. Report the pack, unsupported reactions and the actual scope of visual/rights checks. Treat production as supervised and iterative, not guaranteed unattended completion.
 
 Use `creator.mjs review` as the current evidence ledger. The creator payload command requires current pose review passes; after export bind the final archive and record renderer/behavior/app/rights evidence. Asset changes invalidate previous reviews. Keep historical candidates and private evidence separate from the final pack; report disk usage independently of Git ignore status.
+
+## Character Chat metadata and export
+
+For an existing pack's chat/persona update, reuse artwork and rigs and skip image/GPU setup. Read `references/character-chat.md`. New production records `intendedMeaning` and `meaningReview` beside each final model ID in `models.json`. The payload and export commands compile confirmed intent into the referenced `chat.json` using the application's shared validator. Unknown intent remains unconnected; never infer confirmed meaning from pose names. For arbitrary IDs, declare the actual `basePoseId` in the production index rather than renaming poses. Existing legacy production indices remain supported.
+
+Use `creator.mjs upgrade-chat` to create a new metadata-only candidate and a preservation report. Keep source evidence, authoring review and source archives outside the public repository. A pack export or semantic test is not visual acceptance; verify the desktop character and its local chat bubble, and distinguish injected meaning from actual model output.

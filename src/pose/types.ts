@@ -13,6 +13,7 @@ export type CharacterManifest = {
   base: { source: string; psd: string; overrides?: string }
   poses: string[]
   behavior?: string
+  chat?: string
   persona?: string
   dialogue?: string
 }

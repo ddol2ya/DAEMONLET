@@ -1,3 +1,4 @@
+import {compileChatAuthoring} from './chat-authoring.mjs'
 import { withPackTools } from './pack-tools.mjs'
 import { parseArgs } from 'node:util'
 import { createHash } from 'node:crypto'
@@ -18,8 +19,9 @@ const index = await json(join(source, 'models.json'))
 if (index.strategy !== 'whole-model-per-pose' || !Array.isArray(index.models)) throw new Error('Expected a selected whole-model-per-pose models.json')
 const required = values.profile === 'trial' ? ['waiting', 'writing', 'head-tap'] : ['waiting', 'writing', 'head-tap', 'failed', 'cancelled', 'disconnected', 'bored', 'happy', 'torso-tap', 'head-pet']
 const ids = index.models.map(m => m.id)
-if (ids.length !== new Set(ids).size || required.some(id => !ids.includes(id)) || ids.some(id => !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id))) throw new Error('The profile is missing distinct required poses')
-const selected = values.profile === 'trial' ? index.models.filter(m => required.includes(m.id)) : index.models
+if (ids.length !== new Set(ids).size || (!index.basePoseId && required.some(id => !ids.includes(id))) || ids.some(id => !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(id))) throw new Error('The profile is missing distinct required poses')
+const baseId=index.basePoseId??'waiting';if(!ids.includes(baseId))throw Error('Declare a real basePoseId from the selected models');
+const selected = values.profile === 'trial' && !index.basePoseId ? index.models.filter(m => required.includes(m.id)) : index.models
 if (values.reviewed) {
   if (values['runtime-patches']) throw Error('Apply runtime patches to a new source round and review it before building a reviewed payload')
   await requirePoseReviews(source,selected.map(m=>m.id))
@@ -58,7 +60,8 @@ try {
   for (const id of Object.keys(dialogue.poseLines ?? {})) if (!Object.hasOwn(dialogue.poseTriggers ?? {}, id)) throw new Error(`Unbound dialogue pose: ${id}`)
   await writeJson(join(stage, 'behavior.json'), behavior); await writeJson(join(stage, 'dialogue.ko.json'), dialogue)
   if (values.persona) await withPackTools(async tools => writeJson(join(stage, 'persona.json'), tools.parseCharacterPersona(await readFile(resolve(values.persona)))))
-  await writeJson(join(stage, 'character.json'), { schemaVersion: 1, id: values.id, label: values.label, base: { source: 'poses/waiting/source.png', psd: 'poses/waiting/model.psd', overrides: 'poses/waiting/rig-overrides.json' }, poses: selected.map(m => `poses/${m.id}/pose.json`), behavior: 'behavior.json', dialogue: 'dialogue.ko.json', ...(values.persona ? { persona: 'persona.json' } : {}) })
+  await withPackTools(async tools => {const compiled=compileChatAuthoring(tools,{models:selected,profile:index.chatProfile,defaultPoseId:index.chatDefaultPoseId},selected.map(m=>m.id));await writeJson(join(stage,'chat.json'),compiled.chat);await writeJson(destination+'.chat-review.json',compiled.report)})
+  await writeJson(join(stage, 'character.json'), { schemaVersion: 1, id: values.id, label: values.label, chat:'chat.json', base: { source: `poses/${baseId}/source.png`, psd: `poses/${baseId}/model.psd`, overrides: `poses/${baseId}/rig-overrides.json` }, poses: selected.map(m => `poses/${m.id}/pose.json`), behavior: 'behavior.json', dialogue: 'dialogue.ko.json', ...(values.persona ? { persona: 'persona.json' } : {}) })
   await writeJson(join(stage, 'provenance.json'), { schemaVersion: 1, characterId: values.id, profile: values.profile, ...(values.profile === 'trial' ? { unsupportedReactions: ['실패', '취소', '연결 끊김', '지루함', '기쁨', '몸통 클릭', '쓰다듬기 전용 포즈'] } : {}), sourceIndexSha256: await hash(join(source, 'models.json')), strategy: 'whole-model-per-pose', sharedBaseArtwork: false, models: records })
   await rename(stage, destination)
   console.log(JSON.stringify({ id: values.id, profile: values.profile, models: selected.length, output: destination }, null, 2))

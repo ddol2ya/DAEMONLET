@@ -1,3 +1,6 @@
+import {ChatPresentationController} from '../character-chat/ChatPresentationController'
+import type {LocalChatPresentation} from '../../electron/shared/character-chat-contract'
+declare global{interface Window{localChatPresentation:{get():Promise<LocalChatPresentation>;subscribe(listener:(value:LocalChatPresentation)=>void):()=>void}}}
 import { useT } from "../i18n/useLanguage"
 import { useEffect, useRef, useState } from "react"
 import type { DesktopSettingsV1 } from "../../electron/shared/desktop-settings"
@@ -54,6 +57,13 @@ export default function PetApp() {
     canvas.addEventListener("webglcontextlost", contextLost)
     const session = new CharacterSession(canvas, "pet://app/characters/catalog.json")
     sessionRef.current = session
+    const localPresentation=new ChatPresentationController(session)
+    let localState:LocalChatPresentation|null=null
+    const syncLocal=()=>{if(localState){localPresentation.update(localState,successfulKey?.split('/')[0]??null,successfulKey?.split('/')[1]??null);if(localState.active){session.dialogue.setEnabled(false);session.setInteractionEnabled(false)}else if(currentSettings)session.dialogue.setEnabled(currentSettings.speechBubblesEnabled)}}
+    const receiveLocal=(value:LocalChatPresentation)=>{localState=value;syncLocal()}
+    const unsubscribeLocal=window.localChatPresentation.subscribe(receiveLocal)
+    void window.localChatPresentation.get().then(receiveLocal)
+
     // A native reload may abort fetch before React unmount cleanup runs. Retire
     // the old renderer immediately so cancellation cannot report a load error
     // or a late ready signal for the new renderer/character.
@@ -87,7 +97,7 @@ export default function PetApp() {
       currentSettings = next
       setSettings(next)
       visible = next.visible
-      session.dialogue.setEnabled(next.speechBubblesEnabled)
+      session.dialogue.setEnabled(!localState?.active && next.speechBubblesEnabled)
       updateAvailability()
       if (!characters) return
       const entry = characters.entries.find(e => e.id === next.characterId && e.status === "ready")
@@ -130,8 +140,9 @@ export default function PetApp() {
         if (!session.runtime.hasRenderedModel(session.runtime.getModelRevision())) throw Error("Character frame was not rendered")
         successfulKey = key
         successfulModelRevision = session.runtime.getModelRevision()
+        syncLocal()
         loadingCharacter = false
-        session.setInteractionEnabled(!inLayout && !dragging)
+        session.setInteractionEnabled(!localState?.active && !inLayout && !dragging)
         setLoading(false)
         updateAvailability()
         alpha.reset()
@@ -199,6 +210,8 @@ export default function PetApp() {
       alpha.dispose()
       source.dispose()
       client.dispose()
+      unsubscribeLocal()
+      localPresentation.dispose()
       session.dispose()
       alphaRef.current = null
       sessionRef.current = null

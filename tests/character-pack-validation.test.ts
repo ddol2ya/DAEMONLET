@@ -40,7 +40,7 @@ function posePack(count: number, capability: boolean, choices?: string[]): ZipEn
     eyeL: { x0: 21, y0: 28, x1: 29, y1: 35, icx: 25, icy: 31, closeY: 32 },
     eyeR: { x0: 35, y0: 28, x1: 43, y1: 35, icx: 39, icy: 31, closeY: 32 },
   } }))
-  manifest.runtime.capabilities = PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1" && c !== "hf-pack-updates-v1" && (c !== "pose-variants" || capability))
+  manifest.runtime.capabilities = PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1" && c !== "hf-pack-updates-v1" && c !== "character-chat-v1" && (c !== "pose-variants" || capability))
   manifest.files = entries.map(e => ({ path: e.path, bytes: e.data.length, sha256: sha256(e.data) }))
   return [{ path: "pack.json", data: Buffer.from(JSON.stringify(manifest)) }, ...entries]
 }

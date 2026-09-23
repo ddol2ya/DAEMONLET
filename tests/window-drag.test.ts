@@ -1,3 +1,4 @@
+import {resizeChatBounds} from '../electron/main/character-chat/ChatWindowLayout'
 import { EventEmitter } from "node:events"
 import { describe, expect, it, vi } from "vitest"
 import type { BrowserWindow } from "electron"
@@ -5,15 +6,15 @@ import { WindowDragController } from "../electron/main/WindowDragController"
 import { validWindowDragRequest } from "../electron/shared/window-drag"
 import { isMoveGesture } from "../src/pet/ModifierDragController"
 
-function fixture() {
+function fixture(transform?: typeof resizeChatBounds, startCursor?: {x:number;y:number}) {
   const window = new EventEmitter() as EventEmitter & { webContents: EventEmitter; bounds: { x: number; y: number; width: number; height: number }; setBounds: ReturnType<typeof vi.fn>; isDestroyed(): boolean; isVisible(): boolean; getBounds(): typeof window.bounds }
   window.webContents = new EventEmitter(); window.bounds = { x: 100, y: 100, width: 460, height: 460 }
   window.isDestroyed = () => false; window.isVisible = () => true; window.getBounds = () => ({ ...window.bounds })
   window.setBounds = vi.fn(value => { window.bounds = { ...value }; window.emit("move") })
   const cursor = { x: 200, y: 200 }, finish = vi.fn(), lock = vi.fn(), capture = vi.fn()
   let now = 0
-  const controller = new WindowDragController({ window: () => window as unknown as BrowserWindow, cursor: () => cursor,
-    workArea: p => p.x < 0 ? { x: -1920, y: 0, width: 1920, height: 1080 } : { x: 0, y: 0, width: 1280, height: 800 }, allowed: () => true, lock, finish, now: () => now })
+  const controller = new WindowDragController({ window: () => window as unknown as BrowserWindow, cursor: () => cursor, startCursor: startCursor ? () => startCursor : undefined,
+    workArea: p => p.x < 0 ? { x: -1920, y: 0, width: 1920, height: 1080 } : { x: 0, y: 0, width: 1280, height: 800 }, allowed: () => true, lock, finish, transform, now: () => now })
   window.on("move", () => { if (!controller.active) capture(window.bounds) })
   return { window, cursor, controller, finish, lock, capture, tick: () => { now += 20 } }
 }
@@ -68,4 +69,29 @@ describe("modifier is decided at pointerdown", () => {
     for (const patch of [{ altKey: false }, { ctrlKey: true }, { metaKey: true }, { button: 2 }, { pointerType: "touch" }, { getModifierState: () => true }]) expect(isMoveGesture({ ...mouse, ...patch })).toBe(false)
     expect(isMoveGesture(mouse, true)).toBe(false)
   })
+})
+
+it("resizes through the same owned gesture, clamps dimensions and rolls back cancelled changes", () => {
+  const f = fixture(resizeChatBounds), id = f.controller.request({action: "begin"}).id!
+  f.cursor.x += 100; f.cursor.y += 140
+  f.controller.request({action: "end", id})
+  expect(f.window.bounds).toEqual({x: 100, y: 100, width: 560, height: 600})
+  expect(f.finish).toHaveBeenLastCalledWith(f.window.bounds, true)
+  const cancel = f.controller.request({action: "begin"}).id!
+  f.cursor.x -= 1000; f.cursor.y -= 1000
+  f.tick(); f.controller.request({action: "move", id: cancel})
+  expect(f.window.bounds.width).toBe(350)
+  expect(f.window.bounds.height).toBe(360)
+  f.controller.request({action: "cancel", id: cancel})
+  expect(f.window.bounds).toEqual({x: 100, y: 100, width: 560, height: 600})
+  expect(f.finish).toHaveBeenLastCalledWith(f.window.bounds, false)
+})
+
+it("commits a fast resize whose native release arrived before begin IPC, with no dangling gesture", () => {
+  const f = fixture(resizeChatBounds, {x: 200, y: 200})
+  f.cursor.x = 260; f.cursor.y = 240
+  expect(f.controller.request({action: "begin"}, true)).toEqual({id: null})
+  expect(f.window.bounds).toEqual({x: 100, y: 100, width: 520, height: 500})
+  expect(f.controller.active).toBe(false)
+  expect(f.finish).toHaveBeenCalledExactlyOnceWith(f.window.bounds, true)
 })

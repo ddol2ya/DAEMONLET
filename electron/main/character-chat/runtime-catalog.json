@@ -1,0 +1,16 @@
+{
+  "platform": "darwin-arm64",
+  "commit": "391fac16460f15233a7740550d858ac96df3419d",
+  "build": {
+    "configuration": "Release",
+    "sharedLibraries": false,
+    "openssl": false,
+    "metal": true,
+    "embeddedMetalLibrary": true,
+    "deploymentTarget": "13.0",
+    "validatedHost": "Apple Silicon / macOS 27.0"
+  },
+  "files": {
+    "llama-server": "9652de214408ba2bf956af37988c38086ae0d2b39a88c637f05de9e0282db927"
+  }
+}

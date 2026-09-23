@@ -921,5 +921,6 @@
   "서버 요청 제한입니다. 잠시 후 다시 확인해 주세요.": "The server limited requests. Try again later.",
   "허용되지 않는 다운로드 주소입니다.": "The download address is not allowed.",
   "업데이트 다운로드 시간이 초과되었습니다.": "The update download timed out.",
-  "대화 응답이나 캐릭터 전환이 끝난 후 적용해 주세요.": "Apply after the response or character transition finishes."
+  "대화 응답이나 캐릭터 전환이 끝난 후 적용해 주세요.": "Apply after the response or character transition finishes.",
+  "캐릭터챗 · 로컬": "Character Chat · Local"
 }

@@ -1,6 +1,6 @@
 import type { PackUpdateSource } from "./pack-update-contract"
 /** Application-owned data contract, not a third-party model format. */
-export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1", "hf-pack-updates-v1"] } as const
+export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1", "hf-pack-updates-v1", "character-chat-v1"] } as const
 export const PACK_LIMITS = {
   archiveBytes: 256 * 1024 * 1024, payloadBytes: 384 * 1024 * 1024,
   fileBytes: 32 * 1024 * 1024, jsonBytes: 2 * 1024 * 1024, files: 256,

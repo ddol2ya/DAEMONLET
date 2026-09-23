@@ -1,3 +1,4 @@
+import { CHAT_LIMITS, validateChatDefinition } from '../shared/character-chat-semantics'
 import { parseCharacterPersona, PERSONA_MAX_BYTES } from "../shared/character-persona"
 import { createHash } from "node:crypto"
 import { lstat, readdir, readFile, realpath } from "node:fs/promises"
@@ -178,8 +179,16 @@ export async function validatePackDirectory(root: string, options: { rig?: boole
     if (!manifest.runtime.capabilities.includes(pose.strategy)) throw new Error("PACK_INCOMPATIBLE")
     model(pose, resolved); return pose
   })
-  if (manifest.profile === "trial" && (poses.length !== 3 || ["waiting", "writing", "head-tap"].some(id => !ids.has(id)))) throw new Error("PACK_SCHEMA")
-  if (manifest.profile === "full" && ["waiting", "writing", "head-tap", "failed", "cancelled", "disconnected", "bored", "happy", "torso-tap", "head-pet"].some(id => !ids.has(id))) throw new Error("PACK_SCHEMA")
+  if (Boolean(character.chat) !== manifest.runtime.capabilities.includes("character-chat-v1")) throw new Error("PACK_INCOMPATIBLE")
+  if (character.chat) {
+    const chatPath = ref(character.chat, "character.json", "\\.json$"); usedJson.add(chatPath)
+    await boundedFile(root, chatPath, CHAT_LIMITS.bytes)
+    // Core archive, path and inventory checks have already succeeded. Optional
+    // semantic rules may degrade safely; strict validation belongs to export.
+    validateChatDefinition(json.get(chatPath), [...ids])
+  }
+  if (!character.chat && manifest.profile === "trial" && (poses.length !== 3 || ["waiting", "writing", "head-tap"].some(id => !ids.has(id)))) throw new Error("PACK_SCHEMA")
+  if (!character.chat && manifest.profile === "full" && ["waiting", "writing", "head-tap", "failed", "cancelled", "disconnected", "bored", "happy", "torso-tap", "head-pet"].some(id => !ids.has(id))) throw new Error("PACK_SCHEMA")
   for (const { overrides } of models) {
     if (Object.keys(overrides.headFollow ?? {}).length && !manifest.runtime.capabilities.includes("head-follow") || overrides.anchorOverrides?.mouth?.morph && !manifest.runtime.capabilities.includes("mouth-morph") || (overrides.anchorOverrides?.eyeL?.blink || overrides.anchorOverrides?.eyeR?.blink) && !manifest.runtime.capabilities.includes("local-eye-blink")) throw new Error("PACK_INCOMPATIBLE")
     for (const start of Object.keys(overrides.meshSources ?? {})) {

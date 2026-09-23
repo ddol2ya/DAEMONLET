@@ -33,7 +33,7 @@ export function packFiles(options: { id?: string; version?: string; color?: numb
     { path: "model.psd", data: tinyPsd(options.color) },
     { path: "rig.json", data: Buffer.from(JSON.stringify({ cleanupThresholds: { face: 1, topwear: 1, eyewhite: 1, irides: 1, eyelash: 1 } })) },
   ]
-  const manifest = { packFormatVersion: 1, id: character.id, name: character.label, entry: "character.json", version: options.version ?? "1.0.0", runtime: { ...PACK_RUNTIME, capabilities: PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1" && c !== "hf-pack-updates-v1") }, files: entries.map(e => ({ path: e.path, bytes: e.data.length, sha256: sha256(e.data) })), ...options.extra }
+  const manifest = { packFormatVersion: 1, id: character.id, name: character.label, entry: "character.json", version: options.version ?? "1.0.0", runtime: { ...PACK_RUNTIME, capabilities: PACK_RUNTIME.capabilities.filter(c => c !== "side-chat-persona-v1" && c !== "hf-pack-updates-v1" && c !== "character-chat-v1") }, files: entries.map(e => ({ path: e.path, bytes: e.data.length, sha256: sha256(e.data) })), ...options.extra }
   return [{ path: "pack.json", data: Buffer.from(JSON.stringify(manifest)) }, ...entries]
 }
 export async function writePack(root: string, options: Parameters<typeof packFiles>[0] = {}) {
