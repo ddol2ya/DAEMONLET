@@ -22,12 +22,17 @@ const line = (name: string, at: string) => JSON.stringify({ id, thread_name: nam
 describe("desktop session display titles", () => {
   it("pages and searches metadata beyond the initial list without treating query text as SQL", async () => {
     const f = await fixture(), db = new DatabaseSync(join(f.home, "state_5.sqlite"))
-    for (let n = 0; n < 70; n++) {
-      const next = `22222222-2222-4222-8222-${n.toString(16).padStart(12, "0")}`
-      const path = join(f.home, "sessions", "2026", "09", "12", `rollout-2026-09-12T00-00-00-${next}.jsonl`)
-      db.prepare("INSERT INTO threads VALUES (?,?,?,?,?,?,?)").run(next, path, "/fixture", `New ${n}`, "exec", n + 2, 0)
-    }
-    db.close()
+    // Seed the same 70 rows in one transaction rather than 70 disk commits.
+    try {
+      db.exec("BEGIN")
+      const insert = db.prepare("INSERT INTO threads VALUES (?,?,?,?,?,?,?)")
+      for (let n = 0; n < 70; n++) {
+        const next = `22222222-2222-4222-8222-${n.toString(16).padStart(12, "0")}`
+        const path = join(f.home, "sessions", "2026", "09", "12", `rollout-2026-09-12T00-00-00-${next}.jsonl`)
+        insert.run(next, path, "/fixture", `New ${n}`, "exec", n + 2, 0)
+      }
+      db.exec("COMMIT")
+    } finally { db.close() }
     expect(await readDesktopThreadCatalog(f.home)).toHaveLength(64)
     expect(await readDesktopThreadCatalogPage(f.home, { offset: 0, query: "" })).toMatchObject({ hasMore: true, items: { length: 64 } })
     expect((await readDesktopThreadCatalog(f.home, { offset: 64, query: "" })).some(row => row.id === id)).toBe(true)
@@ -39,7 +44,8 @@ describe("desktop session display titles", () => {
     changed.prepare("UPDATE threads SET source='ineligible' WHERE id != ?").run(id); changed.close()
     expect(await readDesktopThreadCatalogPage(f.home, { offset: 0, query: "" })).toEqual({ items: [], hasMore: true })
     expect((await readDesktopThreadCatalogPage(f.home, { offset: 64, query: "" })).items).toMatchObject([{ id }])
-  })
+    // Allow Windows CI filesystem latency for this multi-read integration case.
+  }, process.platform === "win32" ? 30_000 : 5_000)
   it("uses the visible request for attachment-generated titles while preserving explicit renames", async () => {
     const f = await fixture(), db = new DatabaseSync(join(f.home, "state_5.sqlite"))
     const wrapped = "# Files mentioned by the user:\n\n## reference.md: /tmp/" + "private-attachment/".repeat(20) + "\n\n## My request:\n읽고 작업해줘"

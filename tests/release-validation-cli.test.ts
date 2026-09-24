@@ -60,7 +60,9 @@ describe('init derives identity from actual artifacts', () => {
     expect(record).toMatchObject({...sourceA, appVersion: '0.7.0'})
     expect(record.sourceCommit).not.toBe(f.git('rev-parse', 'HEAD'))
     expect(record.checks.every((c: any) => c.status === 'NOT_RUN')).toBe(true)
-  })
+    // Real Git commits, ASAR/ZIP I/O and a separate CLI process share this budget.
+    // Keep the normal default elsewhere; Windows runner cold starts can exceed 5 s.
+  }, process.platform === 'win32' ? 30_000 : 5_000)
   it('identifies a bare ASAR without checkout build outputs', async () => {
     const f = await repository(); await asar(f.root, 'A')
     const result = init(f, 'asar:A.asar'); expect(result.status, result.stderr).toBe(0)
