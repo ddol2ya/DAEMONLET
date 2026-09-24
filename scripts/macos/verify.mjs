@@ -6,6 +6,7 @@ import { APP_NAME, BUNDLE_ID, assertEntitlements, entitlementRole, assertProduct
 import { hashFile, hashObject, inventory, run, within, writeJSON } from "./io.mjs"
 import { checkCandidate } from "../release/check.mjs"
 import { checkExternalNotices } from "../release/check-notices.mjs"
+import { verifyRuntime } from "../../electron/main/character-chat/runtime-artifacts.mjs"
 
 export async function plist(path) {
   return JSON.parse((await run("/usr/bin/plutil", ["-convert", "json", "-o", "-", path])).stdout)
@@ -35,6 +36,7 @@ export async function verifyApp(requestedApp, expected, { evidence, requireTicke
   const production = inspectAsar(asar, appName)
   await checkCandidate(asar)
   await checkExternalNotices(join(app, "Contents/Resources/licenses"))
+  await verifyRuntime(join(app, "Contents/Resources/local-llm"), 'darwin-arm64')
   if (production.version !== info.CFBundleShortVersionString) throw new Error("Bundle and package versions differ.")
   // Pin the leaf certificate directly in a codesign requirement; no certificate/private-key export.
   const requirement = `=anchor apple generic and certificate leaf = H"${expected.fingerprint}" and certificate leaf[subject.OU] = "${expected.team}"`

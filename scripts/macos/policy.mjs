@@ -6,6 +6,10 @@ export { APP_NAME, BUNDLE_ID }
 export const NOTARY_PROFILE = "daemonlet-notary"
 export const JIT_ENTITLEMENT = "com.apple.security.cs.allow-jit"
 export const AUDIO_INPUT_ENTITLEMENT = "com.apple.security.device.audio-input"
+// This input is signed before its exact bytes are pinned in runtime-catalog.json.
+// Re-signing it here changes the timestamp and breaks the app's hash check.
+// verifyApp still checks its pinned bytes, certificate, timestamp and entitlements.
+export const isPinnedChatRuntime = file => file.endsWith('/Contents/Resources/local-llm/llama-server')
 export const isDictationCode = file => /\/native\/DaemonletDictation\.app(?:\/Contents\/MacOS\/DaemonletDictation)?$/.test(file)
 export function entitlementRole(file) {
   if (isDictationCode(file)) return "dictation"
@@ -49,7 +53,7 @@ export function signedForgeConfig(base, identity, platform = process.platform) {
         preEmbedProvisioningProfile: false,
         // osx-sign 2.7.0 discovers generic binary files, including PAK/PNG/ASAR.
         // Those are resources sealed by their enclosing bundle, not individual code.
-        ignore: (file) => !isSigningTarget(file),
+        ignore: (file) => !isSigningTarget(file) || isPinnedChatRuntime(file),
         optionsForFile: (file) => ({
           // TCC attributes the native helper's microphone request to the main app.
           // Only that app and the dictation helper need audio input; other V8 helpers retain JIT only.
