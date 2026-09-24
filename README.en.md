@@ -2,33 +2,35 @@
 
 [한국어](README.md) · **English**
 
-**A desktop character that reacts while Codex works.**
+**A desktop character that reacts to Codex tasks and chats with you in a speech bubble.**
 
-Daemonlet changes its character's poses and speech bubbles to reflect your task status. Start with the built-in **Gpichan (지피쨩)**, or import other characters as external `.petchar` packs.
+Daemonlet reflects your task status through poses and speech bubbles, and lets you talk to your character using a local AI model. Start with the built-in **Gpichan (지피쨩)**, or import other characters as external `.petchar` packs.
 
 This is not an official OpenAI product and is not affiliated with OpenAI.
 
 <img src="docs/images/gpichan.png" width="360" alt="Gpichan running in Daemonlet for Codex">
 
-## Downloads — v0.7.2
+## Downloads — v0.8.0
 
 | Platform | Download | Notes |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
-| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-windows-x64-Setup.exe) | Unsigned |
-| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/Daemonlet-for-Codex-0.7.2-windows-x64.zip) | Extract and run without installation |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
+| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-windows-x64-Setup.exe) | Unsigned |
+| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-windows-x64.zip) | Extract and run without installation |
 
-[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.7.2) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.7.2/SHA256SUMS.txt)
+[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.0) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/SHA256SUMS.txt)
 
-To use the app, you do not need a separate Node.js or Python installation, ComfyUI, model weights, or a GPU for character creation.
+The app needs no separate Node.js, Python, ComfyUI or manual server installation. **Local character chat requires installing an E4B or 12B model separately through the app.** Task status and authored click reactions do not need model weights. Both Windows packages are unsigned.
 
 ## Quick start
 
 1. Download the app for your operating system.
    - **Mac:** Extract the ZIP and move `Daemonlet for Codex.app` to Applications.
    - **Windows:** Run the installer. For the portable ZIP, extract the entire folder.
-2. Run the **Codex desktop app** and **Daemonlet for Codex** under the same operating system user account.
-3. Start a task in Codex and watch the character's pose and task bubble.
+2. Run **Daemonlet for Codex**. The built-in Gpichan appears.
+3. Choose a feature:
+   - **Local chat:** Open **Character Chat · Local (캐릭터챗 · 로컬)** from the character context menu or menu bar/tray, install a model and send a message. No Codex login or parent conversation is required.
+   - **Task status:** Start a task in the **Codex desktop app** under the same OS user account.
 
 **The desktop connection does not require CLI Hooks.**
 
@@ -38,6 +40,9 @@ For installation, recovery and removal details, see the [Mac guide](docs/install
 
 ## Features
 
+- **Local character chat:** Talk in a speech bubble with streamed replies, cancellation and retry.
+- **Conversation management:** Save, resume and delete conversations per character; manage explicitly saved memories.
+- **Chat poses and motion:** Follow the pack's emotion/gesture declarations and retain the last reply pose until the next request.
 - **Task status:** Poses and task bubbles change as Codex works.
 - **Character interactions:** Click the head or torso, or stroke the head.
 - **Display settings:** Adjust the character's size, position and bubble visibility.
@@ -45,9 +50,31 @@ For installation, recovery and removal details, see the [Mac guide](docs/install
 - **Loading feedback:** See progress while importing characters and preparing the app at startup.
 - **Mac voice input:** Use Korean or English dictation to compose a message to send to Codex.
 
+## Local character chat — v0.8.0
+
+Choose **Character Chat · Local (캐릭터챗 · 로컬)** from the character context menu or menu bar/tray to open a messenger-style speech bubble beside the character.
+
+1. Install **Gemma 4 E4B or 12B**. Downloads support resume, cancellation and file verification; an exact matching official GGUF can also be imported. Model downloads start only when requested.
+2. Send a message to receive a streamed reply. Stop generation with the cancel button, then send another question.
+3. Use the **···** menu for new/saved conversations, retry, deletion, model selection and explicit memories. Empty new conversations are saved only after the first message.
+4. Drag the header to move the bubble and the bottom-right handle to resize it. Placement and size persist across restarts.
+
+After model installation, **reply generation runs locally**. It uses no paid external chat/evaluation API and provides no file-editing, shell or MCP tool permissions. This is text chat; TTS is not included.
+
+| Environment | Local chat runtime |
+|---|---|
+| Mac · Apple Silicon | Metal |
+| Windows · x64 + NVIDIA GPU | CUDA |
+
+E4B/12B multi-turn generation, cancellation and recovery were checked on both platforms, with representative UI verification on Mac and the Windows portable app. Windows installer execution was user-confirmed. **Minimum RAM/VRAM requirements have not been established.** Intel Mac and Windows AMD/Intel GPU paths are not presented as verified. See the [0.8.0 release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.0) for verification limits.
+
+Chat names, persona and emotional poses come from the pack. Legacy packs without chat metadata can still chat in their default pose. Fast replies skip the preparation pose, and the final reply pose remains until the next request. New conversations, cancellation, errors and character/model changes clear that state.
+
+[Usage, models and storage](docs/local-character-chat.md) · [Windows runtime guide](docs/windows-character-chat.md)
+
 ## Desktop controls
 
-These controls are available starting with v0.7.2.
+Task bubbles and local chat bubbles have separate placement controls.
 
 - **Move:** Option-drag on Mac or Alt-drag on Windows from a painted part of the character. Release to save; Esc restores the starting position. Ordinary clicks, petting and the existing move/resize menu remain available.
 - **Bubble position:** Use the menu or Settings → Character & Display → Bubble position. Choose Auto, Adjust position or Reset position. Drag the local preview handle and Apply; Cancel/Esc keeps the previous setting. Reset affects only bubble placement.
@@ -97,7 +124,27 @@ For connection or character display issues, start with the connection recovery a
 
 When [reporting a bug](https://github.com/ddol2ya/DAEMONLET/issues), include the app version, operating system, steps to reproduce and screenshots with personal information removed. Do not post account tokens, original conversations or your full Codex configuration.
 
+## Ask about Codex tasks — Side Chat
+
+Separate from local character chat, choose **Ask the character** in the existing task card to ask and read replies in that same window. **Chat with character** in the character's context menu or tray opens the same task surface. New installations default to ON; an existing OFF choice is preserved. Check official CLI/login readiness, explicitly select a parent conversation, and ask a question. The first send asks for consent to context/file transmission and usage. No model generation occurs before sending. The persona follows the character that successfully appeared on screen.
+
+The **official CLI 0.154.0 / macOS Apple Silicon / gpt-5.6-luna** path creates a separate temporary child in the parent's Codex Home. It explains successfully completed context and user-selected project excerpts and proposes changes for copying. File changes, commands, builds/tests, external services and parent controls are blocked. Expand, copy and hide reuse the original response without another model request.
+
+This feature is included starting with v0.7.2. See [setup, recovery and platform compatibility](docs/side-chat.md). App chat/drafts stay in memory; normal Codex storage, logs and authentication processing can occur.
+
+## App updates
+
+Use the menu or Settings → Updates. Automatic checks default to OFF; downloading and restarting require user actions. Existing public 0.7.1 installations need one manual upgrade first. See [supported installations, signing requirements and verification](docs/app-updates.md).
+
+## Character pack updates
+
+Import a `.petchar` file from the [public character packs](https://huggingface.co/datasets/ddol2/daemonlet-character-packs) to check, download, validate and manually apply updates in Settings, or restore the previous version. Asuma Toki v3, v4 and v5 are independent appearances with separate updates. Older packs without an update source require a one-time import of a source-enabled pack. See [updates, cancellation and rollback](docs/character-pack-updates.md).
+
 ## Character creation and development
+
+[**Download the character creation skill 0.8.0 ZIP**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-creator-skill-0.8.0.zip) — includes authoring instructions and standalone runtime source.
+
+Export includes confirmed emotion/gesture meaning metadata. Use `upgrade-chat` to prepare a chat metadata update while preserving an existing pack's visual assets. See the [character chat authoring guide](skills/create-pet-character/references/character-chat.md).
 
 The character creation tools are **experimental** and are not included in the regular app downloads. ComfyUI, See-through and models must be prepared separately by the user.
 
@@ -130,6 +177,8 @@ npm run build:electron:production
 npm run electron:package
 ```
 
+To run local chat or package the app, prepare the platform-specific pinned runtime and stage it with `scripts/stage-chat-runtime.mjs` as described in the [runtime/build guide](docs/local-character-chat.md#런타임과-빌드). The commands above do not automatically install models or that runtime.
+
 Electron setup uses the local installation script from the lockfile-pinned dependency. Apps built from source do not automatically inherit the release binaries' signing or notarization.
 
 </details>
@@ -145,19 +194,3 @@ The terms for the referenced community character designs, images and sheets are 
 External code, upstream assets, models and other character packs remain subject to [their own terms](THIRD_PARTY_NOTICES.md). Packaging files as `.petchar` does not place the entire pack under a single artwork license.
 
 The links above point to files in the source repository. In an installed app, notices are available in `resources/licenses/` on Windows/Linux and `Contents/Resources/licenses/` inside the macOS app bundle; you do not need to open the ASAR archive to read them. The existing MIT credit to `Momo Motion Lab contributors` is retained because there is no basis for changing the copyright holder.
-
-### Character chat — v0.7.2
-
-Choose **Ask the character** in the existing task card to ask and read replies in that same window. **Chat with character** in the character's context menu or tray opens the same task surface. New installations default to ON; an existing OFF choice is preserved. Check official CLI/login readiness, explicitly select a parent conversation, and ask a question. The first send asks for consent to context/file transmission and usage. No model generation occurs before sending. The persona follows the character that successfully appeared on screen.
-
-The **official CLI 0.154.0 / macOS Apple Silicon / gpt-5.6-luna** path creates a separate temporary child in the parent's Codex Home. It explains successfully completed context and user-selected project excerpts and proposes changes for copying. File changes, commands, builds/tests, external services and parent controls are blocked. Expand, copy and hide reuse the original response without another model request.
-
-This feature is included starting with v0.7.2. See [setup, recovery and platform compatibility](docs/side-chat.md). App chat/drafts stay in memory; normal Codex storage, logs and authentication processing can occur.
-
-### App updates — v0.7.2
-
-Use the menu or Settings → Updates. Automatic checks default to OFF; downloading and restarting require user actions. Existing public 0.7.1 installations need one manual upgrade first. See [supported installations, signing requirements and verification](docs/app-updates.md).
-
-### Character pack updates — v0.7.2
-
-Import a `.petchar` file from the [public character packs](https://huggingface.co/datasets/ddol2/daemonlet-character-packs) to check, download, validate and manually apply updates in Settings, or restore the previous version. Asuma Toki v3, v4 and v5 are independent appearances with separate updates. Older packs without an update source require a one-time import of a source-enabled pack. See [updates, cancellation and rollback](docs/character-pack-updates.md).
