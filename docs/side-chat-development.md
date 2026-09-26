@@ -13,6 +13,7 @@ activity targets resolve to Main-owned conversation keys and catalog parents wit
 opening, acknowledging or controlling the parent. A bound parent stays fixed across
 background task-list changes; the user can select another task explicitly.
 
+Hook setup, usage and side chat share `adapter/codex/runtime` official-byte admission.
 `SideChatDiscovery` reuses standard CLI locations, inspects bounded PATH candidates
 without a shell, and resolves npm wrappers without running them. Unknown binaries
 are not executed. `OfficialRuntimeRegistry` retains reviewed bytes as an offline

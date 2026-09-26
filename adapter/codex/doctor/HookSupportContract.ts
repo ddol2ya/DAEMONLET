@@ -5,7 +5,7 @@ export type HookSupportContract = {
   version: string
   artifactSha256: string
   surface: "cli" | "desktop" | "synthetic"
-  source: "installed-artifact-and-fixtures" | "test-fixture"
+  source: "installed-artifact-and-fixtures" | "official-artifact-and-embedded-schemas" | "test-fixture"
   events: EventSupport
   featureKey: "hooks" | "codex_hooks"
   eventTimeoutSeconds: number
@@ -13,8 +13,9 @@ export type HookSupportContract = {
 
 // An exact artifact match, not a semver >= comparison or an App Server schema.
 // The wire fixtures and their original evidence are linked in PACKAGED_HOOK_SETUP.
-// A new CLI build/version requires a reviewed contract; Desktop remains a
-// separate observation surface even when the CLI's schema is known.
+// Legacy offline contracts. Official npm CLI >=0.154.0 additionally uses shared
+// official-byte verification and the installed binary's embedded Hook schemas.
+// Desktop delivery remains a separate observation surface.
 export const VERIFIED_HOOK_CONTRACTS: readonly HookSupportContract[] = [{
   id: "codex-cli-0.147.0-darwin-arm64",
   version: "codex-cli 0.147.0",

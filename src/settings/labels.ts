@@ -19,7 +19,7 @@ const reasons: Record<string, string> = {
   HOOK_FEATURE_DISABLED: "선택한 Codex에서 Hook 기능이 꺼져 있습니다. 아래 안내에 따라 직접 활성화해 주세요.",
   HOOK_FEATURE_UNKNOWN: "선택한 Codex의 Hook 활성 상태를 확인하지 못했습니다.",
   MANAGED_POLICY_BLOCKED: "관리자 정책이 사용자 Hook 실행을 차단합니다. 관리자에게 확인해 주세요.",
-  CAPABILITY_CONTRACT_UNKNOWN: "이 Codex 바이너리에 대해 검증된 Hook 계약이 없습니다. 버전 번호만으로 설치를 허용하지 않습니다.",
+  CAPABILITY_CONTRACT_UNKNOWN: "공식 Codex CLI 파일 또는 Hook 호환성을 확인하지 못했습니다. 공식 npm 설치본과 인터넷 연결을 확인해 주세요.",
   CORE_EVENTS_UNCONFIRMED: "작업 시작·완료 이벤트의 지원이 확인되지 않아 설치를 보류합니다.",
   EXISTING_EVENT_UNCONFIRMED: "기존 Hook 중 지원이 미확인인 이벤트가 있습니다. 기존 항목을 보존하고 자동 변경을 보류합니다.",
   EXISTING_UNCONFIRMED_EVENTS_PRESERVED: "미확인 이벤트의 기존 앱 Hook을 보존합니다.",
