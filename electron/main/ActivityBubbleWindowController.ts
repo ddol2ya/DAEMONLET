@@ -19,6 +19,13 @@ import { SIDE_CHAT_IPC, type SideChatSnapshot } from "../shared/side-chat-contra
 /** One task surface for activity, explicit controls and the owned-child conversation. */
 export class ActivityBubbleWindowController {
   window: BrowserWindow | null = null
+  private usageVisible = false
+  private readonly usageListeners = new Set<(visible: boolean) => void>()
+  subscribeUsageVisibility(listener: (visible: boolean) => void) { this.usageListeners.add(listener); listener(this.usageVisible); return () => { this.usageListeners.delete(listener) } }
+  private publishUsageVisibility() {
+    const visible = Boolean(!this.disposed && this.ready && !this.localChatVisible && !this.inLayout && !this.placementDraft && !this.presentation.sideChatVisible && this.view === "activity" && this.settings?.taskBubblesEnabled && this.window?.isVisible())
+    if (visible !== this.usageVisible) { this.usageVisible = visible; for (const listener of this.usageListeners) listener(visible) }
+  }
   private localChatVisible = false
   setLocalChatVisible(value: boolean) { this.localChatVisible = value; this.sync() }
   private pet: BrowserWindow | null = null
@@ -138,8 +145,9 @@ export class ActivityBubbleWindowController {
 
   sync = (): void => {
     if (this.disposed) return
-    if (this.localChatVisible) { this.window?.hide(); this.speech.sync(this.pet,this.settings,this.presentation.anchor,null,this.inLayout,null); return }
+    if (this.localChatVisible) { this.window?.hide(); this.speech.sync(this.pet,this.settings,this.presentation.anchor,null,this.inLayout,null); this.publishUsageVisibility(); return }
     this.syncActivity()
+    this.publishUsageVisibility()
     this.speech.sync(this.pet, this.settings, this.presentation.anchor, this.presentation.sideChatVisible || this.placementDraft ? null : this.presentation.speech, this.inLayout, this.view === "control" ? this.window : null)
   }
 
@@ -158,13 +166,14 @@ export class ActivityBubbleWindowController {
     if (!this.window || this.window.isDestroyed()) this.create()
     const win = this.window!
     if (this.view === "activity" && !chatting && !editing && this.pressed && win.isVisible()) return
+    const zoom = win.webContents.getZoomFactor?.() ?? 1
     const bounds = pet.getBounds()
     const placement = this.placementDraft ?? this.settings!.bubblePlacement
     const area = screen.getDisplayMatching(bubblePlacementReference(bounds, placement)).workArea
     // Explicit controls keep their own adjacent slot and are not automatically hidden.
     const automatic = editing ? positionActivityBubble(bounds, area, false, false, { width: 360, height: 210 }) : chatting ? positionActivityBubble(bounds, area, false, false, this.chat?.mode === "panel" ? { width: 480, height: 640 } : { width: 360, height: 340 }) : this.view === "activity" && this.presentation.anchor
-      ? positionAnchoredActivityBubble(bounds, area, this.presentation.anchor, this.collapsed, this.contentHeight)
-      : positionActivityBubble(bounds, area, this.collapsed, this.view === "control")
+      ? positionAnchoredActivityBubble(bounds, area, this.presentation.anchor, this.collapsed, Math.ceil(this.contentHeight * zoom), zoom)
+      : positionActivityBubble(bounds, area, this.collapsed, this.view === "control", this.view === "activity" ? { width: Math.round(276 * zoom), height: Math.ceil(this.contentHeight * zoom) } : undefined)
     const next = placement.mode === "relative" ? positionRelativeBubble(bounds, area, automatic, placement) : automatic
     const current = win.getBounds()
     if (!this.placementDrag.active && Object.keys(next).some(key => next[key as keyof typeof next] !== current[key as keyof typeof next])) win.setBounds(next, false)
@@ -195,6 +204,10 @@ export class ActivityBubbleWindowController {
     }
     win.webContents.on("before-mouse-event", (_event, input) => { if (input.type === "mouseDown") { this.placementStart.record(win.getBounds(), input, input.button === "left" && Boolean(this.placementDraft)); beforeDispatch() } })
     win.webContents.on("before-input-event", (_event, input) => { if (input.type === "keyDown" && ["Enter", " "].includes(input.key)) beforeDispatch() })
+    win.on("hide", () => this.publishUsageVisibility())
+    const usageNotReady = () => { this.ready = false; this.publishUsageVisibility() }
+    win.webContents.on("render-process-gone", usageNotReady)
+    win.webContents.on("did-start-navigation", usageNotReady)
     win.on("hide", release)
     win.webContents.on("render-process-gone", release)
     win.webContents.on("did-start-navigation", release)
@@ -203,7 +216,7 @@ export class ActivityBubbleWindowController {
     this.applyWindowSettings()
     secureWebContents(win.webContents, "activity-bubble", this.devServerUrl)
     win.once("ready-to-show", () => { this.ready = true; this.sync() })
-    win.once("closed", () => { if (this.window === win) { this.window = null; this.ready = false; this.focusChat = false; if (this.view === "control") this.view = "activity" } if (this.placementDraft) this.cancelPlacement(); else this.hideChat(); this.onHidden(); release() })
+    win.once("closed", () => { if (this.window === win) { this.window = null; this.ready = false; this.focusChat = false; if (this.view === "control") this.view = "activity" } if (this.placementDraft) this.cancelPlacement(); else this.hideChat(); this.onHidden(); release(); this.publishUsageVisibility() })
     win.webContents.on("did-finish-load", () => {
       if (this.snapshot) this.send(ACTIVITY_IPC.changed, this.snapshot)
       if (this.chat) this.send(SIDE_CHAT_IPC.changed, this.chat)
@@ -222,5 +235,5 @@ export class ActivityBubbleWindowController {
     this.window.setAlwaysOnTop(this.settings.alwaysOnTop, "floating")
     if (process.platform === "darwin") this.window.setVisibleOnAllWorkspaces(this.settings.showOnAllWorkspaces, { visibleOnFullScreen: this.settings.showOverFullScreen })
   }
-  destroy(): void { this.disposed = true; this.cancelPlacement(); this.onHidden(); this.detach?.(); this.detach = null; this.pet = null; this.presentation.dispose(); this.speech.destroy(); this.window?.destroy(); this.window = null }
+  destroy(): void { this.disposed = true; this.publishUsageVisibility(); this.usageListeners.clear(); this.cancelPlacement(); this.onHidden(); this.detach?.(); this.detach = null; this.pet = null; this.presentation.dispose(); this.speech.destroy(); this.window?.destroy(); this.window = null }
 }
