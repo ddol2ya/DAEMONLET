@@ -242,3 +242,5 @@ New exporter calls add the capability only for an explicit validated reference. 
 ## Optional HF update source (app 0.7.2)
 
 Packs may declare `update` with schemaVersion 1, provider `huggingface`, repoType `dataset`, exact `repoId` and relative `.json` manifestPath. Such packs must also declare `hf-pack-updates-v1`; existing packs without update keep their original capabilities. This optional extension retains packFormatVersion 1. See [character pack updates](character-pack-updates.md) for feed, trust, network, version and rollback rules.
+
+Pose-specific `dialogue.json` bindings and lines support up to 64 entries, matching the extended pose capacity. Text, trigger and per-pose line bounds remain unchanged.
