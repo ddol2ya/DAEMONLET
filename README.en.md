@@ -10,15 +10,15 @@ This is not an official OpenAI product and is not affiliated with OpenAI.
 
 <img src="docs/images/gpichan.png" width="360" alt="Gpichan running in Daemonlet for Codex">
 
-## Downloads — v0.8.0
+## Downloads — v0.8.1
 
 | Platform | Download | Notes |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
-| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-windows-x64-Setup.exe) | Unsigned |
-| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-windows-x64.zip) | Extract and run without installation |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-for-Codex-0.8.1-macOS-arm64.zip) | Developer ID signed and notarized by Apple |
+| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-for-Codex-0.8.1-windows-x64-Setup.exe) | Unsigned |
+| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-for-Codex-0.8.1-windows-x64.zip) | Extract and run without installation |
 
-[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.0) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/SHA256SUMS.txt)
+[Release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.1) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/SHA256SUMS.txt)
 
 The app needs no separate Node.js, Python, ComfyUI or manual server installation. **Local character chat requires installing an E4B or 12B model separately through the app.** Task status and authored click reactions do not need model weights. Both Windows packages are unsigned.
 
@@ -142,7 +142,7 @@ Import a `.petchar` file from the [public character packs](https://huggingface.c
 
 ## Character creation and development
 
-[**Download the character creation skill 0.8.0 ZIP**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-creator-skill-0.8.0.zip) — includes authoring instructions and standalone runtime source.
+[**Download the character creation skill 0.8.1 ZIP**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-creator-skill-0.8.1.zip) — includes authoring instructions and standalone runtime source.
 
 Export includes confirmed emotion/gesture meaning metadata. Use `upgrade-chat` to prepare a chat metadata update while preserving an existing pack's visual assets. See the [character chat authoring guide](skills/create-pet-character/references/character-chat.md).
 

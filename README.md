@@ -10,15 +10,15 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
 <img src="docs/images/gpichan.png" width="360" alt="Daemonlet for Codex에서 실행 중인 지피쨩">
 
-## 다운로드 — v0.8.0
+## 다운로드 — v0.8.1
 
 | 환경 | 다운로드 | 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-macOS-arm64.zip) | Developer ID 서명·Apple 공증 완료 |
-| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-windows-x64-Setup.exe) | 미서명 |
-| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-for-Codex-0.8.0-windows-x64.zip) | 설치 없이 압축 해제 후 실행 |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-for-Codex-0.8.1-macOS-arm64.zip) | Developer ID 서명·Apple 공증 완료 |
+| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-for-Codex-0.8.1-windows-x64-Setup.exe) | 미서명 |
+| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-for-Codex-0.8.1-windows-x64.zip) | 설치 없이 압축 해제 후 실행 |
 
-[릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.0) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/SHA256SUMS.txt)
+[릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.1) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/SHA256SUMS.txt)
 
 앱 실행에는 별도 Node.js, Python, ComfyUI 또는 수동 서버 설치가 필요하지 않습니다. **로컬 캐릭터챗은 앱에서 E4B 또는 12B 모델을 별도로 설치해야 합니다.** 작업 상태 표시와 기존 클릭 반응에는 모델이 필요하지 않습니다. Windows 배포 파일은 설치형·압축판 모두 미서명입니다.
 
@@ -142,7 +142,7 @@ Windows는 **CMD와 PowerShell**을 지원합니다. Hook 실행에 별도 Node.
 
 ## 캐릭터 제작과 개발
 
-[**캐릭터 제작 스킬 0.8.0 ZIP 다운로드**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.0/Daemonlet-creator-skill-0.8.0.zip) — 제작 지침과 독립 실행용 런타임 소스를 함께 포함합니다.
+[**캐릭터 제작 스킬 0.8.1 ZIP 다운로드**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.1/Daemonlet-creator-skill-0.8.1.zip) — 제작 지침과 독립 실행용 런타임 소스를 함께 포함합니다.
 
 확인된 감정·제스처 의미 정보를 팩 내보내기에 자동 포함하고, `upgrade-chat`으로 기존 팩의 시각 자산을 유지한 대화 설정 후보를 만들 수 있습니다. [캐릭터챗 제작 지침](skills/create-pet-character/references/character-chat.md)을 참고하세요.
 
