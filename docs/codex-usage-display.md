@@ -121,8 +121,11 @@ child (sampled peak 64 MiB RSS), and zero remaining owned children. Parent RSS w
 99 / 120 MiB; two samples do not establish steady-state memory behavior. Real
 account data is excluded from fixtures and screenshots.
 
-Windows execution, mixed-DPI physical monitors, forced logout/account switches,
-real suspend/resume and extended CPU/memory soak remain **unverified** on this host.
+The macOS run did not verify Windows execution. Subsequent Windows native,
+production-package, metadata and fixture results are recorded separately in
+[Windows validation](codex-usage-windows-validation.md), including explicit
+**NOT_RUN** coverage. Mixed-DPI physical monitors, forced logout/account switches,
+real suspend/resume and extended CPU/memory soak remain unverified.
 Do not infer Windows success from mocked platform tests. On Windows, run the same
 build/test/UI fixture with an admitted native executable, then verify console
 suppression, account metadata with side chat OFF, actual sleep/wake and network
