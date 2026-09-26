@@ -40,7 +40,10 @@ describe("official CLI Hook setup shares runtime admission", () => {
     expect(Object.values(status.capability.events)).toEqual(Array(9).fill("supported"))
     const adapter: any = { state: "READY", adapterOwnership: "OWNED_UTILITY", activeRunCount: 0, activeTaskCount: 0, hookEvents: [] }
     const controller = new CodexIntegrationController({ userData: f.userData, appVersion: "0.8.1", packaged: true, platform: process.platform === "win32" ? "win32" : "darwin", doctor: f.doctor,
-      launchSpec: { mode: "packaged-electron-node", executablePath: join(f.root, "Pet.app/Contents/MacOS/Pet"), forwarderPath: join(f.root, "Pet.app/Contents/Resources/codex/hook-forwarder.mjs"), dataDir: join(f.root, "adapter"), hookEndpoint: "http://127.0.0.1:4175/hook" },
+      launchSpec: { mode: process.platform === "win32" ? "packaged-windows-host" : "packaged-electron-node",
+        executablePath: join(f.root, process.platform === "win32" ? "Pet/resources/codex/hook-host.exe" : "Pet.app/Contents/MacOS/Pet"),
+        forwarderPath: join(f.root, process.platform === "win32" ? "Pet/resources/codex/hook-forwarder.mjs" : "Pet.app/Contents/Resources/codex/hook-forwarder.mjs"),
+        dataDir: join(f.root, "adapter"), hookEndpoint: "http://127.0.0.1:4175/hook" },
       getAdapterDiagnostics: () => adapter, getFreshAdapterDiagnostics: async () => adapter,
       inspectHost: async () => ({ available: true, reason: "ready", fingerprint: "test-host", runAsNode: "enabled", temporaryLocation: false }),
       selfTest: async () => ({ ...notTestedHost(), status: "passed", hostFingerprint: "test-host", checkedAt: Date.now() }) })
