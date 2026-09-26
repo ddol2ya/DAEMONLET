@@ -6,10 +6,6 @@ import { AppServerJsonlClient } from "../../../adapter/codex/app-server/AppServe
 export function startChatProcess(executable: string, args: string[], cwd: string, env: NodeJS.ProcessEnv) {
   const child = spawn(executable, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true })
   child.stderr.resume()
-  // The client detaches on cancellation; absorb late pipe errors until the
-  // owned child finishes closing. These streams never outlive that child.
-  child.stdout.on("error", () => {})
-  child.stdin.on("error", () => {})
   const client = new AppServerJsonlClient({ readable: child.stdout, writable: child.stdin })
   child.once("error", () => client.close(new Error("SESSION_LOST")))
   let ended = false, stopping: Promise<void> | null = null

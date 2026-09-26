@@ -4,6 +4,21 @@ import type { Readable, Writable } from "node:stream"
 
 type JsonObject = Record<string, unknown>
 
+// Logical RPC closure can precede a pipe/socket's final error and close events.
+// This guard belongs to the stream, not the client: it retains no RPC state and
+// is removed only at physical close. Shared duplex streams get one guard.
+const guardedStreams = new WeakSet<Readable | Writable>()
+const ignoreLateStreamError = () => {}
+function guardUntilStreamClosed(stream: Readable | Writable): void {
+  if (stream.closed || guardedStreams.has(stream)) return
+  guardedStreams.add(stream)
+  stream.on("error", ignoreLateStreamError)
+  stream.once("close", () => {
+    stream.removeListener("error", ignoreLateStreamError)
+    guardedStreams.delete(stream)
+  })
+}
+
 export type JsonlClientOptions = {
   readable: Readable
   writable: Writable
@@ -178,6 +193,8 @@ export class AppServerJsonlClient {
     this.writeAbort.abort()
     this.options.readable.removeListener("data", this.onData)
     this.options.readable.removeListener("end", this.onEnd)
+    guardUntilStreamClosed(this.options.readable)
+    guardUntilStreamClosed(this.options.writable)
     this.options.readable.removeListener("error", this.onStreamError)
     this.options.writable.removeListener("error", this.onStreamError)
     this.buffer = Buffer.alloc(0)
