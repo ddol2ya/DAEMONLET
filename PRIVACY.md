@@ -63,3 +63,19 @@ Persona data and file contents are untrusted descriptive material. They cannot g
 ## Optional character pack updates
 
 For an installed external pack with an HF update source, a manual check or individually enabled automatic check makes an anonymous HTTPS request to its declared public Hugging Face Dataset. Hugging Face and its delivery providers receive ordinary network metadata such as the request path and IP address. The app sends no HF/Codex token, cookies, chat, persona or local path with these requests. Automatic checks default off; download and apply are always manual. Source consent, skip choice, last feed/ETag and check time are stored locally, separately from pack payloads. This does not enable a marketplace, search, LLM call or app executable update. See [the update workflow](docs/character-pack-updates.md).
+
+## Codex account quota display
+
+When enabled and an activity bubble is visible, Daemonlet starts a short-lived,
+verified official Codex process against the saved integration authentication home.
+It reads account and quota metadata from official services, normally every 60
+seconds. It does not submit prompts, create conversations, log in/out, buy credits
+or consume reset credits. Side-chat enablement is independent.
+
+Percentages, reset times and freshness live only in memory. Email and workspace ID
+are used only to derive a Main-local account-scope hash; no identity, hash, token,
+local path or raw server error is sent to the renderer or usage logs. Failed reads
+hide old numbers when the current account scope cannot be confirmed. Only the
+boolean display preference is saved. Native Codex retains its own normal account,
+cache and diagnostic behavior. Turn this feature off under Character & appearance
+→ Show Codex usage. See [usage policy](docs/codex-usage-display.md).

@@ -62,3 +62,11 @@ const control: TaskControlApi = {
   onViewChanged: listener => subscribe(TASK_CONTROL_IPC.viewChanged, listener),
 }
 contextBridge.exposeInMainWorld("taskControlDesktop", control)
+
+import { CODEX_USAGE_IPC, type CodexUsageApi, type CodexUsageSnapshot } from "../shared/codex-usage-contract"
+const usage: CodexUsageApi = {
+  getSnapshot: () => ipcRenderer.invoke(CODEX_USAGE_IPC.get),
+  refresh: () => ipcRenderer.invoke(CODEX_USAGE_IPC.refresh),
+  onChanged: listener => subscribe<CodexUsageSnapshot>(CODEX_USAGE_IPC.changed, listener),
+}
+contextBridge.exposeInMainWorld("codexUsageDesktop", usage)

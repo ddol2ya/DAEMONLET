@@ -34,13 +34,14 @@ export type DesktopSettingsV1 = {
   updateAutoCheck: boolean
   allowUnsignedWindowsUpdates: boolean
   sideChatEnabled: boolean
+  codexUsageEnabled: boolean
   taskBubblesEnabled: boolean
   bubblePlacement: BubblePlacement
 }
 
 export type DesktopSettingsPatch = Partial<Pick<DesktopSettingsV1,
   "characterId" | "language" | "scale" | "visible" | "alwaysOnTop" | "showOnAllWorkspaces" |
-  "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "taskBubblesEnabled" | "sideChatEnabled" | "updateAutoCheck" | "bubblePlacement"
+  "showOverFullScreen" | "clickThrough" | "adapterAutoStart" | "speechBubblesEnabled" | "codexUsageEnabled" | "taskBubblesEnabled" | "sideChatEnabled" | "updateAutoCheck" | "bubblePlacement"
 >>
 
 export type DisplayLike = {
@@ -67,6 +68,7 @@ export function defaultDesktopSettings(): DesktopSettingsV1 {
     clickThrough: true,
     adapterAutoStart: true,
     speechBubblesEnabled: true,
+    codexUsageEnabled: true,
     taskBubblesEnabled: true,
     sideChatEnabled: true,
     updateAutoCheck: false,
@@ -116,6 +118,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
     clickThrough: bool(input.clickThrough, defaults.clickThrough),
     adapterAutoStart: bool(input.adapterAutoStart, defaults.adapterAutoStart),
     speechBubblesEnabled: bool(input.speechBubblesEnabled, defaults.speechBubblesEnabled),
+    codexUsageEnabled: bool(input.codexUsageEnabled, defaults.codexUsageEnabled),
     taskBubblesEnabled: bool(input.taskBubblesEnabled, defaults.taskBubblesEnabled),
     sideChatEnabled: bool(input.sideChatEnabled, defaults.sideChatEnabled),
     updateAutoCheck: bool(input.updateAutoCheck, false),
@@ -129,7 +132,7 @@ export function normalizeDesktopSettings(value: unknown, characterAllowed: (id: 
 export function validateDesktopSettingsPatch(value: unknown, characterAllowed: (id: string) => boolean = builtinCharacter): DesktopSettingsPatch | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
   const input = value as Record<string, unknown>
-  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled", "sideChatEnabled", "updateAutoCheck", "bubblePlacement"])
+  const allowed = new Set(["characterId", "language", "scale", "visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "codexUsageEnabled", "taskBubblesEnabled", "sideChatEnabled", "updateAutoCheck", "bubblePlacement"])
   if (Object.keys(input).some((key) => !allowed.has(key))) return null
   const patch: DesktopSettingsPatch = {}
   if ("bubblePlacement" in input) { const placement = parseBubblePlacement(input.bubblePlacement); if (!placement) return null; patch.bubblePlacement = placement }
@@ -145,7 +148,7 @@ export function validateDesktopSettingsPatch(value: unknown, characterAllowed: (
     if (!finite(input.scale) || input.scale < MIN_WINDOW_SIZE / DEFAULT_WINDOW_SIZE || input.scale > MAX_WINDOW_SIZE / DEFAULT_WINDOW_SIZE) return null
     patch.scale = input.scale
   }
-  for (const key of ["visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "taskBubblesEnabled", "sideChatEnabled", "updateAutoCheck"] as const) {
+  for (const key of ["visible", "alwaysOnTop", "showOnAllWorkspaces", "showOverFullScreen", "clickThrough", "adapterAutoStart", "speechBubblesEnabled", "codexUsageEnabled", "taskBubblesEnabled", "sideChatEnabled", "updateAutoCheck"] as const) {
     if (key in input) {
       if (typeof input[key] !== "boolean") return null
       patch[key] = input[key]

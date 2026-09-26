@@ -188,3 +188,8 @@ Electron 준비에는 lockfile에 고정된 로컬 설치 스크립트를 사용
 프로젝트 코드는 [MIT](LICENSE)입니다. 지정된 지피쨩 시각 파일에 대한 **제공자가 허락할 권한이 있는 프로젝트 추가 기여**와 별도로 승인된 아이콘에는 [CC BY 4.0](distribution/ARTWORK-LICENSE.md)을 적용하며, 그 권리 범위에서 출처·라이선스·변경 표시 조건으로 수정·재배포·상업적 이용을 허용합니다. 참고한 커뮤니티 캐릭터 디자인·이미지·시트의 이용 조건은 **미확인**이며 이 허락에 포함되지 않습니다. 이미지 전체의 이용 허락이 확보됐다는 뜻은 아닙니다. [파일 및 권리 범위](distribution/ARTWORK-SCOPE.json) · [모음글과 출처 정정](distribution/ARTWORK-NOTICE.md) · [CC BY 전문](distribution/licenses/CC-BY-4.0.txt)을 확인하세요. 외부 코드·upstream 자산·모델·다른 캐릭터 팩은 [각자의 조건](THIRD_PARTY_NOTICES.md)을 따릅니다. `.petchar` 전체가 하나의 자산 라이선스로 바뀌는 것은 아닙니다.
 
 위 링크는 소스 저장소 경로입니다. 설치된 앱의 고지는 Windows/Linux `resources/licenses/`, macOS 앱 패키지의 `Contents/Resources/licenses/`에 있으며 ASAR를 열지 않고 읽을 수 있습니다. 기존 MIT의 `Momo Motion Lab contributors` 표기는 권리자 변경 근거가 없어 보존합니다.
+
+작업 말풍선은 연결된 Codex 계정의 5시간·주간 **사용률**을 표시합니다. 미제공 구간은 `—`로,
+오래된 값과 사용 제한은 별도로 표시하며, 메뉴에서 새로고침할 수 있습니다. 표시 중 기본 60초
+간격으로 공식 계정 메타데이터를 조회하며 모델 호출·대화 생성은 하지 않습니다. 설정의
+**Codex 사용량 표시**에서 끌 수 있습니다. [동작·개인정보·검증 범위](docs/codex-usage-display.md).

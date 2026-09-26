@@ -20,6 +20,20 @@ describe("dialogue manifest", () => {
     expect(() => parseDialogueManifest({ ...manifest, poseLines: poseLines ?? { writing: ['대기합니다.'] } })).toThrow()
   })
 
+  it("supports dialogue for all 64 poses and rejects a 65th binding", async () => {
+    const manifest = dialogueManifest()
+    manifest.poseTriggers = Object.fromEntries(Array.from({ length: 64 }, (_, i) => [`pose-${i}`, 'run.started' as const]))
+    manifest.poseLines = Object.fromEntries(Array.from({ length: 64 }, (_, i) => [`pose-${i}`, ['대기합니다.']]))
+    expect(Object.keys(parseDialogueManifest(manifest).poseLines!)).toHaveLength(64)
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify(manifest) }))
+    expect(Object.keys((await loadDialogueManifest("/dialogue")).manifest!.poseTriggers!)).toHaveLength(64)
+    manifest.poseTriggers['pose-64'] = 'run.started'
+    expect(() => parseDialogueManifest(manifest)).toThrow('Invalid dialogue manifest')
+    delete manifest.poseTriggers['pose-64']
+    manifest.poseLines['pose-64'] = ['대기합니다.']
+    expect(() => parseDialogueManifest(manifest)).toThrow('Invalid dialogue manifest')
+  })
+
   it("loads Gpichan's complete pose voice in formal Korean", () => {
     const character=JSON.parse(readFileSync('public/characters/gpichan/character.json','utf8'))
     const manifest=parseDialogueManifest(JSON.parse(readFileSync('public/characters/gpichan/'+character.dialogue,'utf8')))

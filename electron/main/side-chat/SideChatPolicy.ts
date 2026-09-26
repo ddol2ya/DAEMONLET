@@ -6,9 +6,10 @@ export { inspectSideChatRuntime } from "./SideChatDiscovery"
 import type { ChatConnection } from "./SideChatBackend"
 import { connectOfficialSameHome } from "./OfficialSameHomeConnection"
 import { OFFICIAL_CHAT_OVERRIDES } from "./OfficialSameHomeLaunchProfile"
+import { MINIMUM_CODEX_VERSION } from "./OfficialRuntimeVerification"
 
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex")
-export const SIDE_CHAT_SUPPORT = { policyVersion: 5, supportedRuntimes: OFFICIAL_RUNTIME_REGISTRY, code: "CHAT_PROFILE_MISSING" } as const
+export const SIDE_CHAT_SUPPORT = { policyVersion: 6, minimumVersion: MINIMUM_CODEX_VERSION, reviewedRuntimes: OFFICIAL_RUNTIME_REGISTRY, code: "CHAT_PROFILE_MISSING" } as const
 export const CHAT_PROFILE_HASH = sha(JSON.stringify({ policy: "readonly-project-companion-v1", overrides: OFFICIAL_CHAT_OVERRIDES, environments: [], instructions: "collaboration-mode", parentContract: "official-same-home", readAccess: "user-selected-files" }))
 export type SideChatConnectOptions = { codexHome: string; authHome?: string; executable?: string | null }
 

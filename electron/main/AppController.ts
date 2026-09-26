@@ -1,3 +1,6 @@
+import { CodexUsageService } from "./codex-usage/CodexUsageService"
+import { createCodexUsageReader } from "./codex-usage/CodexUsageReader"
+import { CodexUsageIpcController } from "./CodexUsageIpcController"
 import { CharacterChatWindow } from './character-chat/CharacterChatWindow'
 import { PackUpdateService } from "./pack-updates/PackUpdateService"
 import { PackUpdateIpcController } from "./pack-updates/PackUpdateIpcController"
@@ -88,6 +91,8 @@ export class AppController {
     lock: active => this.pet.setDragging(active), finish: (bounds, committed) => { if (committed) this.captureBounds(bounds) },
   })
   private sideChatPage = { offset: 0, query: "", generation: 0 }
+  private readonly codexUsage = new CodexUsageService(createCodexUsageReader())
+  private readonly codexUsageIpc: CodexUsageIpcController
   private readonly sideChatIpc: SideChatIpcController
   private readonly personaResolver: PersonaResolver
   private personaGeneration = 0
@@ -162,6 +167,8 @@ export class AppController {
     this.dictation = new DictationService(join(app.isPackaged ? process.resourcesPath : dirname, "native/DaemonletDictation.app/Contents/MacOS/DaemonletDictation"), undefined, process.platform, appLanguage)
     this.activityBubble = new ActivityBubbleWindowController(preload("activity"), this.devServerUrl, () => this.dictation.cancel(), () => { this.chatEntry.cancel(); this.sideChat.setMode("hidden") }, placement => this.updateSettings({ bubblePlacement: placement }))
     this.personaResolver = new PersonaResolver((selection, path) => this.characters.readPersonaAsset(selection, path))
+    this.codexUsageIpc = new CodexUsageIpcController(this.codexUsage, this.activityBubble, this.devServerUrl)
+    this.subscriptions.push(this.activityBubble.subscribeUsageVisibility(visible => this.codexUsage.setVisible(visible)))
     this.sideChatIpc = new SideChatIpcController(this.sideChat, this.activityBubble, this.devServerUrl, this.sideChatSetup, (query, more) => this.refreshChatParents(query, more), () => this.chatEntry.cancel())
     this.subscriptions.push(this.sideChat.subscribe(() => this.activityBubble.updateChat(this.sideChat.snapshot())))
     this.bubbleIpc = new BubblePresentationIpcController(this.activityBubble, this.devServerUrl)
@@ -290,6 +297,7 @@ export class AppController {
     await this.packUpdates.start()
     this.packUpdateIpc.register()
     this.characterIpc.register()
+    this.codexUsageIpc.register()
     this.sideChatIpc.register()
 
     this.sideChat.configure(this.settings.sideChatEnabled, this.settings.language)
@@ -297,7 +305,7 @@ export class AppController {
     let sideChatSelection = JSON.stringify(this.integration.sideChatSelection())
     this.subscriptions.push(this.integration.subscribe(() => {
       const selection = JSON.stringify(this.integration.sideChatSelection())
-      if (selection !== sideChatSelection) { sideChatSelection = selection; this.sideChatSetup.invalidate() }
+      if (selection !== sideChatSelection) { sideChatSelection = selection; this.sideChatSetup.invalidate(); this.configureCodexUsage() }
     }))
     this.activityIpc.register()
     this.bubbleIpc.register()
@@ -356,11 +364,14 @@ export class AppController {
     screen.on("display-added", this.onDisplaysChanged)
     screen.on("display-removed", this.onDisplaysChanged)
     screen.on("display-metrics-changed", this.onDisplaysChanged)
+    powerMonitor.on("suspend", this.onSuspend)
     powerMonitor.on("resume", this.onResume)
     powerMonitor.on("shutdown", this.onSystemShutdown)
     app.once("will-quit", this.onFinalQuit)
     this.pet.window?.on("query-session-end", this.onSystemShutdown)
     if (await this.integration.start() && !process.argv.includes("--character-chat")) this.settingsWindow.open()
+    // start() loads the saved provider without emitting a settings event.
+    this.configureCodexUsage()
     if (updateRecovery) this.updateIpc.open()
     if (__SETUP_SMOKE__ && this.setupSmoke) void this.setupSmoke.run({
       settings: this.settingsWindow, integration: this.integration, pet: this.pet, adapter: this.adapter,
@@ -469,6 +480,8 @@ export class AppController {
     this.activityBubble.cancelPlacement()
     this.petDrag.cancel()
     this.quitting = true
+    this.codexUsageIpc.dispose()
+    const usageStopped = this.codexUsage.dispose()
     setApplicationInputLocked(true)
     // Native quit can bypass the cached menu. Settle renderer readiness first
     // so an active pack apply can finish cleanup without waiting for a frame
@@ -491,6 +504,7 @@ export class AppController {
     if (this.settingsPoll) clearInterval(this.settingsPoll)
     this.settingsPoll = null
     await this.characterChat.dispose()
+    await usageStopped
     this.sideChatIpc.dispose()
     await this.sideChat.dispose()
     this.settingsWindow.destroy()
@@ -515,6 +529,7 @@ export class AppController {
     screen.removeListener("display-added", this.onDisplaysChanged)
     screen.removeListener("display-removed", this.onDisplaysChanged)
     screen.removeListener("display-metrics-changed", this.onDisplaysChanged)
+    powerMonitor.removeListener("suspend", this.onSuspend)
     powerMonitor.removeListener("resume", this.onResume)
     if (!forUpdate) powerMonitor.removeListener("shutdown", this.onSystemShutdown)
   }
@@ -625,6 +640,7 @@ export class AppController {
       this.pet.setBounds(next)
     }
     this.pet.applySettings(this.settings)
+    this.configureCodexUsage()
     this.activityBubble.applySettings(this.settings)
     this.settingsIpc.broadcastSettings(this.settings)
     this.persistSoon()
@@ -660,7 +676,10 @@ export class AppController {
     this.persistSoon()
   }
 
+  private configureCodexUsage() { this.codexUsage.configure(this.settings.codexUsageEnabled && this.settings.taskBubblesEnabled, this.integration.sideChatSelection()) }
+  private readonly onSuspend = () => this.codexUsage.setSuspended(true)
   private readonly onResume = () => {
+    this.codexUsage.setSuspended(false)
     this.onDisplaysChanged()
     this.protocol.reconnectAll()
     this.activity.reconnect()

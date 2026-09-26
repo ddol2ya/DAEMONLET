@@ -5,7 +5,8 @@ import { officialRuntimeEnvironment } from "./OfficialPlatform"
 import { SIDE_CHAT_MODEL } from "./SideChatModelPolicy"
 import type { ChatConnection } from "./SideChatBackend"
 
-/** Pinned official 0.154.0 controls, applied before initialize. No user config
+/** Minimum 0.154.0 controls, applied before initialize and checked in effective
+ * config on each connection, including newer official runtimes. No user config
  * writes, external auth-token injection, custom catalog, or alternate home. */
 export const OFFICIAL_CHAT_OVERRIDES: Record<string, unknown> = {
   model: SIDE_CHAT_MODEL.id, model_provider: "openai", model_reasoning_effort: SIDE_CHAT_MODEL.effort,

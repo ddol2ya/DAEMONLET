@@ -157,6 +157,7 @@ export async function validatePackDirectory(root: string, options: { rig?: boole
   const character = parsed("character.json", parseCharacterManifest)
   if (character.id !== manifest.id || character.label !== manifest.name) throw new Error("PACK_MANIFEST")
   if (character.poses.length > PACK_LIMITS.variantPoses) throw new Error("PACK_LIMIT")
+  if (character.poses.length > PACK_LIMITS.legacyVariantPoses && !manifest.runtime.capabilities.includes("extended-pose-library-v1")) throw new Error("PACK_INCOMPATIBLE")
   if (character.poses.length > PACK_LIMITS.poses && !manifest.runtime.capabilities.includes("pose-variants")) throw new Error("PACK_INCOMPATIBLE")
   if (Boolean(character.persona) !== manifest.runtime.capabilities.includes("side-chat-persona-v1")) throw new Error("PACK_PERSONA")
   if (character.persona) {

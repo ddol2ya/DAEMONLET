@@ -140,6 +140,22 @@ async function writeProtectedJson(path: string, value: unknown, beforeRename?: (
   finally { await unlink(temporary).catch(() => {}) }
 }
 
+async function syncDirectory(path: string, expected?: Identity): Promise<void> {
+  // Node directory fsync fails on Windows (EPERM). Files are already
+  // flushed by writeExclusive before rename; retain identity and readback checks
+  // on every platform. Do not misreport a verified Windows commit as a conflict.
+  if (process.platform === "win32") {
+    const current = await directoryIdentity(path, Boolean(expected))
+    if (expected && !same(current, expected)) throw new Error("UNSAFE_STORAGE")
+    return
+  }
+  const directory = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
+  try {
+    if (expected && !same(identityOf(await directory.stat()), expected)) throw new Error("UNSAFE_STORAGE")
+    await directory.sync()
+  } finally { await directory.close() }
+}
+
 type TargetLock = { assertOwned: () => Promise<void>; release: () => Promise<void> }
 type AbortableReceipt = {
   receipt: HookReceipt
@@ -359,11 +375,7 @@ export class HookInstallTransaction {
     await writeProtectedJson(this.receiptPath(receipt.id), aborted, assertContext)
     await lock.assertOwned()
     await this.assertStorage(storageIdentity)
-    const directory = await open(this.options.storageRoot, constants.O_RDONLY | constants.O_NOFOLLOW)
-    try {
-      if (!same(identityOf(await directory.stat()), storageIdentity)) throw new Error("UNSAFE_STORAGE")
-      await directory.sync()
-    } finally { await directory.close() }
+    await syncDirectory(this.options.storageRoot, storageIdentity)
     const verified = await safeReadFile(this.receiptPath(receipt.id), MAX_HOOK_FILE_BYTES, true)
     if (verified?.contents !== `${JSON.stringify(aborted, null, 2)}\n`) throw new Error("INVALID_RECEIPT")
   }
@@ -452,10 +464,9 @@ export class HookInstallTransaction {
       const verified = await readHookTarget(this.options.codexHome)
       if (verified.hash !== receipt.afterHash) return { status: "committed-conflict", changed: true, requiresHookReview: true, warning: "POST_COMMIT_CONFLICT" }
       targetCommit = "verified"
-      // Commit is durable before publishing a successful receipt. A failed
-      // receipt update never triggers a destructive whole-file rollback.
-      const directory = await open(this.options.codexHome, constants.O_RDONLY)
-      try { await directory.sync() } finally { await directory.close() }
+      // Flush directory metadata where supported before publishing the receipt.
+      // A failed receipt update never triggers a destructive whole-file rollback.
+      await syncDirectory(this.options.codexHome, verified.rootIdentity ?? undefined)
       try {
         await this.options.phase?.("before-receipt")
         await this.assertStorage(storageIdentity)

@@ -1,6 +1,6 @@
 import { PassThrough, Writable } from "node:stream"
 import { describe, expect, it, vi } from "vitest"
-import { AppServerJsonlClient } from "../adapter/codex/app-server/AppServerJsonlClient.ts"
+import { AppServerJsonlClient, AppServerRpcError } from "../adapter/codex/app-server/AppServerJsonlClient.ts"
 
 const setup = (timeout = 100) => {
   const readable = new PassThrough()
@@ -64,4 +64,45 @@ it("rejects a failed transport write without leaving an orphaned response reject
   await expect(client.request("turn/interrupt", { threadId: "safe", turnId: "exact" })).rejects.toThrow("broken pipe")
   expect(client.pendingRequestCount).toBe(0)
   client.close()
+})
+
+it("preserves only numeric RPC codes and releases transport listeners", async () => {
+  const { client, readable, writable } = setup()
+  const pending = client.request("account/rateLimits/read")
+  const outgoing = await new Promise<string>(resolve => writable.once("data", data => resolve(data.toString())))
+  const id = JSON.parse(outgoing).id
+  readable.write(JSON.stringify({ id, error: { code: -32602, message: "private-token", data: { path: "/private/account" } } }) + "\n")
+  const error = await pending.catch(e => e)
+  expect(error).toBeInstanceOf(AppServerRpcError); if (!(error instanceof AppServerRpcError)) throw Error("missing safe RPC error")
+  expect(error.code).toBe(-32602)
+  expect(error.message).toBe("app-server request failed"); expect(JSON.stringify(error)).not.toMatch(/private/)
+  client.close(); expect(readable.listenerCount("data")).toBe(0); expect(readable.listenerCount("end")).toBe(0)
+  expect(writable.listenerCount("drain")).toBe(0)
+})
+
+it.each(["late-write", "readable-end", "readable-error", "backpressure"])("survives %s during close in an isolated Node process", async scenario => {
+  const { mkdtemp, rm } = await import("node:fs/promises")
+  const { tmpdir } = await import("node:os")
+  const { join, resolve } = await import("node:path")
+  const { execFile } = await import("node:child_process")
+  const { promisify } = await import("node:util")
+  const { build } = await import("esbuild")
+  const root = await mkdtemp(join(tmpdir(), "jsonl-stream-lifetime-"))
+  try {
+    const outfile = join(root, "repro.mjs")
+    await build({ entryPoints: [resolve("tests/fixtures/app-server/stream-lifetime.ts")], outfile, bundle: true, platform: "node", format: "esm", logLevel: "silent" })
+    const result = await promisify(execFile)(process.execPath, ["--unhandled-rejections=strict", outfile, scenario], { timeout: 3000 })
+    expect(result.stdout.trim()).toBe("stream-lifetime:passed")
+    expect(result.stderr).toBe("")
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+it("keeps one passive guard for a shared duplex and releases it at physical close", async () => {
+  const stream = new PassThrough()
+  const client = new AppServerJsonlClient({ readable: stream, writable: stream })
+  client.close(); client.close()
+  expect(stream.listenerCount("error")).toBe(1)
+  stream.destroy(new Error("late duplex failure"))
+  await new Promise<void>(resolve => stream.once("close", resolve))
+  expect(stream.listenerCount("error")).toBe(0)
 })

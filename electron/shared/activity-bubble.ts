@@ -9,12 +9,12 @@ export const ACTIVITY_BUBBLE_COMPACT_SIZE = { width: 64, height: 44 }
 export const TASK_CONTROL_BUBBLE_SIZE = { width: 360, height: 300 }
 export const TASK_CONTROL_BUBBLE_COMPACT_SIZE = { width: 260, height: 52 }
 
-export function positionAnchoredActivityBubble(pet: Rect, area: Rect, anchor: BubbleAnchor, collapsed: boolean, measuredHeight: number): Rect {
-  const size = { ...(collapsed ? ACTIVITY_BUBBLE_COMPACT_SIZE : ACTIVITY_BUBBLE_SIZE), height: measuredHeight }
+export function positionAnchoredActivityBubble(pet: Rect, area: Rect, anchor: BubbleAnchor, collapsed: boolean, measuredHeight: number, zoom = 1): Rect {
+  const size = { width: collapsed ? ACTIVITY_BUBBLE_COMPACT_SIZE.width : Math.round(ACTIVITY_BUBBLE_SIZE.width * zoom), height: measuredHeight }
   const face = { x0: pet.x + anchor.x0 * pet.width, x1: pet.x + anchor.x1 * pet.width, y0: pet.y + anchor.y0 * pet.height, y1: pet.y + anchor.y1 * pet.height }
   const candidate = anchoredBubbleCandidates(area, face, size).find(r => fitsBubbleArea(r, area))
   if (candidate) return { x: Math.round(candidate.x), y: Math.round(candidate.y), width: size.width, height: size.height }
-  return positionActivityBubble(pet, area, collapsed)
+  return positionActivityBubble(pet, area, collapsed, false, size)
 }
 
 /** Never put the companion over the Pet canvas (including its dialogue), if space permits. */

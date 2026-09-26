@@ -2,20 +2,24 @@ import { constants } from "node:fs"
 import { spawn } from "node:child_process"
 import { access, lstat, realpath, open } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
-import { basename, delimiter, dirname, isAbsolute, join } from "node:path"
+import { delimiter, isAbsolute, join } from "node:path"
 import { parse as parseToml } from "smol-toml"
 import { containsHookMarker, HOOK_SYSTEM_PATH, hashFile, hashText } from "../hooks/HookLaunchSpec.ts"
 import { allEventSupport, type EventSupport } from "../hooks/HookInstallPlan.ts"
 import { isObject } from "../hooks/HookJson.ts"
 import { canonicalCodexHome, readSetupConfig } from "../hooks/HookInstallTransaction.ts"
 import { VERIFIED_HOOK_CONTRACTS, hookContractFor, type HookSupportContract } from "./HookSupportContract.ts"
+import { codexExecutableCandidates, inspectOfficialCodexExecutable, resolveNativeCandidate } from "../runtime/CodexExecutable.ts"
+import { RUNTIME_VERIFICATION_TIMEOUT_MS } from "../runtime/OfficialRuntimeVerification.ts"
+import { officialHookContract } from "./OfficialHookContract.ts"
+export { standardCodexExecutables } from "../runtime/CodexExecutable.ts"
 
 export type CodexSelection = { executablePath: string | null; codexHome: string | null }
 export type HookSetupDiscovery = {
   checkedAt: number
   home: { path: string; source: "selected" | "environment" | "default" }
   executable: { path: string | null; source: "selected" | "environment" | "path" | "installation" | "not-found"; version: string | null; probeStatus: "verified" | "selection-required" | "missing" | "failed" | "version-mismatch"; fingerprint: string | null }
-  capability: { contractId: string | null; source: "installed-artifact-and-fixtures" | "test-fixture" | "unknown"; surface: "cli" | "desktop" | "synthetic" | "unknown"; events: EventSupport }
+  capability: { contractId: string | null; source: HookSupportContract["source"] | "unknown"; surface: "cli" | "desktop" | "synthetic" | "unknown"; events: EventSupport }
   feature: "enabled" | "disabled" | "unknown"
   policy: "blocked" | "not-blocked-in-checked-file" | "unknown"
   inlineOwnedConflict: boolean
@@ -64,21 +68,6 @@ async function checkedExecutable(path: string): Promise<string | null> {
   } catch { return null }
 }
 
-// The known npm wrapper is resolved to its native payload without running the
-// wrapper or searching the installation recursively. This does not make Codex's
-// own npm distribution Node-independent; it only avoids running an arbitrary
-// PATH script during discovery.
-const KNOWN_NPM_WRAPPERS = new Set([
-  "134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477", // 0.147.0
-  "61b0194f3bb6534439c8d26a3ed57d0805f84b884588b761795323eeb92fcf70", // 0.153.4
-])
-async function unwrapKnownNpmExecutable(path: string): Promise<string> {
-  if (process.platform !== "darwin" || process.arch !== "arm64" || basename(path) !== "codex.js") return path
-  if (!KNOWN_NPM_WRAPPERS.has(await hashFile(path))) return path
-  const native = join(dirname(dirname(path)), "node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex")
-  return await checkedExecutable(native) ?? path
-}
-
 export type HookSetupDoctorOptions = {
   environment?: NodeJS.ProcessEnv
   defaultHome?: string
@@ -89,16 +78,6 @@ export type HookSetupDoctorOptions = {
   additionalExecutables?: () => Promise<string[]>
 }
 
-/** Finder-launched apps do not inherit the user's shell PATH. No shell or
- * recursive filesystem search is needed for these standard installation paths. */
-export function standardCodexExecutables(userHome = homedir(), platform = process.platform): string[] {
-  if (platform === "win32") return [join(userHome, "AppData/Roaming/npm/node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe")]
-  return [
-    ...(platform === "darwin" ? ["/opt/homebrew/bin/codex"] : []),
-    "/usr/local/bin/codex", join(userHome, ".local/bin/codex"), join(userHome, ".npm-global/bin/codex"), join(userHome, "bin/codex"),
-  ]
-}
-
 export class HookSetupDoctor {
   private readonly options: HookSetupDoctorOptions
   private readonly environment: NodeJS.ProcessEnv
@@ -106,6 +85,7 @@ export class HookSetupDoctor {
   private cache: { key: string; revision: string; expiresAt: number; value: HookSetupDiscovery } | null = null
   private pending: { key: string; promise: Promise<HookSetupDiscovery> } | null = null
   private readonly children = new Set<ReturnType<typeof spawn>>()
+  private admission: AbortController | null = null
   private generation = 0
   private closed = false
 
@@ -116,6 +96,7 @@ export class HookSetupDoctor {
   }
 
   invalidate(): void {
+    this.admission?.abort(); this.admission = null
     this.generation++
     this.cache = null
     this.pending = null
@@ -131,7 +112,9 @@ export class HookSetupDoctor {
     if (!refresh && this.pending?.key === key) return this.pending.promise.then((value) => structuredClone(value))
     this.invalidate()
     const generation = this.generation
-    const promise = this.run(selection, generation).then(async (value) => {
+    this.admission = new AbortController()
+    const signal = AbortSignal.any([this.admission.signal, AbortSignal.timeout(RUNTIME_VERIFICATION_TIMEOUT_MS)])
+    const promise = this.run(selection, generation, signal).then(async (value) => {
       if (this.closed || this.generation !== generation) throw new Error("PROBE_CANCELLED")
       const revision = await this.revision(value, selection)
       if (this.closed || this.generation !== generation) throw new Error("PROBE_CANCELLED")
@@ -187,7 +170,7 @@ export class HookSetupDoctor {
     })
   }
 
-  private async run(selection: CodexSelection, generation: number): Promise<HookSetupDiscovery> {
+  private async run(selection: CodexSelection, generation: number, signal: AbortSignal): Promise<HookSetupDiscovery> {
     const requestedHome = selection.codexHome ?? this.environment.CODEX_HOME ?? this.options.defaultHome ?? join(homedir(), ".codex")
     const home = { path: await canonicalCodexHome(requestedHome), source: selection.codexHome ? "selected" as const : this.environment.CODEX_HOME ? "environment" as const : "default" as const }
     const value: HookSetupDiscovery = {
@@ -210,25 +193,40 @@ export class HookSetupDoctor {
     } catch { value.warnings.push("CONFIG_UNREADABLE_OR_INVALID") }
     value.configFingerprint = hashText(JSON.stringify({ home: home.path, config, policy, warnings: value.warnings }))
     const explicit = selection.executablePath ?? this.environment.CODEX_PATH
-    const pathCandidates = [...new Set((this.environment.PATH ?? "").split(delimiter).filter((path) => isAbsolute(path)).map((path) => join(path, "codex")))].slice(0, 32)
+    const pathCandidates = [...new Set((this.environment.PATH ?? this.environment.Path ?? "").split(delimiter)
+      .filter(path => isAbsolute(path)).slice(0, 32)
+      .flatMap(path => (process.platform === "win32" ? ["codex.exe", "codex.cmd", "codex.ps1"] : ["codex"]).map(name => join(path, name))))]
     const installations = explicit ? [] : [
       // An injected environment is an isolated discovery scope (tests/embedded
       // callers); do not silently inspect the host user's installations there.
-      ...(this.options.environment ? [] : standardCodexExecutables()),
+      ...(this.options.environment ? [] : codexExecutableCandidates(null, this.environment)),
       ...await this.options.additionalExecutables?.().catch(() => []) ?? [],
     ].slice(0, 16)
     const candidates = explicit ? [explicit] : [...new Set([...pathCandidates, ...installations])]
     const contracts = this.options.contracts ?? VERIFIED_HOOK_CONTRACTS
+    let admittedContract: HookSupportContract | null = null
     const checked = new Set<string>()
     for (const candidate of candidates) {
-      const path = await checkedExecutable(candidate)
-      if (!path) continue
-      const executable = await unwrapKnownNpmExecutable(path)
+      signal.throwIfAborted()
+      let native = candidate
+      try { native = await resolveNativeCandidate(candidate) } catch { /* Legacy verified platforms still use the selected file. */ }
+      const executable = await checkedExecutable(native)
+      if (!executable) continue
       if (checked.has(executable)) continue
       checked.add(executable)
       const fingerprint = await hashFile(executable)
-      const known = contracts.some(item => item.artifactSha256 === fingerprint)
+      let contract = contracts.find(item => item.artifactSha256 === fingerprint) ?? null
+      // Custom contract sets are isolated test/embedded policies, never extended
+      // from the host. Production uses the same official admission as usage/chat.
+      if (!contract && this.options.contracts === undefined) {
+        try {
+          const official = await inspectOfficialCodexExecutable(executable, signal)
+          contract = await officialHookContract(official.executable, official.runtime, signal)
+        } catch { signal.throwIfAborted() }
+      }
+      const known = contract !== null
       if (!value.executable.path || known) {
+        admittedContract = contract
         value.executable.path = executable
         value.executable.fingerprint = fingerprint
         value.executable.source = selection.executablePath ? "selected" : this.environment.CODEX_PATH ? "environment" : pathCandidates.includes(candidate) ? "path" : "installation"
@@ -238,24 +236,24 @@ export class HookSetupDoctor {
       if (explicit || known) break
     }
     if (!value.executable.path) { value.warnings.push(explicit ? "SELECTED_CODEX_UNAVAILABLE" : "CLI_NOT_FOUND_DESKTOP_MAY_STILL_WORK"); return value }
-    const artifactKnown = contracts.some((item) => item.artifactSha256 === value.executable.fingerprint)
-    if (!artifactKnown && !selection.executablePath) {
+    const artifactKnown = admittedContract !== null
+    if (!artifactKnown && (!selection.executablePath || this.options.contracts === undefined)) {
       value.executable.probeStatus = "selection-required"
-      value.warnings.push("SELECT_EXECUTABLE_BEFORE_PROBE")
+      value.warnings.push(selection.executablePath ? "CAPABILITY_CONTRACT_UNKNOWN" : "SELECT_EXECUTABLE_BEFORE_PROBE")
       return value
     }
     try {
       const version = await this.probe(value.executable.path, ["--version"], home.path, generation)
       if (!/^codex-cli \d{1,4}\.\d{1,4}\.\d{1,4}(?:-[A-Za-z0-9.+-]{1,60})?$/.test(version)) throw new Error("INVALID_CODEX_VERSION")
       value.executable.version = version
-      const contract = hookContractFor(value.executable.fingerprint, version, contracts)
+      const contract = hookContractFor(value.executable.fingerprint, version, admittedContract ? [admittedContract] : contracts)
       value.executable.probeStatus = contract ? "verified" : artifactKnown ? "version-mismatch" : "selection-required"
       if (contract) {
         value.capability = { contractId: contract.id, source: contract.source, surface: contract.surface, events: structuredClone(contract.events) }
         const features = parseHookFeatureOutput(await this.probe(value.executable.path, ["features", "list"], home.path, generation))
         // Effective CLI output outranks a user-file flag. Missing output never
         // turns an absent key into explicit false or evidence of support.
-        if (features !== "unknown") value.feature = features
+        value.feature = features
         if (value.feature === "disabled") value.manualFeatureInstruction = `[features]\n${contract.featureKey} = true`
       } else value.warnings.push("CAPABILITY_CONTRACT_UNKNOWN")
     } catch {

@@ -29,7 +29,7 @@ const errors: Record<ChatError, [string, string]> = {
   CHAT_MODEL_UNAVAILABLE: ["이 계정에서 현재 검증 모델을 사용할 수 없습니다. 로그인과 사용 가능 모델을 확인한 뒤 다시 확인해 주세요. 다른 모델로 자동 전환하지 않습니다.", "The reviewed model is unavailable for this account. Check login and model access, then check again. The model will not switch automatically."],
   CHAT_PROFILE_MISSING: ["이 연결 경로에는 검증된 실행 프로필이 없습니다.", "This connection has no verified launch profile."],
   CHAT_RUNTIME_MISSING: ["Codex CLI를 찾지 못했습니다. 공식 CLI 설치를 확인해 주세요.", "Codex CLI was not found. Check the official CLI installation."],
-  CHAT_RUNTIME_UNSUPPORTED: ["지원하는 공식 CLI를 선택하거나 감지한 공식 CLI를 사용해 주세요. 기존 작업 연결 설정은 보존됩니다.", "Choose a supported official CLI or use the detected official CLI. Existing task connection settings are preserved."],
+  CHAT_RUNTIME_UNSUPPORTED: ["공식 npm판 Codex CLI 0.154.0 이상을 선택해 주세요. 새 버전의 최초 확인에는 인터넷 연결이 필요합니다. 기존 작업 연결 설정은 보존됩니다.", "Choose the official npm Codex CLI 0.154.0 or newer. First verification of a new version requires internet access. Existing task connection settings are preserved."],
   CHAT_AUTH_REQUIRED: ["유효한 Codex ChatGPT 로그인이 필요합니다. 공식 Codex 로그인 상태를 확인해 주세요.", "A valid Codex ChatGPT login is required. Check your official Codex login."],
   CHAT_MANAGED_POLICY: ["관리자 정책이 있는 환경은 별도 실행 프로필 검증이 필요합니다. 정책은 변경하지 않았습니다.", "Managed environments need a separately audited profile. Policy was not changed."],
   CHAT_EXECUTION_POLICY: ["현재 실행 설정에서 읽기 전용 제한을 확인하지 못해 연결을 중단했습니다.", "Read-only execution constraints could not be verified. Connection stopped."],

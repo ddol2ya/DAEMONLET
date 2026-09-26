@@ -61,7 +61,7 @@ describe("pose variant pack compatibility", () => {
     else await expect(validatePackDirectory(dir)).rejects.toThrow('PACK_INCOMPATIBLE')
   })
 
-  it.each([16, 22, 32])("validates %i poses through the real loader with the supported capability", async count => {
+  it.each([16, 22, 32, 34, 64])("validates %i poses through the real loader with the supported capability", async count => {
     const dir = await writePayload(await temp(), posePack(count, count > 16))
     expect((await validatePackDirectory(dir)).poseCount).toBe(count)
   })
@@ -69,9 +69,16 @@ describe("pose variant pack compatibility", () => {
     const dir = await writePayload(await temp(), posePack(17, false))
     await expect(validatePackDirectory(dir)).rejects.toThrow("PACK_INCOMPATIBLE")
   })
-  it("rejects 33 poses even with the capability", async () => {
-    const dir = await writePayload(await temp(), posePack(33, true))
+  it("rejects 65 poses even with the extended capability", async () => {
+    const dir = await writePayload(await temp(), posePack(65, true))
     await expect(validatePackDirectory(dir)).rejects.toThrow("PACK_LIMIT")
+  })
+  it("requires an explicit extension capability above the legacy 32-pose limit", async () => {
+    const entries = posePack(34, true), manifest = JSON.parse(entries[0].data.toString())
+    manifest.runtime.capabilities = manifest.runtime.capabilities.filter((c: string) => c !== "extended-pose-library-v1")
+    entries[0].data = Buffer.from(JSON.stringify(manifest))
+    const dir = await writePayload(await temp(), entries)
+    await expect(validatePackDirectory(dir)).rejects.toThrow("PACK_INCOMPATIBLE")
   })
   it("requires the capability for behavior choices even in a small pack", async () => {
     const dir = await writePayload(await temp(), posePack(3, false, ["pose-1", "pose-2"]))

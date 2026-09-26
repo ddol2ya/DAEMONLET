@@ -8,6 +8,7 @@ import { readOfficialAccountBinding } from "./SideChatAuth"
 import { isSideChatModelAvailable } from "./SideChatModelPolicy"
 import { inspectSideChatRuntime } from "./SideChatDiscovery"
 import { chatError } from "./SideChatErrors"
+import { AppServerRpcError } from "../../../adapter/codex/app-server/AppServerJsonlClient"
 
 /** The caller has admitted the native hash. All auth stays in Codex's supported
  * same-home credential path. No account/login/start or logout is sent. */
@@ -72,6 +73,7 @@ export async function connectOfficialSameHome(executable: string, codexHome: str
     return connection
   } catch (error) {
     await connection?.stop(); await rm(root, { recursive: true, force: true })
-    throw Object.assign(Error(chatError(error)), { stage })
+    const code = error instanceof AppServerRpcError && [-32601, -32602].includes(error.code ?? 0) ? "CHAT_RUNTIME_UNSUPPORTED" : chatError(error)
+    throw Object.assign(Error(code), { stage })
   }
 }

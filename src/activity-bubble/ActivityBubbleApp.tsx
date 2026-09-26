@@ -1,3 +1,5 @@
+import { CodexUsageStrip, usagePresentation } from "./CodexUsageStrip"
+import { useCodexUsage } from "./useCodexUsage"
 import { useT } from "../i18n/useLanguage"
 import TaskControlPanel from "./TaskControlPanel"
 import { SideChatApp } from "../side-chat/SideChatApp"
@@ -37,6 +39,7 @@ export default function ActivityBubbleApp() {
   const main = useRef<HTMLElement>(null)
   const latest = useRef<ActivitySnapshot | null>(null)
   const holds = useRef(new Set<string>())
+  const usage = useCodexUsage(() => holds.current.size > 0)
   const actionPending = useRef(false)
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blockedClick = useRef(false)
@@ -56,6 +59,7 @@ export default function ActivityBubbleApp() {
     const after = holds.current.size > 0
     if (before !== after || beforePressed !== pressed()) window.activityDesktop?.setInteractionLocked(after, pressed())
     if (!after && latest.current) setSnapshot(latest.current)
+    if (!after) usage.flush()
   }
   useEffect(() => {
     const api = window.activityDesktop
@@ -149,7 +153,7 @@ export default function ActivityBubbleApp() {
     onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) hold("focus", false) }}
     onKeyDown={event => { if (isComposing(event.nativeEvent)) return; if (["Enter", " "].includes(event.key)) { hold("keyboard", true); hold("native", false) } if (event.key === "Escape" && !event.defaultPrevented) { if (menuOpen) { event.preventDefault(); closeMenu(); menu.current?.querySelector("summary")?.focus() } else if (!collapsed) toggle() } }}
     onKeyUp={() => release("keyboard")}>
-    {collapsed ? <button className="mini-task-chip" aria-label={t("작업 알림 펼치기")} aria-expanded="false" title={t`${entry?.name ?? t("작업 알림")} · ${entry ? t(labels[entry.state]) : ""} · 입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`} disabled={pending || !api} onClick={toggle}>
+    {collapsed ? <button className="mini-task-chip" aria-label={[t("작업 알림 펼치기"), usage.snapshot.enabled ? usagePresentation(usage.snapshot, t).description : ""].filter(Boolean).join(" · ")} aria-expanded="false" title={t`${entry?.name ?? t("작업 알림")} · ${entry ? t(labels[entry.state]) : ""} · 입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`} disabled={pending || !api} onClick={toggle}>
       <span className="mini-task-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-6 3V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h6"/></svg><span className={`task-dot ${stale ? "stale" : ""}`} /></span>
       {attention.waiting + attention.unread > 0 && <span className="mini-task-count" aria-hidden="true">{Math.min(99, attention.waiting + attention.unread)}{attention.waiting + attention.unread > 99 ? "+" : ""}</span>}
       <span className="sr-label" role="status" aria-live="polite">{t`입력 필요 ${attention.waiting} · 미확인 ${attention.unread}`}</span>
@@ -158,6 +162,7 @@ export default function ActivityBubbleApp() {
       <div className="task-heading"><strong>{entry ? stale ? t("작업 재확인 중") : t(labels[entry.state]) : t("작업")}</strong>{!collapsed && entry && (entry.unread || entry.category || entry.state === "waiting" || stale) && <span>· {entry.unread ? t("미확인") : entry.state === "running" && entry.category ? t(categories[entry.category]) : entry.state === "waiting" ? t("대화에서 응답") : t("마지막 관찰")}</span>}</div>
       <button className="text-button" aria-label={t("작업 목록 열기")} disabled={pending || !api} onClick={() => api && void perform(() => api.openList())}>{t("목록")}</button>
       <details ref={menu} className="bubble-menu" open={menuOpen} onToggle={event => { setMenuOpen(event.currentTarget.open); hold("menu", event.currentTarget.open) }}><summary aria-label={t("작업 말풍선 메뉴")} onClick={event => hold("menu", !(event.currentTarget.parentElement as HTMLDetailsElement).open)}>···</summary><div className="bubble-menu-panel">
+        {!chatOpen && usage.snapshot.enabled && <button onClick={() => { closeMenu(); void window.codexUsageDesktop?.refresh().catch(() => {}) }}>{t("사용량 새로고침")}</button>}
         {window.taskControlDesktop && <button disabled={pending} onClick={() => { closeMenu(); void window.taskControlDesktop!.setView("control", false) }}>{t("Codex 제어")}</button>}
         <button disabled={pending || !api} onClick={toggle}>{collapsed ? t("펼치기") : t("접기")}</button>
         {entry?.unread && entry.canOpenConversation && <button disabled={pending || !api} onClick={() => { closeMenu(); if (api && target) void perform(() => api.openResult(target), receive) }}>{t("열고 확인")}</button>}
@@ -170,6 +175,7 @@ export default function ActivityBubbleApp() {
     <div className="bubble-summary"><span role="status" aria-live="polite" aria-atomic="true">{attention.waiting ? t`입력 필요 ${attention.waiting}` : ""}{attention.waiting && attention.unread ? " · " : ""}{attention.unread ? t`미확인 ${attention.unread}` : ""}</span>
       {entries.length > 1 && (!chatOpen || foundIndex >= 0) && <div className="task-pager" aria-label={t("작업 선택")}><button className="text-button" aria-label={t("이전 작업")} disabled={pending || chatBusy} onClick={() => cycle(-1)}>‹</button><span>{index + 1}/{entries.length}</span><button className="text-button" aria-label={t("다음 작업")} disabled={pending || chatBusy} onClick={() => cycle(1)}>›</button></div>}
     </div>
+    {!chatOpen && view === "activity" && !placement.editing && <CodexUsageStrip snapshot={usage.snapshot} />}
     {!chatOpen && window.daemonletSideChat && <button className="task-chat-entry" aria-label={t("캐릭터에게 물어보기")} disabled={pending || !api} onClick={() => api && void perform(() => api.openChat(target ?? null))}><span>{chat?.character.label ?? t("지피쨩")}{t("에게 물어보기")}</span><span aria-hidden="true">↵</span></button>}
     {(error || snapshot?.storage === "error") && <p className="task-error" role="alert">{t(error) || t("이력 저장 실패 · 작업 목록에서 확인해 주세요.")}</p>}</>}
   {window.daemonletSideChat && <SideChatApp api={window.daemonletSideChat} onSnapshot={setChat} />}

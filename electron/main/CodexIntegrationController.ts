@@ -1,5 +1,6 @@
 import { realpath } from "node:fs/promises"
 import { join } from "node:path"
+import { homedir } from "node:os"
 import { HookSetupDoctor, type HookSetupDiscovery } from "../../adapter/codex/doctor/HookSetupDoctor"
 import { allEventSupport, hookHandler, inspectHookConfiguration, type HookPlanAction } from "../../adapter/codex/hooks/HookInstallPlan"
 import { HookInstallTransaction, canonicalCodexHome, discoverLegacyHandlers, readHookTarget, type HookApplySummary, type HookPlanSummary, type InstallationBinding } from "../../adapter/codex/hooks/HookInstallTransaction"
@@ -103,7 +104,14 @@ export class CodexIntegrationController {
   subscribe(listener: (status: PublicSetupStatus) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   private emit(): PublicSetupStatus { const value = this.getStatus(); for (const listener of this.listeners) listener(value); return value }
 
-  sideChatSelection() { return this.store.get().selection }
+  sideChatSelection() {
+    const selected = this.store.get().selection
+    // Discovery resolves default CODEX_HOME/npm locations even when the user
+    // never opens either picker. Each consumer still verifies its own runtime;
+    // resolving defaults must not rewrite the user's saved selection.
+    return { executablePath: selected.executablePath ?? this.discovery?.executable.path ?? null,
+      codexHome: selected.codexHome ?? this.discovery?.home.path ?? process.env.CODEX_HOME ?? join(homedir(), ".codex") }
+  }
   getStatus(): PublicSetupStatus {
     const adapter = this.options.getAdapterDiagnostics()
     this.observation.update(adapter.hookEvents, this.discovery?.capability.events ?? allEventSupport("unknown"), adapter.adapterOwnership === "OWNED_UTILITY")

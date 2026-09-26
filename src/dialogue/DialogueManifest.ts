@@ -55,7 +55,7 @@ export function parseDialogueManifest(input: unknown): DialogueManifest {
   let poseTriggers: Record<string, DialogueTriggerId> | undefined
   if (root.poseTriggers !== undefined) {
     const entries = Object.entries(record(root.poseTriggers))
-    if (!entries.length || entries.length > 32) return invalid()
+    if (!entries.length || entries.length > 64) return invalid()
     poseTriggers = {}
     for (const [poseId, triggerId] of entries) {
       if (!/^[a-z][a-z0-9-]{0,63}$/.test(poseId) || typeof triggerId !== "string" || !isDialogueTriggerId(triggerId) || !triggers[triggerId]) return invalid()
@@ -65,7 +65,7 @@ export function parseDialogueManifest(input: unknown): DialogueManifest {
   let poseLines: Record<string, string[]> | undefined
   if (root.poseLines !== undefined) {
     const entries = Object.entries(record(root.poseLines))
-    if (!entries.length || entries.length > 32 || !poseTriggers) return invalid()
+    if (!entries.length || entries.length > 64 || !poseTriggers) return invalid()
     poseLines = {}
     for (const [poseId, lines] of entries) {
       if (!Object.hasOwn(poseTriggers, poseId)) return invalid()

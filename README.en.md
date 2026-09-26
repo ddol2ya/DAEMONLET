@@ -194,3 +194,9 @@ The terms for the referenced community character designs, images and sheets are 
 External code, upstream assets, models and other character packs remain subject to [their own terms](THIRD_PARTY_NOTICES.md). Packaging files as `.petchar` does not place the entire pack under a single artwork license.
 
 The links above point to files in the source repository. In an installed app, notices are available in `resources/licenses/` on Windows/Linux and `Contents/Resources/licenses/` inside the macOS app bundle; you do not need to open the ASAR archive to read them. The existing MIT credit to `Momo Motion Lab contributors` is retained because there is no basis for changing the copyright holder.
+
+Task bubbles show account-wide Codex five-hour/weekly **used** percentages. Missing
+windows show `—`; outdated values and usage restrictions are labeled separately.
+Refresh from the bubble menu or disable **Show Codex usage** in settings. While
+visible, metadata is normally read every 60 seconds without model calls or creating
+conversations. See [behavior, privacy and verification](docs/codex-usage-display.md).

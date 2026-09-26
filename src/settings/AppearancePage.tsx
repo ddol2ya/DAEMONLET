@@ -8,6 +8,7 @@ const toggles = [
   { key: "visible", label: "캐릭터 표시", description: null },
   { key: "alwaysOnTop", label: "항상 위에 표시", description: null },
   { key: "speechBubblesEnabled", label: "캐릭터 대사 표시", description: null },
+  { key: "codexUsageEnabled", label: "Codex 사용량 표시", description: "이 컴퓨터의 Codex 계정 한도를 작업 말풍선에 표시합니다." },
   { key: "taskBubblesEnabled", label: "작업 말풍선 표시", description: null },
   { key: "clickThrough", label: "투명한 영역의 클릭 통과", description: "캐릭터가 없는 부분에서 뒤의 앱을 클릭합니다." },
   { key: "showOnAllWorkspaces", label: "모든 데스크톱에서 표시", description: null, macOnly: true },

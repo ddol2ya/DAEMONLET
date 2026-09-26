@@ -92,3 +92,9 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #765845; outlin
 .control-feedback.task-error { color: #a23e38; }
 
 .activity-view:has(.has-chat){height:100%}.task-bubble.has-chat{height:100%;display:flex;flex-direction:column;min-height:0}.has-chat>.bubble-top,.has-chat>.bubble-bottom,.has-chat>.bubble-summary{flex-shrink:0}.task-chat-entry{margin-top:7px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:30px;padding:5px 8px;border:1px solid #d8ccbe;border-radius:9px;background:#fffdf8;color:#8a7766;font-size:11px;text-align:left}.task-chat-entry:active{transform:scale(.98)}
+
+.codex-usage { margin-top: 7px; border-top: 1px solid #dfd5c9; padding-top: 5px; height: 43px; font-size: 10px; line-height: 16px; font-variant-numeric: tabular-nums; color: var(--bubble-muted); }
+.codex-usage-heading, .codex-usage-windows { display: flex; justify-content: space-between; gap: 5px; white-space: nowrap; }
+.codex-usage-heading > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.codex-usage-windows { color: var(--bubble-ink); }
+.activity-view { max-height: 100%; overflow-y: auto; scrollbar-width: thin; }
