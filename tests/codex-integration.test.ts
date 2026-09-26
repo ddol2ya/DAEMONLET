@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { renderToStaticMarkup } from "react-dom/server"
@@ -52,6 +52,17 @@ async function fixture(temporaryLocation = false, platform: NodeJS.Platform = "d
   await controller.refresh(true)
   return { root, home, userData, original, discovery, doctor, adapter, host, controller, owner, make }
 }
+
+it("passes discovered default CLI and Home to usage/chat without requiring manual picker selections", async () => {
+  const f = await fixture()
+  expect(f.controller.sideChatSelection()).toEqual({ executablePath: f.discovery.executable.path, codexHome: f.home })
+  const saved = JSON.parse(await readFile(join(f.userData, "codex-integration.json"), "utf8"))
+  expect(saved.selection).toEqual({ executablePath: null, codexHome: null })
+  await writeFile(f.discovery.executable.path!, "fixture")
+  await f.controller.selectExecutable(f.discovery.executable.path!, f.owner)
+  const reopened = f.make(); await reopened.start()
+  expect(reopened.sideChatSelection()).toEqual({ executablePath: f.discovery.executable.path, codexHome: process.env.CODEX_HOME ?? join(homedir(), ".codex") })
+})
 
 it("separates Windows Desktop connection from optional CLI Hook preparation", async () => {
   const f = await fixture(false, "win32")

@@ -13,6 +13,11 @@ are shared across all three consumers. npm JS/cmd/PowerShell wrappers are resolv
 to the native payload without being executed. Windows PATH discovery checks native
 and npm wrapper names; standard npm locations remain available for GUI launches.
 
+The resolved default executable/Home are also passed to usage and side chat when
+the saved picker values are null. They are not persisted as an explicit choice.
+Each consumer still performs its own runtime verification; an installed CLI no
+longer appears missing merely because the user did not choose the default Home.
+
 ## Verification before enabling a Hook plan
 
 1. Resolve and check the installed native file. Reuse a reviewed official digest,
