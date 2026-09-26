@@ -54,3 +54,18 @@ with no test-only runtime flag in production. It also covers integrity failure,
 incompatible schemas, missing/disabled features, version mismatch and cancellation.
 Actual 0.154.0 macOS and Windows embedded schema checks are recorded separately in
 local candidate evidence. No real-account model calls are needed for these checks.
+
+## Windows commit verification
+
+Native Settings apply exposed a second issue after version admission succeeded:
+Node directory fsync returned EPERM after hooks.json had already been renamed and
+read back correctly. The transaction incorrectly returned committed-conflict and
+left its receipt prepared. Directory metadata sync now runs only on POSIX; Windows
+retains regular-file flush before rename, canonical directory identity checks,
+post-rename content/hash readback and applied/aborted receipt verification. The
+unsupported directory operation is not evidence of a conflicting writer. This
+does not claim POSIX directory-fsync crash durability on Windows. Real mismatches
+still return committed-conflict and never roll back another writer's changes.
+
+Cross-platform filesystem regressions run install/uninstall, receipt retirement
+after a pre-commit abort, and a real post-rename conflict without platform skips.
