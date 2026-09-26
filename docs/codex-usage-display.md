@@ -24,7 +24,7 @@ side chat OFF and when `ordinaryUsageAllowed` is false. It does not call
 create/resume/fork conversations, run turns, reset limits or buy credits.
 
 Each read creates a short-lived, owned official app-server, using the existing
-native binary/hash allowlist, environment and same-home restricted launch profile.
+official native-byte verification, environment and same-home restricted launch profile.
 Configuration preflight rejects forced login rules, managed/unknown startup layers
 and endpoint overrides, and disables configured MCP servers. Server requests are
 rejected. The only requests are `initialize`, `configRequirements/read`,
@@ -39,17 +39,30 @@ new reader does not parse auth.json or keyring data. The saved integration home,
 not a selected task's history source home or side-chat-only CLI preference, is
 used. Remote host credentials are not fetched.
 
-The admitted runtime registry currently lists official 0.154.0 for macOS arm64
-and Windows x64. The installed macOS runtime's generated experimental TypeScript
-schema was checked for `supportsLunaReserve:false` and
-`excludeResetCreditDetails:true`. No older runtime is currently admitted, so there
-is deliberately **no empty-params retry**. Numeric `-32601`/`-32602` RPC errors
-produce an unsupported state, and other errors never trigger compatibility retries.
-The JSONL client preserves only a numeric RPC code, not the upstream message/data.
+The minimum CLI version is **0.154.0**, with no fixed upper-version allowlist for
+official npm native installations on macOS arm64 and Windows x64. Existing reviewed
+0.154.0 hashes remain an offline fast path. A new package version requires a first
+connection download from fixed `registry.npmjs.org/@openai/codex` endpoints. The
+complete npm archive integrity and installed native file hash/size must match;
+local package metadata alone never authorizes execution. Data is streamed for
+comparison, not installed, extracted or executed. Results are cached in memory
+for this app process; a restart can require verification again. Unknown standalone
+layouts lack a version hint and remain unsupported; use the official npm install.
+
+The generated 0.154.0 metadata schema was checked for `supportsLunaReserve:false`
+and `excludeResetCreditDetails:true`. Newer versions must satisfy the same effective
+configuration and RPC contracts. There is deliberately **no empty-params retry**.
+Numeric `-32601`/`-32602` errors produce an unsupported state; other errors never
+trigger weaker compatibility retries. Only the safe numeric RPC code is retained.
+No claim is made that every future upstream API has already been tested.
 
 Native admission is cached by resolved executable identity (device, inode, size,
 mtime, ctime, mode and owner). Every read re-resolves the selected path and checks
-its identity. Replacement requires hash admission again; polling never scans PATH.
+its identity. Replacement requires official-byte admission again; polling never
+scans PATH. Unknown-version verification is cancellable and bounded to 120 seconds,
+then the existing 25-second metadata-read deadline starts. A missing network or
+failed official byte comparison prevents the new executable from running.
+
 Owned processes stop and temporary directories are removed on success, errors,
 timeouts and cancellation. Existing Codex processes are never targeted.
 
@@ -60,6 +73,11 @@ timeouts and cancellation. Existing Codex processes are never targeted.
   `codex` only. Other/model/reserve/credit buckets are never mixed into it.
 - Classify windows by 300/10080 minutes, not primary/secondary position. Missing,
   unknown or duplicate durations leave the affected slot unavailable.
+- When one window is supplied, display only that window in the footer, tooltip
+  and accessibility description. Weekly-only accounts therefore have no `5h —`
+  placeholder. This follows response data, not a guessed subscription tier. A
+  genuine 0% is still shown; when neither window is supplied, keep the unavailable
+  placeholders and connection/status explanation.
 - Accept finite nonnegative percentages up to `Number.MAX_SAFE_INTEGER`. Preserve
   values above 100, round only for display, and clamp remaining to zero. Neither
   rounding 99.6 to 100 nor an elapsed reset determines execution permission.
@@ -78,7 +96,7 @@ timeouts and cancellation. Existing Codex processes are never targeted.
 
 These intervals are product policy, not OpenAI guarantees: 60-second visible
 polling, 15-second manual cooldown with single-flight, 10-second RPC timeout,
-25-second read deadline, failure backoff 60/120/240/300 seconds with ±5% jitter.
+25-second read deadline after runtime verification, failure backoff 60/120/240/300 seconds with ±5% jitter.
 Successful values become stale at 180 seconds and disappear at ten minutes. Reset
 boundaries update freshness locally; reads remain limited by the existing schedule.
 Visible entry/resume reuses values younger than 60 seconds; stale values are aged

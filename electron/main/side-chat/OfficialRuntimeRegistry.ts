@@ -1,5 +1,5 @@
-/** Reviewed release artifacts, never fetched or extended at runtime. An unknown
- * version is discoverable but cannot start a companion process. */
+/** Reviewed release artifacts: an offline fast path, not a version allowlist.
+ * Other versions require independent official npm archive integrity/byte checks. */
 export const OFFICIAL_RUNTIME_REGISTRY = [{
   version: "0.154.0", platform: "darwin", arch: "arm64", kind: "official",
   executableSha256: "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc",

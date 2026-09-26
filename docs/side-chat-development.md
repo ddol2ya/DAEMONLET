@@ -15,12 +15,22 @@ background task-list changes; the user can select another task explicitly.
 
 `SideChatDiscovery` reuses standard CLI locations, inspects bounded PATH candidates
 without a shell, and resolves npm wrappers without running them. Unknown binaries
-are not executed. `OfficialRuntimeRegistry` pins reviewed bytes and provenance;
+are not executed. `OfficialRuntimeRegistry` retains reviewed bytes as an offline
+fast path. Other installed official npm native packages at **0.154.0 or newer**
+are verified by `OfficialRuntimeVerification`: local package metadata is only a
+version hint, and fixed HTTPS npm metadata plus the complete archive SHA-512 and
+exact native payload SHA-256/size must agree before launch. Downloads stream into
+hashes, never filesystem extraction, installation or execution. Redirects, foreign
+URLs, duplicate/link payloads, invalid archives and mismatched bytes fail closed.
+The process-local cache holds at most 16 verified release records; no editable disk
+cache authorizes execution. Initial verification is bounded to 120 seconds and
+cancellable, with 512 MiB compressed and 1 GiB expanded limits.
+
 `SideChatModelPolicy` pins reviewed models and reasoning. Provenance, effective
 permission compatibility and account/model readiness are distinct gates. Discovery
 is not proof of authentication, a successful fork or a model answer.
 
-Windows uses the same pinned native 0.154.0 path, with POSIX mode-bit checks
+Windows uses the same official native-byte admission policy, with POSIX mode-bit checks
 limited to POSIX. Native hashes and file identity still gate launch. System policy
 is read from `%ProgramData%\OpenAI\Codex`; the child retains the same system
 and credential-store locations through a small environment allowlist, without
@@ -88,13 +98,19 @@ launcher rejects production packages and all old live-account options. Real
 production candidates must be driven through normal external UI. No environment
 variable authorizes model calls; each live review needs a new explicit budget.
 
-Before extending the registry, review official release provenance and the exact
-schema for fork boundaries, readonly turns, account binding and notifications.
-Run the real CLI/fixture matrix including startup effects, concurrency, history
-formats, tool denials and process cleanup. Test actual OS discovery, ACL/link
-semantics, credential stores, installation/upgrade/uninstall and packaging. Do not
-admit an open-ended version range, remotely update this registry, or silently
-replace a selected binary. A prior version remains unsupported until tested.
+The minimum-version policy is intentionally open-ended, as requested for newer
+official npm CLIs. Version labels alone never grant trust. The built-in 0.154.0
+hashes also support standalone copies; other standalone layouts without npm
+package metadata fail closed (select the official npm installation instead).
+The architecture scope remains macOS arm64 and Windows x64. Effective permission,
+account identity, model and parent contracts are still checked at connection/turn
+boundaries. Missing methods or incompatible parameters do not fall back to weaker
+policies. This does not assert that every future upstream API is compatible.
+
+Before claiming a newer CLI has been end-to-end tested, run the real CLI/fixture
+matrix including startup effects, concurrency, history formats, tool denials and
+process cleanup. Record actual OS discovery, credential-store and packaging
+coverage separately. Never silently replace a selected binary or downgrade it.
 
 Report synthetic tests, actual-parent preparation, file reads, account answers and
 native HTTP activity separately. UI clicks, accepted submissions and native model

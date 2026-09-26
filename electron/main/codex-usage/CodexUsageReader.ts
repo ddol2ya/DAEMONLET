@@ -8,13 +8,14 @@ import { launchOfficialSameHomeProcess } from "../side-chat/OfficialSameHomeLaun
 import { assertOfficialConfiguration, inspectOfficialStartup } from "../side-chat/SideChatPermissionPolicy"
 import { normalizeCodexUsage, record, type NormalizedUsage } from "./normalizeCodexUsage"
 import type { CodexUsageReason } from "../../shared/codex-usage-contract"
+import { RUNTIME_VERIFICATION_TIMEOUT_MS } from "../side-chat/OfficialRuntimeVerification"
 export type UsageProvider = { executablePath: string | null; codexHome: string | null }
 export type UsageRead = { value: NormalizedUsage; scope: string | null } | { reason: CodexUsageReason }
 export const USAGE_RPC_TIMEOUT_MS = 10_000, USAGE_DEADLINE_MS = 25_000
 export type UsageReader = (provider: UsageProvider, signal: AbortSignal) => Promise<UsageRead>
 const fingerprint = async (path: string) => { const s = await lstat(path); return [s.dev, s.ino, s.size, s.mtimeMs, s.ctimeMs, s.mode, s.uid].join(":") }
 /** Main-only admission cache. Re-resolve the selected path and check native file
- * identity on every read; changed files must pass the existing hash allowlist. */
+ * identity on every read; changed files must pass official byte verification. */
 export function createCodexUsageReader(): UsageReader {
   let cached: { selected: string; executable: string; fingerprint: string } | null = null
   return async (provider, externalSignal) => {
@@ -24,7 +25,9 @@ export function createCodexUsageReader(): UsageReader {
     const abort = () => { controller.abort(); void connection?.stop() }
     externalSignal.addEventListener("abort", abort, { once: true })
     if (externalSignal.aborted) abort()
-    const timer = setTimeout(abort, USAGE_DEADLINE_MS)
+    // A new npm version may need its official archive checked once. Metadata
+    // RPCs retain their existing deadline after runtime admission completes.
+    let timer = setTimeout(abort, RUNTIME_VERIFICATION_TIMEOUT_MS)
     const check = () => signal.throwIfAborted()
     try {
       check()
@@ -32,10 +35,11 @@ export function createCodexUsageReader(): UsageReader {
       const selected = await resolveNativeCandidate(provider.executablePath); check()
       const before = await fingerprint(selected); check()
       if (!cached || cached.selected !== selected || cached.fingerprint !== before) {
-        const checked = await inspectSideChatRuntime(provider.executablePath); check()
+        const checked = await inspectSideChatRuntime(provider.executablePath, signal); check()
         if (await fingerprint(checked.executable) !== before) throw Error("CHAT_RUNTIME_UNSUPPORTED")
         cached = { selected, executable: checked.executable, fingerprint: before }
       }
+      clearTimeout(timer); timer = setTimeout(abort, USAGE_DEADLINE_MS)
       const startup = await inspectOfficialStartup(provider.codexHome); check()
       root = await mkdtemp(join(tmpdir(), "daemonlet-usage-")); check()
       connection = await launchOfficialSameHomeProcess({ executable: cached.executable, codexHome: provider.codexHome, osHome: homedir(), root, disabledMcpServers: startup.disabledMcpServers }); check()
@@ -52,7 +56,8 @@ export function createCodexUsageReader(): UsageReader {
       const account = record(accountResponse.account)
       if (account?.type === "apiKey") return { reason: "api-key-account" }
       if (account?.type !== "chatgpt") return { reason: "unsupported-account" }
-      // All admitted runtimes support these options. No unverified legacy retry.
+      // Require this metadata contract; incompatible newer versions fail closed.
+      // Never retry with weaker options or initiate a model request.
       const raw = await request("account/rateLimits/read", { supportsLunaReserve: false, excludeResetCreditDetails: true }); check()
       const value = normalizeCodexUsage(raw)
       if (!value) return { reason: "invalid-response" }

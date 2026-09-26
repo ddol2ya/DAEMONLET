@@ -44,6 +44,18 @@ describe("Codex account quota normalization", () => {
     expect(en.description).toContain("24% used"); expect(en.description).toContain("76% remaining"); expect(en.description).toContain("125% used"); expect(en.description).toContain("0% remaining"); expect(en.limited).toBe("Usage restricted")
     expect(ko.description).toContain("24% 사용"); expect(ko.description).toContain("76% 남음")
   })
+  it.each(["ko", "en"] as const)("shows only supplied quota windows in %s, including a real zero", language => {
+    const t = createTranslator(language)
+    const view = (primary: unknown, secondary: unknown = null) => usagePresentation({ ...emptyCodexUsage(), ...parse(primary, secondary), state: "ready", enabled: true }, t)
+    const weekly = view(w(10080, 0))
+    expect(weekly.windows).toHaveLength(1)
+    expect(weekly.windows[0].text).toBe(language === "ko" ? "주간 0% 사용" : "Weekly 0% used")
+    expect(weekly.description).not.toMatch(/5시간|5h/)
+    expect(view(w(300)).windows).toHaveLength(1)
+    expect(view(w(300), w(10080)).windows).toHaveLength(2)
+    expect(view(null).windows).toHaveLength(2)
+    expect(view(null).windows.every(window => window.text.endsWith("—"))).toBe(true)
+  })
   it("drops late initial revisions and strictly validates/migrates the boolean setting", () => {
     expect(newerCodexUsage({ ...emptyCodexUsage(), revision: 9 }, { ...emptyCodexUsage(), revision: 1 }).revision).toBe(9)
     expect(defaultDesktopSettings().codexUsageEnabled).toBe(true)

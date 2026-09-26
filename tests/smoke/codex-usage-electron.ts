@@ -77,7 +77,18 @@ async function main() {
     assert(JSON.stringify(win.getBounds()) === JSON.stringify(bounds), "pointer press retains native bounds")
     wc.sendInputEvent({ type: "mouseUp", button: "left", clickCount: 1, ...point }); await wait(60)
     await js('document.querySelector(".bubble-menu").open=false; document.activeElement?.blur()')
-    await until('document.querySelector(".codex-usage").textContent.includes("5시간 —")'); await capture("partial")
+    await until('document.querySelectorAll(".codex-usage-windows span").length === 1 && document.querySelector(".codex-usage-windows").textContent.includes("주간")')
+    assert(await js('!document.querySelector(".codex-usage").getAttribute("title").includes("5시간")'), "weekly-only hides missing five-hour window and tooltip")
+    await capture("weekly-only")
+    for (const language of ["ko", "en"] as const) {
+      setAppLanguage(language); await wait(100)
+      for (const zoom of [1, 1.25, 1.5, 2]) {
+        wc.setZoomFactor(zoom); bubbles.sync(); await wait(200)
+        assert(await js('(()=>{const e=document.querySelector(".codex-usage"),r=e.getBoundingClientRect();return e.querySelectorAll(".codex-usage-windows span").length===1 && r.right<=innerWidth && r.bottom<=innerHeight && !/5시간|5h/.test(e.getAttribute("title"))})()'), `weekly-only fits ${language} ${zoom}`)
+        await capture(`weekly-only-${language}-${zoom}`)
+      }
+    }
+    wc.setZoomFactor(1); setAppLanguage("ko"); await wait(100)
     result = { value: { ...normal, ordinaryUsageAllowed: false }, scope: "synthetic" }; now += 16000; await service.refresh()
     await until('document.querySelector(".codex-usage").textContent.includes("사용 제한")'); await capture("restricted")
     let release!: () => void; gate = new Promise<void>(resolve => { release = resolve; releaseGate = resolve })
@@ -90,7 +101,7 @@ async function main() {
     assert(win.getBounds().width === 64, "compact width unchanged"); await capture("collapsed")
     bubbles.setView("control", false); await wait(60); const before = calls; now += 60000; await service.refresh(); assert(calls === before, "control pauses reads")
     bubbles.setView("activity", false); bubbles.setLocalChatVisible(true); await wait(60); assert(!win.isVisible(), "local chat hides activity")
-    report.status = "PASS"; report.fixtureReads = calls; report.checks = ["normal", "partial", "restricted", "stale", "signed-out", "ko/en zoom 100/125/150/200", "fallback measured height", "input lock", "collapsed", "control pause", "local chat hiding", "task selection preserved"]
+    report.status = "PASS"; report.fixtureReads = calls; report.checks = ["normal", "weekly-only", "restricted", "stale", "signed-out", "ko/en normal and weekly-only zoom 100/125/150/200", "fallback measured height", "input lock", "collapsed", "control pause", "local chat hiding", "task selection preserved"]
   } catch (error) { report.error = String(error); console.error(report.error) }
   finally { releaseGate(); off(); usageIpc.dispose(); bubbleIpc.dispose(); await service.dispose(); bubbles.destroy(); pet.destroy(); await writeFile(join(output, "result.json"), JSON.stringify(report, null, 2)); app.exit(report.status === "PASS" ? 0 : 1) }
 }

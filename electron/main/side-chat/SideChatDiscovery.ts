@@ -5,6 +5,7 @@ import { basename, delimiter, dirname, isAbsolute, join, win32 } from "node:path
 import { homedir } from "node:os"
 import { standardCodexExecutables } from "../../../adapter/codex/doctor/HookSetupDoctor"
 import { OFFICIAL_RUNTIME_REGISTRY, findOfficialRuntime } from "./OfficialRuntimeRegistry"
+import { RUNTIME_VERIFICATION_TIMEOUT_MS, verifyInstalledOfficialRuntime } from "./OfficialRuntimeVerification"
 
 export function sideChatCandidates(selected?: string | null, env = process.env, home = homedir(), platform = process.platform) {
   if (selected) return [selected]
@@ -22,7 +23,8 @@ export function sideChatCandidates(selected?: string | null, env = process.env, 
 }
 
 /** Resolves only known package layouts. Shell/JS/PowerShell shims are never run.
- * The native payload must independently match a reviewed hash. */
+ * The native payload must match reviewed bytes or an integrity-checked official
+ * npm archive. Neither the wrapper nor an unverified native binary is executed. */
 export async function resolveNativeCandidate(candidate: string, platform = process.platform, arch = process.arch) {
   if (!isAbsolute(candidate) || /[\0\r\n]/.test(candidate)) throw Error("CHAT_RUNTIME_UNSUPPORTED")
   const resolved = await realpath(candidate)
@@ -37,11 +39,14 @@ export async function resolveNativeCandidate(candidate: string, platform = proce
   return resolved
 }
 
-export async function inspectSideChatRuntime(selected?: string | null) {
+export async function inspectSideChatRuntime(selected?: string | null, signal?: AbortSignal) {
   if (!OFFICIAL_RUNTIME_REGISTRY.some(item => item.platform === process.platform && item.arch === process.arch)) throw Error("CHAT_PLATFORM_UNVERIFIED")
+  const deadline = AbortSignal.timeout(RUNTIME_VERIFICATION_TIMEOUT_MS)
+  const bounded = signal ? AbortSignal.any([signal, deadline]) : deadline
   let found = false
   const seen = new Set<string>()
   for (const candidate of sideChatCandidates(selected)) {
+    bounded.throwIfAborted()
     try {
       const executable = await resolveNativeCandidate(candidate)
       if (seen.has(executable)) continue
@@ -50,13 +55,16 @@ export async function inspectSideChatRuntime(selected?: string | null) {
       if (!before.isFile() || before.size > 350 * 1024 * 1024 || process.platform !== "win32" && (![0, process.getuid?.()].includes(before.uid) || Boolean(before.mode & 0o022))) continue
       await access(executable, constants.X_OK)
       const hash = createHash("sha256")
-      for await (const chunk of createReadStream(executable)) hash.update(chunk)
+      for await (const chunk of createReadStream(executable, { signal: bounded })) hash.update(chunk)
       const after = await lstat(executable)
       if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) continue
       const digest = hash.digest("hex")
-      const runtime = findOfficialRuntime(digest, before.size)
+      const runtime = findOfficialRuntime(digest, before.size) ?? await verifyInstalledOfficialRuntime(executable, digest, before.size, bounded)
+      const checked = await lstat(executable)
+      if (before.dev !== checked.dev || before.ino !== checked.ino || before.size !== checked.size || before.mtimeMs !== checked.mtimeMs || before.ctimeMs !== checked.ctimeMs || before.mode !== checked.mode || before.uid !== checked.uid) continue
       if (runtime) return { executable, runtime }
     } catch { /* Inspect the next bounded candidate, never execute an unknown file. */ }
   }
+  bounded.throwIfAborted()
   throw Error(found ? "CHAT_RUNTIME_UNSUPPORTED" : "CHAT_RUNTIME_MISSING")
 }

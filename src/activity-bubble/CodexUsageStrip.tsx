@@ -16,7 +16,10 @@ export function usagePresentation(snapshot: CodexUsageSnapshot, t: Translator) {
     const details = w ? [text, t`${Math.round(Math.max(0, 100 - w.usedPercent))}% 남음`, w.resetsAtMs === null ? t("초기화 시각 미제공") : t`다음 초기화: ${date(w.resetsAtMs)}`, freshness] : [t`${title} 정보 미제공`]
     return { text, freshness, description: [...details, observed, scope].filter(Boolean).join(" · ") }
   }
-  const windows = [window("5시간", snapshot.fiveHour), window("주간", snapshot.weekly)]
+  const available: [string, CodexQuotaWindow | null][] = [["5시간", snapshot.fiveHour], ["주간", snapshot.weekly]]
+  // Some plans provide only one quota window. Do not render a missing one next
+  // to real data; retain placeholders when neither window is available.
+  const windows = available.filter(([, value]) => value !== null || !snapshot.fiveHour && !snapshot.weekly).map(([label, value]) => window(label, value))
   const limited = snapshot.ordinaryUsageAllowed === false ? t("사용 제한") : ""
   return { windows, status, limited, description: [t("Codex 사용량"), status, limited, ...windows.map(w => w.description)].filter(Boolean).join(" · ") }
 }
