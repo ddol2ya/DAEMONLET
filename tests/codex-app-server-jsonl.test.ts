@@ -1,6 +1,6 @@
 import { PassThrough, Writable } from "node:stream"
 import { describe, expect, it, vi } from "vitest"
-import { AppServerJsonlClient } from "../adapter/codex/app-server/AppServerJsonlClient.ts"
+import { AppServerJsonlClient, AppServerRpcError } from "../adapter/codex/app-server/AppServerJsonlClient.ts"
 
 const setup = (timeout = 100) => {
   const readable = new PassThrough()
@@ -64,4 +64,18 @@ it("rejects a failed transport write without leaving an orphaned response reject
   await expect(client.request("turn/interrupt", { threadId: "safe", turnId: "exact" })).rejects.toThrow("broken pipe")
   expect(client.pendingRequestCount).toBe(0)
   client.close()
+})
+
+it("preserves only numeric RPC codes and releases transport listeners", async () => {
+  const { client, readable, writable } = setup()
+  const pending = client.request("account/rateLimits/read")
+  const outgoing = await new Promise<string>(resolve => writable.once("data", data => resolve(data.toString())))
+  const id = JSON.parse(outgoing).id
+  readable.write(JSON.stringify({ id, error: { code: -32602, message: "private-token", data: { path: "/private/account" } } }) + "\n")
+  const error = await pending.catch(e => e)
+  expect(error).toBeInstanceOf(AppServerRpcError); if (!(error instanceof AppServerRpcError)) throw Error("missing safe RPC error")
+  expect(error.code).toBe(-32602)
+  expect(error.message).toBe("app-server request failed"); expect(JSON.stringify(error)).not.toMatch(/private/)
+  client.close(); expect(readable.listenerCount("data")).toBe(0); expect(readable.listenerCount("end")).toBe(0)
+  expect(writable.listenerCount("drain")).toBe(0)
 })

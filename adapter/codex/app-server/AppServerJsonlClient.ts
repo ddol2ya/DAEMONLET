@@ -11,6 +11,10 @@ export type JsonlClientOptions = {
   maxLineBytes?: number
 }
 
+export class AppServerRpcError extends Error {
+  constructor(readonly code: number | null) { super("app-server request failed") }
+}
+
 export class AppServerJsonlClient {
   private readonly options: JsonlClientOptions
   private readonly events = new EventEmitter()
@@ -18,16 +22,20 @@ export class AppServerJsonlClient {
   private nextId = 1
   private buffer = Buffer.alloc(0)
   private closed = false
+  private readonly writeAbort = new AbortController()
+  private readonly onData = (chunk: Buffer | string) => this.pushChunk(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  private readonly onEnd = () => this.close(new Error("app-server stdout ended"))
+  private readonly onStreamError = (error: Error) => this.close(error)
   lastError: string | null = null
   lastNotification: string | null = null
   handshakeState: "NEW" | "INITIALIZING" | "READY" | "CLOSED" = "NEW"
 
   constructor(options: JsonlClientOptions) {
     this.options = options
-    options.readable.on("data", (chunk: Buffer | string) => this.pushChunk(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
-    options.readable.once("end", () => this.close(new Error("app-server stdout ended")))
-    options.readable.once("error", (error) => this.close(error))
-    options.writable.once("error", (error) => this.close(error))
+    options.readable.on("data", this.onData)
+    options.readable.once("end", this.onEnd)
+    options.readable.once("error", this.onStreamError)
+    options.writable.once("error", this.onStreamError)
   }
 
   get pendingRequestCount(): number { return this.pending.size }
@@ -93,7 +101,7 @@ export class AppServerJsonlClient {
       if (!pending) return
       clearTimeout(pending.timer)
       this.pending.delete(message.id)
-      if (Object.hasOwn(message, "error")) pending.reject(new Error("app-server request failed"))
+      if (Object.hasOwn(message, "error")) pending.reject(new AppServerRpcError(typeof (message.error as JsonObject)?.code === "number" && Number.isSafeInteger((message.error as JsonObject).code) ? (message.error as JsonObject).code as number : null))
       else pending.resolve(message.result)
       return
     }
@@ -110,7 +118,7 @@ export class AppServerJsonlClient {
   private async write(message: JsonObject): Promise<void> {
     if (this.closed) throw new Error("app-server client is closed")
     const line = `${JSON.stringify(message)}\n`
-    if (!this.options.writable.write(line, "utf8")) await once(this.options.writable, "drain")
+    if (!this.options.writable.write(line, "utf8")) await once(this.options.writable, "drain", { signal: this.writeAbort.signal })
   }
 
   async notify(method: string, params?: unknown): Promise<void> {
@@ -140,7 +148,7 @@ export class AppServerJsonlClient {
     return result
   }
 
-  async initialize(clientInfo: { name: string; title: string; version: string }, profile: "observer" | "side-chat" = "observer"): Promise<unknown> {
+  async initialize(clientInfo: { name: string; title: string; version: string }, profile: "observer" | "side-chat" = "observer", timeoutMs?: number): Promise<unknown> {
     if (this.handshakeState !== "NEW") throw new Error("app-server client was already initialized")
     this.handshakeState = "INITIALIZING"
     const result = await this.request("initialize", {
@@ -158,7 +166,7 @@ export class AppServerJsonlClient {
           "item/plan/delta",
         ],
       },
-    })
+    }, timeoutMs)
     await this.notify("initialized")
     this.handshakeState = "READY"
     return result
@@ -167,6 +175,12 @@ export class AppServerJsonlClient {
   close(reason = new Error("app-server client closed")): void {
     if (this.closed) return
     this.closed = true
+    this.writeAbort.abort()
+    this.options.readable.removeListener("data", this.onData)
+    this.options.readable.removeListener("end", this.onEnd)
+    this.options.readable.removeListener("error", this.onStreamError)
+    this.options.writable.removeListener("error", this.onStreamError)
+    this.buffer = Buffer.alloc(0)
     this.handshakeState = "CLOSED"
     for (const pending of this.pending.values()) {
       clearTimeout(pending.timer)
