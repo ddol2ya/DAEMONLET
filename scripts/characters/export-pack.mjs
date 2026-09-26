@@ -53,14 +53,15 @@ try {
     }
     const behavior = character.behavior ? tools.parseBehaviorManifest(JSON.parse(await tools.boundedFile(stage,
       tools.resolvePackReference(character.behavior, 'character.json', new Set(files.map(f => f.path)))))).value : undefined
+    const needsExtendedPoses = character.poses.length > tools.PACK_LIMITS.legacyVariantPoses
     const needsVariants = character.poses.length > tools.PACK_LIMITS.poses || behavior && tools.behaviorUsesPoseVariants(behavior)
     const dialogue = character.dialogue ? tools.parseDialogueManifest(JSON.parse(await tools.boundedFile(stage,
       tools.resolvePackReference(character.dialogue, 'character.json', new Set(files.map(f => f.path)))))) : undefined
     const update = values['repo-id'] || values['manifest-path'] ? tools.parseUpdateSource({ schemaVersion: 1, provider: 'huggingface', repoType: 'dataset', repoId: values['repo-id'], manifestPath: values['manifest-path'] }) : preserved.update
     const runtime = preserved.runtime
-      ? { ...preserved.runtime, capabilities: [...new Set([...preserved.runtime.capabilities, ...(character.persona ? ['side-chat-persona-v1'] : []), ...(character.chat ? ['character-chat-v1'] : []), ...(update ? ['hf-pack-updates-v1'] : [])])] }
+      ? { ...preserved.runtime, capabilities: [...new Set([...preserved.runtime.capabilities, ...(character.persona ? ['side-chat-persona-v1'] : []), ...(character.chat ? ['character-chat-v1'] : []), ...(update ? ['hf-pack-updates-v1'] : []), ...(needsVariants ? ['pose-variants'] : []), ...(needsExtendedPoses ? ['extended-pose-library-v1'] : [])])] }
       : { ...tools.PACK_RUNTIME, capabilities: tools.PACK_RUNTIME.capabilities.filter(c =>
-        (c !== 'character-chat-v1' || Boolean(character.chat)) && (c !== 'hf-pack-updates-v1' || Boolean(update)) && (c !== 'side-chat-persona-v1' || Boolean(character.persona)) && (c !== 'pose-variants' || needsVariants) && (c !== 'pose-dialogue' || dialogue?.poseLines)) }
+        (c !== 'extended-pose-library-v1' || needsExtendedPoses) && (c !== 'character-chat-v1' || Boolean(character.chat)) && (c !== 'hf-pack-updates-v1' || Boolean(update)) && (c !== 'side-chat-persona-v1' || Boolean(character.persona)) && (c !== 'pose-variants' || needsVariants) && (c !== 'pose-dialogue' || dialogue?.poseLines)) }
     let provenance = {}
     try { provenance = JSON.parse(await readFile(join(stage, 'provenance.json'), 'utf8')) } catch { /* Optional. */ }
     const manifest = { ...preserved, packFormatVersion: 1, id: character.id, name: character.label, version: values.version, entry: 'character.json', runtime, files, ...(update ? { update } : {}),

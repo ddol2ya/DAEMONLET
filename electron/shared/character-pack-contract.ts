@@ -1,12 +1,12 @@
 import type { PackUpdateSource } from "./pack-update-contract"
 /** Application-owned data contract, not a third-party model format. */
-export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1", "hf-pack-updates-v1", "character-chat-v1"] } as const
+export const PACK_RUNTIME = { engine: "anime25d", assetApiVersion: 1, capabilities: ["independent-model", "semantic-layer-swap", "local-eye-blink", "mouth-morph", "head-follow", "pose-variants", "pose-dialogue", "side-chat-persona-v1", "hf-pack-updates-v1", "character-chat-v1", "extended-pose-library-v1"] } as const
 export const PACK_LIMITS = {
   archiveBytes: 256 * 1024 * 1024, payloadBytes: 384 * 1024 * 1024,
-  fileBytes: 32 * 1024 * 1024, jsonBytes: 2 * 1024 * 1024, files: 256,
+  fileBytes: 32 * 1024 * 1024, jsonBytes: 2 * 1024 * 1024, files: 512,
   pathBytes: 180, pathDepth: 8, jsonDepth: 16, jsonNodes: 60_000, arrayLength: 2048,
   canvasSide: 2048, layerCount: 96, layerPixels: 8_000_000, rigPixels: 12_000_000,
-  poses: 16, variantPoses: 32, meshVertices: 65_535, storageBytes: 2 * 1024 * 1024 * 1024,
+  poses: 16, legacyVariantPoses: 32, variantPoses: 64, meshVertices: 65_535, storageBytes: 2 * 1024 * 1024 * 1024,
   workerTimeoutMs: 120_000, workerHeapMb: 384, transactionMs: 10 * 60_000,
 } as const
 

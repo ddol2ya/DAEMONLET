@@ -64,7 +64,10 @@ poses/head-tap/...
 ```
 
 이 기능을 쓰거나 16개를 넘는 포즈를 담는 팩은 `pose-variants`를 선언해야 한다.
-기능을 선언한 팩은 최대 32포즈를 담을 수 있다. 0.4.x 앱은 새 capability를 설치 전에
+`pose-variants`만 선언한 팩은 최대 32포즈를 담을 수 있다.
+33–64포즈는 `pose-variants`와 `extended-pose-library-v1`을 함께 선언한다.
+새 capability를 모르는 앱은 설치 전에 호환성 오류를 표시한다.
+압축·해제 용량과 개별 리그 제한은 그대로 적용한다. 0.4.x 앱은 새 capability를 설치 전에
 거부하므로 앱을 먼저 업데이트한다. export 명령은 필요한 팩에만 이 capability를 추가하여
 기존 팩의 호환성을 유지한다. 모든 추가 pose ID도 실제 팩에 있어야 한다.
 
@@ -108,13 +111,13 @@ manifest의 상대 참조는 **참조하는 파일 기준**이다. `../`는 해�
 | --- | --- |
 | 압축 파일 / 해제 payload | 256 MiB / 384 MiB |
 | 개별 파일 / JSON | 32 MiB / 2 MiB |
-| payload 파일 / ZIP entry (디렉터리 포함) | 256 / 512 |
+| payload 파일 / ZIP entry (디렉터리 포함) | 512 / 1,024 |
 | 경로 UTF-8 길이 / 깊이 | 180바이트 / 8 |
 | JSON 깊이 / 방문 노드 / 배열 길이 | 16 / 60,000 / 2,048 |
 | canvas 및 이미지 한 변 | 2,048px |
 | PSD layer 수 / 레이어 직사각형 픽셀 합 | 96 / 8,000,000 |
 | 파생 rig 레이어 픽셀 합 | 12,000,000 |
-| 포즈 / 설치 캐릭터 / 캐릭터별 보존 revision | 기본 16, `pose-variants` 32 / 32 / 32 |
+| 포즈 / 설치 캐릭터 / 캐릭터별 보존 revision | 기본 16, `pose-variants` 32, `extended-pose-library-v1` 64 / 32 / 32 |
 | 메시 정점 / 한 rig의 합계 정점 | 65,535 / 300,000 |
 | 사용자 팩 저장 공간 | 2 GiB (보존 revision 포함) |
 | Worker JS heap / 검증 시간 / 확인 유효 시간 | 384 MiB / 120초 / 10분 |
