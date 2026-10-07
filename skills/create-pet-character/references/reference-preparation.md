@@ -21,6 +21,14 @@ Explain the needed edits in the user's language and use an available image-editi
 5. **Produce real transparency.** Save the selected standalone artwork as PNG with actual subject-shaped alpha. White or checkerboard pixels painted into an opaque image are not transparency. A generator's claim of a transparent background is insufficient; if alpha is absent, perform a supported background-removal/matting step and inspect the result. If that capability is unavailable, retain the candidate and report background removal as pending.
 6. **Preserve the original.** Write edits, reconstructed candidates and previews as separate versioned files in a new production run. Retain original images and selected revisions unchanged; record the source-to-edit relationship, changes, prompt and selected result. Keep private source paths and experiment artifacts out of Git and distributable packs.
 
+Carry the user's accepted design edits into every generated pose. For example, jewelry removed from the selected base should not reappear during pose generation. These are that character's choices, not default removals for later characters.
+
+## Source resolution and decomposition resolution
+
+Keep the original and any selected upscale as separate masters. Check face, linework and small outfit details at the intended display sizes before deciding whether an upscale improves the source. An upscale can also change those details; dimensions alone are not an acceptance criterion.
+
+Distinguish the uploaded image size from the working resolution used by the selected decomposition workflow. Inspect its actual resize path before estimating time or quality; a larger upload may still be processed at the configured layer resolution. Prepare a working copy at the supported production resolution, retain its scale transform for masks/geometry, and preserve the higher-resolution master. Do not increase layer/depth resolution or run another GPU job merely because an upscale exists. Follow the production setup and running-job rules when GPU processing is actually needed.
+
 ## Verify before expanding poses
 
 - Compare the source and cleaned candidate visually for face identity, outfit details, colors, hair silhouette, pose and expression. Show the candidate and summarize intentional changes and unresolved limitations; obtain the user's selection before using a newly prepared reference for pose expansion. Reuse an existing selection when no material change is needed.

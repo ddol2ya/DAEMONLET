@@ -1,6 +1,6 @@
 ---
 name: create-pet-character
-description: Create a Daemonlet character or poses as an external .petchar pack, or add/update the persona of an existing pack from supplied character sources while preserving artwork and rigs.
+description: Create a Daemonlet character or poses as an external .petchar pack, repair an existing pack's artwork or motion, or update its persona from supplied character sources.
 ---
 
 # Daemonlet character production
@@ -9,6 +9,7 @@ description: Create a Daemonlet character or poses as an external .petchar pack,
 
 - **Update source only:** Existing pack + confirmed public Hugging Face Dataset/feed location. Read [updates.md](references/updates.md), inspect the internal ID/version, and use `add-update-source` / `create-update-feed` / `publish-update-packs`. Preserve payload bytes and original packs; skip image, pose, persona and GPU questions. Recheck archive/install/distribution acceptance without claiming a new visual review.
 - **Persona only:** Existing pack + personality/source material, with no new artwork or poses. Read [persona.md](references/persona.md) and use `validate-persona` / `upgrade-persona`. Skip all image, framing, pose-count, ComfyUI, Python and GPU questions below. Preserve the original archive and every visual/rig/dialogue byte. Do not rerun the independent payload builder.
+- **Visual or motion repair:** Existing pack + a reported defect or motion reference. Read [visual-review.md](references/visual-review.md), and [motion-authoring.md](references/motion-authoring.md) for rig changes. Reuse the selected artwork, framing, pose counts and confirmed persona. Create a fresh candidate; change only the affected assets and verify preservation of the rest. A rig-only adjustment does not require image generation or GPU setup; use the setup workflow if new image production or decomposition becomes necessary. A shared defect requires checking every affected pose, not only the reported example.
 - **New character or poses:** Follow the production inputs below. Use the same confirmed personality for pose/reaction planning, fixed dialogue and `persona.json`; read [persona.md](references/persona.md) before packaging. New packs include a validated persona unless the user explicitly requests omission.
 
 Read [production.md](references/production.md) for executable commands and data contracts. Use `scripts/creator.mjs info` and `check` to locate and validate the supplied runtime. The source checkout and complete skill ZIP both include the required local tools; an instructions-only copy does not.
@@ -89,11 +90,11 @@ Match native layers and geometry to the source. Review eye/skin masks and hair s
 
 Before local joint motion, inspect the isolated moving layer. If it also contains parts that must stay attached elsewhere (for example shoulder/torso or hair baked into an arm), split and restore hidden paint, or remake the affected layer, before rigging. Require full attachment-boundary coverage and enlarged full-cycle inspection; a stable pivot and sufficient hand travel do not establish a connected shoulder. See [motion-authoring.md](references/motion-authoring.md) for the layer review and connection evidence contract.
 
-Default new production to visibly expressive, pose-specific motion at desktop size. Read [motion-authoring.md](references/motion-authoring.md): use preparation, action, small overshoot and settling; stagger head/body/free limbs and secondary hair/accessories. Fit pivots, influence and contact constraints to each illustration. Increase useful movement through rigging and timing, not a global amplitude multiplier. Respect a user request for restrained motion or the character's intended acting style.
+Default new production to visibly expressive, pose-specific motion at desktop size. Read [motion-authoring.md](references/motion-authoring.md): interpret supplied motion references, use joint rotation with stable local shape, coordinate the whole body, and distinguish breathing from delayed secondary motion. Fit pivots, influence and contact constraints to each illustration. Increase useful movement through rigging and timing, not a global amplitude multiplier. Respect a user request for restrained motion or the character's intended acting style.
 
 ## Validation and delivery
 
-Verify blink/mouth/smile at eleven intermediate values, combined gaze/head states, 320/460/1280px, pose transitions, interruptions/re-entry, hand contact, click and petting. Inspect captures; parser and unit-test success alone does not establish visual quality. Create pose-specific motion rather than the same arm sway everywhere.
+Verify every selected pose's two eyes and blink/mouth/smile at eleven intermediate values, combined gaze/head states, 320/460/1280px, pose transitions, interruptions/re-entry, hand contact, click and petting. Inspect hair gaps and layer transparency on light and dark backgrounds throughout motion. Inspect captures; parser and unit-test success alone does not establish visual quality. Create pose-specific motion rather than the same arm sway everywhere.
 
 Build a payload outside `public/characters`, export `.petchar`, and import through the app UI. Check selection, reactions and restart. Never overwrite frozen runs or mutate the built-in catalog to install a new character. Report the pack, unsupported reactions and the actual scope of visual/rights checks. Treat production as supervised and iterative, not guaranteed unattended completion.
 
