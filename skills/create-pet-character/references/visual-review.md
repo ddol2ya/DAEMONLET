@@ -19,6 +19,10 @@ Review the first agreed pose through source → layers → expressions → motio
 
 The eye triangle check at blink 30–70% detects mesh inversion; it does not prove a natural eyelid, intact eyelashes or a correctly masked iris. Likewise, exact source-vs-payload pixels prove packaging fidelity, not artwork quality. Capture folders are fresh and bound to a source fingerprint; source mutation during capture fails that run.
 
+Review both eyes of **every selected pose**, including alternate click/chat variants, against that pose's source. Look for eyelid folding, iris stretching/clipping, broken or doubled lashes, leftover brows and backing patches through intermediate blink plus gaze/head movement. A repaired neutral pose or a passing mesh check cannot stand in for the other illustrations. When changing a shared eye recipe, revisit the entire affected set after the pilot passes.
+
+Inspect alpha again after decomposition and layer repair: clean source transparency does not guarantee clean exported layers. Check crown/back hair, flyaways and enclosed gaps between locks on dark and light backgrounds, in neutral and when head/hair motion exposes them. Inspect isolated hair as well as the composite; background islands can hide behind another layer at rest. Distinguish pale highlights from background remnants by source comparison rather than a universal white-pixel threshold.
+
 ## Diagnose before another repair
 
 - Compare source, isolated part and rendered composite at the same coordinates. Determine whether the error is painted in the source, belongs to a mask, comes from alpha/color compositing, or appears only during deformation.
@@ -59,6 +63,8 @@ node <skill>/scripts/creator.mjs review --source <run>
 ```
 
 Renderer and behavior evidence must correspond to the bound archive's payload. `app` records actual packaged app/version, import, selection, observed interactions and quit/restart persistence; distinguish real UI coverage from automated input coverage. Coordinate-automation failures are not automatically application bugs. `rights` records sources and unresolved terms; a pass means the review was performed, never that permission was granted. It is valid to record unresolved rights explicitly without claiming distribution clearance.
+
+For a revision of an existing pack, target the user's actual app version and its supported rig capabilities, not only the development checkout. Preserve the pack ID and issue a new version. Compare the new payload with the previous frozen archive to confirm that unrelated artwork, persona, dialogue and routing stayed unchanged. Test update import and restart in an isolated profile when appropriate; identify that scope in delivery. A successful click on an apply button is not evidence that the active revision changed.
 
 Complete only when current pose checks and delivery checks pass and the archive is bound. Keep review data and private paths outside distributable packs. Report material visual limits rather than “flawless”. Use fresh delivery versions; never hand off a rejected candidate.
 
