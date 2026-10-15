@@ -379,7 +379,7 @@ class ManagedGpuGateTests(unittest.TestCase):
             result=managed.verify_gpu_support(self.admitted)
             loader.assert_called_once_with(str(self.system/'nvcuda.dll'),winmode=0x800)
             return result
-    def test_cuda_cc_and_api_gate_reports_actual_name_without_claiming_branch_check(self):
+    def test_cuda_query_reports_actual_name_without_claiming_branch_check(self):
         value=self.query(FakeDriver(version=13020))
         self.assertEqual(value['cudaDriverApiVersion'],13020)
         self.assertEqual(value['cudaComputeCapability'],[8,9])
@@ -389,8 +389,17 @@ class ManagedGpuGateTests(unittest.TestCase):
     def test_driver_api_older_than_pinned_binary_is_rejected(self):
         with self.assertRaisesRegex(ValueError,'GGUF_MANAGED_DRIVER_UNSUPPORTED'):
             self.query(FakeDriver(version=12090))
-    def test_other_compute_capability_or_missing_gpu_is_rejected(self):
-        for driver in (FakeDriver(capability=(8,6)),FakeDriver(init=100),FakeDriver(device_status=101)):
+    def test_other_gpu_generations_pass_preflight_for_both_cuda_workers(self):
+        for runtime in ('qwen-cuda','vox-cuda'):
+            self.admitted['runtimeId']=runtime
+            for capability in ((7,5),(8,6),(8,9),(12,0),(13,0)):
+                with self.subTest(runtime=runtime,capability=capability):
+                    value=self.query(FakeDriver(capability=capability,name=b'Unlisted GPU'))
+                    self.assertEqual(value['cudaComputeCapability'],list(capability))
+                    self.assertEqual(value['cudaDeviceName'],'Unlisted GPU')
+                    self.assertEqual(value['validatedGpuNames'],['NVIDIA RTX4090'])
+    def test_missing_gpu_is_rejected(self):
+        for driver in (FakeDriver(init=100),FakeDriver(device_status=101)):
             with self.subTest(driver=driver),self.assertRaisesRegex(ValueError,'GGUF_MANAGED_GPU_UNSUPPORTED'):
                 self.query(driver)
     def test_missing_installed_driver_is_rejected(self):

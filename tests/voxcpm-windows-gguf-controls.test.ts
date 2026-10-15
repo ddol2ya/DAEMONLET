@@ -13,7 +13,7 @@ const state:VoiceSnapshot={epoch:1,enabled:true,autoRead:true,volume:.5,profiles
 const render=(value:VoiceSnapshot=state)=>renderToStaticMarkup(createElement(VoiceSettings,{state:value,act:()=>{},playbackReady:true,characterId:'test'}))
 it('Windows Vox GGUF connects audited external files and preserves trained weights without automatic conversion',()=>{
  const html=render()
- for(const text of ['VoxCPM2 Windows GGUF 실행 환경 연결','LoRA를 반영한 F16 GGUF','학습 가중치가 유지됩니다.','Mac F16 변환 결과','원본 학습팩과 모델은 보존','자동 변환·설치는 하지 않습니다.','실행 승인 기록','compute capability 8.9와 R580 이상','RTX 4090에서 검증했습니다.','VoxCPM2 GGUF CUDA · 청크 재생','VoxCPM2 GGUF CUDA · 완성 후 재생','VoxCPM2 GGUF Vulkan · 청크 재생','VoxCPM2 GGUF Vulkan · 완성 후 재생'])expect(html).toContain(text)
+ for(const text of ['VoxCPM2 Windows GGUF 실행 환경 연결','LoRA를 반영한 F16 GGUF','학습 가중치가 유지됩니다.','Mac F16 변환 결과','원본 학습팩과 모델은 보존','자동 변환·설치는 하지 않습니다.','실행 승인 기록','R580 이상 NVIDIA 드라이버','RTX 4090에서 검증했습니다.','VoxCPM2 GGUF CUDA · 청크 재생','VoxCPM2 GGUF CUDA · 완성 후 재생','VoxCPM2 GGUF Vulkan · 청크 재생','VoxCPM2 GGUF Vulkan · 완성 후 재생'])expect(html).toContain(text)
  expect(render({...state,executionProfile:'gguf-vulkan-f16'})).toContain('AMD·Intel GPU는 아직 검증하지 않았습니다.')
  expect(html).not.toContain('>TTS 런타임·모델 연결</button>');expect(html).not.toContain('처음 사용할 때 실행용 음성을 준비하고')
  expect(render({...state,voxGgufConfigured:true})).toContain('VoxCPM2 Windows GGUF 런타임 다시 연결')

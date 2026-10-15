@@ -397,6 +397,8 @@ def verify_gpu_support(admitted):
 Manual/Vulkan admission preserves the existing native GPU verification. CUDA
 queries use only the installed driver in the OS system directory. No inference,
 driver installation, fallback, downloads or persistent settings changes occur.
+Compute capability and device names are diagnostic information, not an allowlist.
+The native worker must still load and execute successfully on the selected GPU.
 """
     if not admitted:
         return {}
@@ -409,9 +411,8 @@ driver installation, fallback, downloads or persistent settings changes occur.
     support = admitted.get('support')
     if (not isinstance(support, dict) or type(support.get('minimumCudaDriverApi')) is not int
             or support['minimumCudaDriverApi'] < 13000
-            or support.get('cudaComputeCapabilities') != [[8, 9]]
             or not isinstance(support.get('validatedGpuNames'), list)
-            or support.get('validationScope') != 'private-RTX4090-candidate'):
+            or not isinstance(support.get('validationScope'), str)):
         fail()
     try:
         driver_path = ordinary(system_directory() / 'nvcuda.dll')
@@ -434,8 +435,7 @@ driver installation, fallback, downloads or persistent settings changes occur.
             raise ValueError('GGUF_MANAGED_DRIVER_UNSUPPORTED')
         device = ctypes.c_int(); major = ctypes.c_int(); minor = ctypes.c_int()
         if (driver.cuDeviceGet(ctypes.byref(device), 0) != 0
-                or driver.cuDeviceComputeCapability(ctypes.byref(major), ctypes.byref(minor), device.value) != 0
-                or [major.value, minor.value] not in support['cudaComputeCapabilities']):
+                or driver.cuDeviceComputeCapability(ctypes.byref(major), ctypes.byref(minor), device.value) != 0):
             raise ValueError('GGUF_MANAGED_GPU_UNSUPPORTED')
         name = ctypes.create_string_buffer(256)
         if driver.cuDeviceGetName(name, len(name), device.value) != 0 or not name.value:

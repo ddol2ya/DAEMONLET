@@ -76,8 +76,16 @@
         "msvc": "19.35.32215.0",
         "msvcRuntime": "MultiThreaded",
         "windowsSDK": "10.0.22000.0",
-        "ownerSourceSha256": "f4fe2c821ea8a4a1006bebebb0f9601c277f8e8d4ee0ccf7200b01faedf321ea",
-        "buildHost": "Windows 11 26200 / RTX 4090 / driver 610.47"
+        "ownerSourceSha256": "cc8876e4dbd03956ebde349f31a1561dcb2f79bf41eb62723afe64135578a231",
+        "buildHost": "Windows 11 26200 / RTX 4090 / driver 610.47",
+        "vulkan": {
+          "sdk": "1.4.363.0",
+          "cmake": "3.25.1-msvc1",
+          "msvc": "19.35.32215.0",
+          "msvcRuntime": "MultiThreaded",
+          "sharedLibraries": false,
+          "buildHost": "Windows 11 / RTX 4090 / driver 610.47"
+        }
       },
       "files": {
         "cublas64_13.dll": {
@@ -89,8 +97,8 @@
           "sha256": "e1c26671801ecd435baf97c6e9cfe28196cf55005c2039356b48030b09ce5dd5"
         },
         "daemonlet-runtime-host.exe": {
-          "bytes": 154624,
-          "sha256": "4365273717198f97053e247862049d9441633ca45d7d4001751f6ce9eeaa00be"
+          "bytes": 155648,
+          "sha256": "77f9da32534a8586fe18c5ec92533477bf3900688d5d2d1b806a950051c43b19"
         },
         "llama-server.exe": {
           "bytes": 137254400,
@@ -131,7 +139,27 @@
         "licenses/CUDA-13.0-EULA.txt": {
           "bytes": 69587,
           "sha256": "f0bd2eb0a82e7db5353a1c32084c53171b6e6792f79a4bd44515457498be74a0"
+        },
+        "llama-server-vulkan.exe": {
+          "bytes": 55759360,
+          "sha256": "6d0a5c437eccc34a21b69c0d5da538aa471e1608fdd2579a735ed5bc0da2af5a"
+        },
+        "licenses/Vulkan-Headers-LICENSE.md": {
+          "bytes": 495,
+          "sha256": "95ad366d23fadf701d355bc45fb8b82ae2d700239471d35d41286ac3b08ff903"
+        },
+        "licenses/Vulkan-Headers-Apache-2.0.txt": {
+          "bytes": 11358,
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+        },
+        "licenses/SPIRV-Headers-LICENSE.txt": {
+          "bytes": 23503,
+          "sha256": "ea43b1de38a6f90c488800d66dec1ed671e68cda530266bc96951fb5b6307613"
         }
+      },
+      "backends": {
+        "CUDA": "llama-server.exe",
+        "Vulkan": "llama-server-vulkan.exe"
       }
     }
   }

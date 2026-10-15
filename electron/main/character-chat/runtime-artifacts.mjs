@@ -7,7 +7,7 @@ import {join, resolve} from 'node:path'
 import {isDeepStrictEqual} from 'node:util'
 
 export function runtimeTarget(platform = process.platform, arch = process.arch) { return `${platform}-${arch}` }
-/** @typedef {{platform:string,commit:string,executable:string,launcher?:string,backend:string,files:Record<string,{bytes:number,sha256:string}>,build:object}} RuntimeEntry */
+/** @typedef {{platform:string,commit:string,executable:string,launcher?:string,backend:string,backends?:{CUDA?:string,Vulkan?:string,Metal?:string},files:Record<string,{bytes:number,sha256:string}>,build:object}} RuntimeEntry */
 /** @returns {RuntimeEntry} */
 export function selectRuntime(target = runtimeTarget(), trusted = catalog) {
   const entry = trusted.targets[target]
@@ -15,6 +15,10 @@ export function selectRuntime(target = runtimeTarget(), trusted = catalog) {
   // llama passes FILE/CRT-owned objects across its internal libraries. Separate
   // static CRT instances in shared DLLs fail at model IO on Windows.
   if (target === 'win32-x64' && entry.build?.sharedLibraries && entry.build?.msvcRuntime === 'MultiThreaded') throw Error('Unsupported shared-library/static-CRT runtime combination')
+  if (entry.backends && (target !== 'win32-x64' || entry.launcher !== 'daemonlet-runtime-host.exe'
+      || entry.backends.CUDA !== 'llama-server.exe' || entry.backends.Vulkan !== 'llama-server-vulkan.exe'
+      || Object.keys(entry.backends).some(key => !['CUDA','Vulkan'].includes(key))
+      || Object.values(entry.backends).some(name => !Object.hasOwn(entry.files,name)))) throw Error('Invalid runtime backend catalog')
   return entry
 }
 /** @param {string} root @param {string} target @param {{signal?: AbortSignal, trusted?: typeof catalog}} options */
