@@ -2,13 +2,14 @@ import {spawn} from 'node:child_process'
 import {readFile,writeFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import assert from 'node:assert/strict'
-const root=process.argv[3]||process.argv[2],state=join(root,'owner-state.json')
+const root=process.argv[2]==='owner'?process.argv[3]:process.argv[2],backend=process.argv[2]==='owner'?process.argv[4]:process.argv[3]||'CUDA',state=join(root,'owner-state-'+backend+'.json')
+if(!['CUDA','Vulkan'].includes(backend))throw Error('Specify CUDA or Vulkan')
 if(process.argv[2]==='owner'){
- const child=spawn(join(root,'daemonlet-runtime-host.exe'),['한글 (공백)','a"b','끝\\'],{stdio:['pipe','pipe','pipe'],windowsHide:true,shell:false,cwd:root})
+ const child=spawn(join(root,'daemonlet-runtime-host.exe'),['--daemonlet-backend',backend,'한글 (공백)','a"b','끝\\'],{stdio:['pipe','pipe','pipe'],windowsHide:true,shell:false,cwd:root})
  let text='';child.stdout.on('data',async b=>{text+=b; if(text.includes('ARG:끝\\')){await writeFile(state,JSON.stringify({hostPid:child.pid,serverPid:Number(/PID:(\d+)/.exec(text)[1]),text}));process.exit(0)}})
  child.stderr.pipe(process.stderr);setTimeout(()=>process.exit(2),10000)
 }else{
- const parent=spawn(process.execPath,[import.meta.filename,'owner',root],{stdio:['ignore','pipe','pipe'],windowsHide:true})
+ const parent=spawn(process.execPath,[import.meta.filename,'owner',root,backend],{stdio:['ignore','pipe','pipe'],windowsHide:true})
  let errors='';parent.stderr.on('data',b=>errors+=b)
  const code=await new Promise(r=>parent.on('exit',r));assert.equal(code,0,errors)
  const record=JSON.parse(await readFile(state,'utf8'))

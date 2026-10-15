@@ -1,11 +1,25 @@
 # Windows local character chat
 
 This extends PR #22 from `6f5de4e`; it does not change model selection, persona,
-semantic pose IDs or the Mac Metal binary. Windows support targets x64 NVIDIA
-CUDA. Native acceptance and build/test success must be reported separately.
+semantic pose IDs or the Mac Metal binary. Windows x64 includes CUDA and Vulkan in one package. Native acceptance and build/test success must be reported separately.
 See [recorded validation and limitations](windows-character-chat-validation.md).
 
 ## Runtime and packaging
+
+Since 0.8.5, the Windows catalog includes two fixed sibling executables:
+`llama-server.exe` (CUDA) and `llama-server-vulkan.exe` (Vulkan). Both remain
+statically linked with a single CRT per process. The common lifetime owner
+accepts only the fixed `CUDA`/`Vulkan` selector, never an arbitrary executable.
+The Vulkan build uses LunarG SDK 1.4.363.0 only as a build tool. Its runtime
+imports the vendor-installed `vulkan-1.dll`; no SDK or GPU driver is bundled.
+
+The default backend is automatic. CUDA is probed first; Vulkan is tried when
+CUDA is unavailable or fails model initialization. The failed owned process
+and auth directory are drained before a fallback launches. An explicit choice
+never falls back. Cancellation, catalog integrity and model integrity errors
+are not fallback triggers. The selected backend/device is shown in settings,
+and a backend preference is saved with the existing conversation store.
+
 
 `runtime-catalog.json` is the trust source for each target. Application startup,
 staging, Electron build, Forge and NSIS preparation use the same selector and
@@ -14,7 +28,7 @@ byte counts and SHA-256; Windows EXE/DLL files must also be AMD64 PE images.
 No local lock or newly built binary can establish its own trusted hash.
 
 The pinned llama.cpp source remains
-`391fac16460f15233a7740550d858ac96df3419d`. The Windows artifact was built with
+`391fac16460f15233a7740550d858ac96df3419d`. The retained CUDA artifact was built with
 CUDA 13.0.48, MSVC 19.35, CMake 3.25.1 and SDK 10.0.22000.0, Release, static MSVC
 CRT in a single statically linked llama/ggml executable, OpenMP/OpenSSL disabled, non-native CPU settings
 and CUDA architectures 75/86/89. These build targets do not establish tested
@@ -43,7 +57,7 @@ owned server. Nothing searches for or kills processes by executable name.
 Startup uses loopback/authentication, shell-free hidden processes, verified
 runtime cwd, and a child-only PATH limited to runtime/System32/Windows. The auth
 directory gets a current-user Windows ACL before the token is written. Readiness
-has an elapsed-time deadline and validates CUDA, full layer offload, one slot,
+has an elapsed-time deadline and validates the selected GPU, full layer offload, one slot,
 8192 context and one checkpoint. Startup/cleanup belong to individual launches;
 cancelled old launches cannot clear a later launch. No CPU fallback is accepted.
 
@@ -59,7 +73,7 @@ installation. Existing toolchains are prerequisites; these commands do not
 install toolchains or download models automatically.
 
 ```powershell
-./scripts/build-chat-runtime-win.ps1 -LlamaSource <pinned-clean-source> -BuildRoot <new-build-root> -CMake <existing-cmake.exe>
+./scripts/build-chat-runtime-win.ps1 -LlamaSource <pinned-clean-source> -BuildRoot <new-build-root> -CMake <existing-cmake.exe> -VulkanSdk <existing-sdk-directory>
 # Review PE/deferred loader dependencies and the catalog before collecting its files.
 node scripts/stage-chat-runtime.mjs <reviewed-native-bin-directory> win32-x64
 npm run typecheck

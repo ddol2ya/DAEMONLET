@@ -90,7 +90,7 @@ export class CharacterChatWindow {
   this.deleting=true;try{const answer=await dialog.showMessageBox(win,{type:'question',message:'이 대화를 삭제할까요?',detail:'대화와 연결된 요약이 삭제됩니다. 별도로 저장한 기억은 유지됩니다.',buttons:['취소','삭제'],defaultId:0,cancelId:0,noLink:true});
    if(!this.disposed&&current()&&!win.isDestroyed()&&answer.response===1)await this.service.deleteConversation(value.id);
   }finally{this.deleting=false}break;
- }case 'character':await this.service.selectCharacter(value.id);break;case 'model':await this.service.selectModel(value.id);break;
+ }case 'character':await this.service.selectCharacter(value.id);break;case 'model':await this.service.selectModel(value.id);break;case 'gpu-backend':await this.service.selectGpuBackend(value.value);break;
  case 'download':void this.service.installModel(value.id).catch(e=>this.service.setError(e));break;case 'cancel-download':await this.service.models.cancel();break;
  case 'import-model':{const win=owner;if(!win||win.isDestroyed())break;const result=await dialog.showOpenDialog(win,{title:'공식 GGUF 파일 가져오기',filters:[{name:'GGUF',extensions:['gguf']}],properties:['openFile']});if(current()&&!win.isDestroyed()&&!result.canceled&&result.filePaths[0]){await this.service.installModel(value.id,result.filePaths[0])}break}
  case 'remove-model':await this.service.removeModel(value.id);break;

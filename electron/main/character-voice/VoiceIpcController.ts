@@ -1,3 +1,4 @@
+import {RuntimeSupervisor} from '../character-chat/RuntimeSupervisor'
 import {QwenVoiceInstaller} from './QwenVoiceInstaller'
 import {WindowsGgufModelInstaller} from './WindowsGgufModelInstaller'
 import {WindowsGgufRuntimeInstaller} from './WindowsGgufRuntimeInstaller'
@@ -103,6 +104,11 @@ export class VoiceIpcController {
   this.service.attachQwenInstaller(new QwenVoiceInstaller(join(root,'qwen-managed'),dirname(worker),()=>this.service.refreshBase()))
   this.service.attachGgufInstaller(new WindowsGgufModelInstaller(join(root,'gguf-models'),()=>this.service.refreshBase()))
   if(process.platform==='win32'&&process.arch==='x64'){
+   this.service.attachGpuDetector(async()=>{
+    const probe=new RuntimeSupervisor(chat.runtime.binary)
+    if(!await probe.available()||!probe.selectedDevice)throw Error('VOICE_GPU_UNAVAILABLE')
+    return probe.selectedDevice.backend==='CUDA'?'cuda':'vulkan'
+   })
    this.service.requireManagedRuntimeTerms()
    try{
     const pin=(qwenWindowsPolicy as unknown as {managedRuntimeCatalog?:{filename:string;bytes:number;sha256:string}}).managedRuntimeCatalog
@@ -243,6 +249,7 @@ export class VoiceIpcController {
     return
    }
    case 'prepare':return this.service.prepare()
+   case 'gpuBackend':return this.service.gpuBackend(v.value,contextCurrent)
    case 'executionProfile':if(!this.service.snapshot().availableProfiles?.includes(v.value))throw Error('VOICE_ACTION');return this.service.executionProfile(v.value)
    case 'enabled':case 'auto':if(typeof v.value!=='boolean')throw Error('VOICE_ACTION');return v.type==='enabled'?this.service.enabled(v.value):this.service.auto(v.value)
    case 'volume':if(!Number.isFinite(v.value)||v.value<0||v.value>1)throw Error('VOICE_ACTION');return this.service.volume(v.value)

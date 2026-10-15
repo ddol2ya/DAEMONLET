@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
 import {useT} from '../i18n/useLanguage'
+import type {GpuBackendPreference} from '../../electron/shared/gpu-backend'
 import {VoiceSettings} from '../character-chat/VoiceControls'
 import type {VoiceAction} from '../../electron/shared/character-voice-contract'
 import type {ChatManagementAction,ChatSettingsApi,ChatSettingsSnapshot,VoiceManagementAction} from '../../electron/shared/chat-settings-contract'
@@ -22,7 +23,10 @@ export function ChatVoicePage({manageCharacters}:{manageCharacters:()=>void}){
   <section className="section-card"><div className="section-heading"><div><h2>{t('캐릭터 음성')}</h2><p>{t('엔진과 필요한 파일을 준비한 뒤 목소리를 선택하고 시험해 보세요.')}</p></div></div><fieldset className="chat-settings-fields" aria-busy={busy}><VoiceSettings state={state.voice} characterId={c.character?.id} act={voice} playbackReady={state.playbackReady} busy={busy}/></fieldset></section>
   <section className="section-card"><div className="section-heading"><div><h2>{t('로컬 대화 모델')}</h2><p>{t('한 번 준비하면 오프라인으로 대화할 수 있어요.')}</p></div><span className="chat-settings-badge">{t(installed?'설치됨':'설치 필요')}</span></div>
    <label className="chat-settings-field">{t('대화 모델')}<select aria-label={t('대화 모델')} value={c.model} disabled={busy||!!c.download} onChange={e=>void chat({type:'model',id:e.target.value as 'E4B'|'12B'})}><option value="E4B">Gemma 4 E4B · 5.2 GB</option><option value="12B">Gemma 4 12B · 7.0 GB</option></select></label>
-   {c.runtimeIssue&&<p role="status">{c.runtimeIssue}</p>}
+   {(c.availableGpuBackends?.length??0)>1&&<label className="chat-settings-field">{t('대화 GPU 실행 방식')}<select aria-label={t('대화 GPU 실행 방식')} value={c.gpuBackend??'auto'} disabled={busy||!!c.download} onChange={e=>void chat({type:'gpu-backend',value:e.target.value as GpuBackendPreference})}><option value="auto">{t('자동 (권장)')}</option><option value="cuda">NVIDIA CUDA</option><option value="vulkan">Vulkan</option></select></label>}
+   {c.runtimeDevice&&<p role="status">{t('선택된 실행 환경')}: {c.runtimeDevice.backend} · {c.runtimeDevice.name}</p>}
+   {c.runtimeFallback&&<p role="status">{t('CUDA를 사용할 수 없어 Vulkan으로 실행했습니다.')}</p>}
+   {c.runtimeIssue&&<p role="status">{t(c.runtimeIssue)}</p>}
    <div className="button-row">{!installed?<><button className="button primary" disabled={busy||!!c.download} onClick={()=>void chat({type:'download',id:c.model})}>{t('모델 다운로드')}</button><button className="button secondary" disabled={busy||!!c.download} onClick={()=>void chat({type:'import-model',id:c.model})}>{t('보유한 GGUF 가져오기')}</button></>:<button className="button secondary destructive-text" disabled={busy||!!c.download} onClick={()=>void chat({type:'remove-model',id:c.model})}>{t('모델 삭제')}</button>}</div>
    {c.download&&<div className="chat-settings-progress" role="status"><progress aria-label={t('모델 설치 진행률')} value={c.download.bytes} max={c.download.total}/><span>{Math.floor(c.download.bytes/c.download.total*100)}%</span><button className="button secondary small" onClick={()=>void chat({type:'cancel-download'})}>{t('설치 중단')}</button></div>}
   </section>

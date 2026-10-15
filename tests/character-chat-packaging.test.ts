@@ -21,6 +21,14 @@ async function fixture(target='win32-x64') {
 }
 it('validates synthetic Windows x64 PE, DLL and notice allowlist without native execution',async()=>{const f=await fixture();await expect(f.verify()).resolves.toEqual(f.entry)})
 it('rejects unknown target and never substitutes the Mac catalog',()=>{expect(runtimeTarget('win32','x64')).toBe('win32-x64');expect(()=>selectRuntime('linux-x64')).toThrow('No validated')})
+it('requires both backend executables to belong to the trusted file allowlist',async()=>{
+ const f=await fixture();Object.assign(f.entry,{launcher:'daemonlet-runtime-host.exe',backends:{CUDA:'llama-server.exe',Vulkan:'llama-server-vulkan.exe'}})
+ expect(()=>selectRuntime('win32-x64',f.trusted)).toThrow('backend catalog')
+ ;(f.entry as any).files['llama-server-vulkan.exe']=f.entry.files['llama-server.exe']
+ expect(selectRuntime('win32-x64',f.trusted)).toBe(f.entry)
+ ;(f.entry as any).backends.Vulkan='../foreign.exe'
+ expect(()=>selectRuntime('win32-x64',f.trusted)).toThrow('backend catalog')
+})
 it('requires a lock and rejects a self-authored different lock',async()=>{const f=await fixture();await rm(join(f.root,'runtime-lock.json'));await expect(f.verify()).rejects.toThrow('Stage the pinned');await writeFile(join(f.root,'runtime-lock.json'),'{}');await expect(f.verify()).rejects.toThrow('catalog differs')})
 it('rejects missing DLLs, extra loader files and omitted notices',async()=>{for(const name of ['ggml-cuda.dll','licenses/runtime.txt']){const f=await fixture();await rm(join(f.root,name));await expect(f.verify()).rejects.toThrow('allowlist')}const f=await fixture();await writeFile(join(f.root,'nvcuda.dll'),'driver');await expect(f.verify()).rejects.toThrow('allowlist')})
 it('rejects wrong bytes even with matching sizes',async()=>{const f=await fixture();await writeFile(join(f.root,'llama-server.exe'),Buffer.alloc(128));await expect(f.verify()).rejects.toThrow('hash differs')})

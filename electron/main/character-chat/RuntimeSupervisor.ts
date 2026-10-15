@@ -11,18 +11,22 @@ import {tmpdir} from 'node:os'
 import {join,dirname,isAbsolute,win32} from 'node:path'
 import {setTimeout as delay} from 'node:timers/promises'
 import {CHAT_RUNTIME_COMMIT} from './catalog'
+import type {GpuBackend, GpuBackendPreference} from '../../shared/gpu-backend'
+import {runtimeBackendOrder,runtimeArguments,runtimeDevice,runtimeBackendLoaded,type RuntimeDevice} from './runtime-backends'
 export type ModelMessage={role:'system'|'user'|'assistant';content:string}
-type Launch={model:string;abort:AbortController;child?:ChildProcess;temporary?:string;token:string;url:string;ready:boolean;preparation:Promise<void>;closing?:Promise<void>;cleanup?:Promise<void>;failure?:Error;log:string}
+type Launch={model:string;preference:GpuBackendPreference;device?:RuntimeDevice;abort:AbortController;child?:ChildProcess;temporary?:string;token:string;url:string;ready:boolean;preparation:Promise<void>;closing?:Promise<void>;cleanup?:Promise<void>;failure?:Error;log:string}
+export class RuntimeStartError extends Error {}
 const run=promisify(execFile)
 
 // Keep DLL discovery within the verified runtime and Windows system directories.
 export function runtimeEnvironment(directory:string,platform=process.platform,source=process.env) {
  const env:NodeJS.ProcessEnv={}
- for(const [key,value] of Object.entries(source)) if(!/^(?:LLAMA_|HF_|GGML_|CUDA_|CUDACXX|LD_|DYLD_)/i.test(key) && !(platform==='win32' && key.toLowerCase()==='path'))env[key]=value
+ for(const [key,value] of Object.entries(source)) if(!/^(?:LLAMA_|HF_|GGML_|CUDA_|CUDACXX|VK_|LD_|DYLD_)/i.test(key) && !(platform==='win32' && key.toLowerCase()==='path'))env[key]=value
  if(platform==='win32') {
   const systemRoot=source.SystemRoot || source.SYSTEMROOT
   if(!systemRoot || !win32.isAbsolute(systemRoot))throw Error('Windows 시스템 경로를 확인하지 못했습니다.')
   env.PATH=[directory,win32.join(systemRoot,'System32'),systemRoot].join(';')
+  env.VK_LOADER_LAYERS_DISABLE='~all~'
  }
  return env
 }
@@ -43,28 +47,37 @@ export class RuntimeSupervisor {
  private owned=new Set<Launch>()
  private generation:AbortController|null=null
  private availabilityProbe:AbortController|null=null
+ backendPreference:GpuBackendPreference='auto'
+ selectedDevice:RuntimeDevice|null=null
+ backendFallback=false
  availabilityError:string|null=null
  constructor(readonly binary:string){}
  private options(signal:AbortSignal,timeout=60000) {return {encoding:'utf8' as const,timeout,signal,windowsHide:true,shell:false as const,cwd:dirname(this.binary),env:runtimeEnvironment(dirname(this.binary)),maxBuffer:2*1024*1024}}
- private async probe(signal:AbortSignal,deadline=performance.now()+60000) {
+ private async probe(signal:AbortSignal,deadline=performance.now()+60000,preference=this.backendPreference,excluded:GpuBackend[]=[]) {
   const entry=await verifyRuntime(dirname(this.binary),runtimeTarget(),{signal})
   signal.throwIfAborted()
   if(entry.commit!==CHAT_RUNTIME_COMMIT || !isAbsolute(this.binary) || join(dirname(this.binary),entry.executable)!==this.binary)throw Error('지원하지 않는 추론 런타임입니다.')
   const remaining=()=>{signal.throwIfAborted();const time=Math.floor(deadline-performance.now());if(time<=0)throw Error('모델 준비 시간이 초과되었습니다.');return time}
-  const executable=entry.launcher?join(dirname(this.binary),entry.launcher):this.binary
-  const h=await run(executable,['--help'],this.options(signal,remaining()))
-  const d=await run(executable,['--list-devices'],this.options(signal,remaining()))
-  signal.throwIfAborted()
-  const devices=d.stdout+d.stderr
-  if(entry.backend==='Metal' ? !/MTL0|Metal/.test(devices) : !/CUDA\d+.*(?:NVIDIA|GeForce|RTX|Tesla|Quadro)/i.test(devices))throw Error(entry.backend==='Metal'?'Apple Silicon / Metal을 사용할 수 없습니다.':'NVIDIA CUDA 장치를 사용할 수 없습니다. 그래픽 드라이버를 확인해 주세요.')
-  return {entry,help:h.stdout+h.stderr}
+  const choices=runtimeBackendOrder(entry,preference).filter(backend=>!excluded.includes(backend))
+  for(const backend of choices){
+   signal.throwIfAborted()
+   const executable=join(dirname(this.binary),entry.launcher||entry.backends?.[backend]||entry.executable)
+   try{
+    const h=await run(executable,runtimeArguments(entry,backend,['--help']),this.options(signal,Math.min(20000,remaining())))
+    const d=await run(executable,runtimeArguments(entry,backend,['--list-devices']),this.options(signal,Math.min(20000,remaining())))
+    signal.throwIfAborted()
+    const device=runtimeDevice(d.stdout+d.stderr,backend)
+    if(device)return {entry,help:h.stdout+h.stderr,device}
+   }catch{signal.throwIfAborted()}
+  }
+  throw Error(entry.backend==='Metal'?'Apple Silicon / Metal을 사용할 수 없습니다.':preference==='cuda'?'NVIDIA CUDA 장치를 사용할 수 없습니다. 그래픽 드라이버를 확인해 주세요.':preference==='vulkan'?'Vulkan GPU를 사용할 수 없습니다. 그래픽 드라이버를 확인해 주세요.':'CUDA 또는 Vulkan GPU를 사용할 수 없습니다. 그래픽 드라이버를 확인해 주세요.')
  }
- async available(){const controller=new AbortController();this.availabilityProbe?.abort();this.availabilityProbe=controller;try{await this.probe(AbortSignal.any([controller.signal,AbortSignal.timeout(60000)]));this.availabilityError=null;return true}catch(e){if(controller.signal.aborted)throw controller.signal.reason;const message=e instanceof Error?e.message:'';this.availabilityError=/^(?:NVIDIA|Apple|지원하지|모델 준비)/.test(message)?message:'로컬 대화 실행 파일을 확인하지 못했습니다. 앱 패키지를 다시 준비해 주세요.';return false}finally{if(this.availabilityProbe===controller)this.availabilityProbe=null}}
+ async available(){const controller=new AbortController();this.availabilityProbe?.abort();this.availabilityProbe=controller;try{const result=await this.probe(AbortSignal.any([controller.signal,AbortSignal.timeout(60000)]));this.selectedDevice=result.device;this.backendFallback=this.backendPreference==='auto'&&result.device?.backend==='Vulkan';this.availabilityError=null;return true}catch(e){if(controller.signal.aborted)throw controller.signal.reason;this.selectedDevice=null;this.backendFallback=false;const message=e instanceof Error?e.message:'';this.availabilityError=/^(?:NVIDIA|Vulkan|CUDA|Apple|지원하지|모델 준비)/.test(message)?message:'로컬 대화 실행 파일을 확인하지 못했습니다. 앱 패키지를 다시 준비해 주세요.';return false}finally{if(this.availabilityProbe===controller)this.availabilityProbe=null}}
  start(model:string):Promise<void> {
-  if(this.current?.model===model && !this.current.abort.signal.aborted && !this.current.failure && this.current.child?.exitCode===null && !this.current.child.signalCode)return this.current.preparation
+  if(this.current?.model===model && this.current.preference===this.backendPreference && !this.current.abort.signal.aborted && !this.current.failure && this.current.child?.exitCode===null && !this.current.child.signalCode)return this.current.preparation
   const previous=[...this.owned]
   for(const item of previous)item.abort.abort()
-  const launch:Launch={model,abort:new AbortController(),token:'',url:'',ready:false,log:'',preparation:Promise.resolve()}
+  const launch:Launch={model,preference:this.backendPreference,abort:new AbortController(),token:'',url:'',ready:false,log:'',preparation:Promise.resolve()}
   this.current=launch;this.owned.add(launch)
   launch.preparation=Promise.resolve().then(async()=>{
    await Promise.all(previous.map(item=>this.closeSession(item)))
@@ -74,8 +87,30 @@ export class RuntimeSupervisor {
   return launch.preparation
  }
  private async prepare(session:Launch) {
-  const signal=session.abort.signal,deadline=performance.now()+180000
-  const {help,entry}=await this.probe(signal,deadline)
+  const excluded:GpuBackend[]=[]
+  this.backendFallback=false
+  for(;;){
+   const deadline=performance.now()+180000,signal=session.abort.signal
+   const candidate=await this.probe(signal,deadline,session.preference,excluded)
+   signal.throwIfAborted()
+   session.device=candidate.device
+   try{
+    await this.prepareBackend(session,candidate,deadline)
+    this.selectedDevice=candidate.device
+    this.backendFallback=session.preference==='auto'&&candidate.device.backend==='Vulkan'
+    return
+   }catch(error){
+    signal.throwIfAborted()
+    if(!(error instanceof RuntimeStartError)||session.preference!=='auto'||candidate.device.backend!=='CUDA'||!candidate.entry.backends?.Vulkan)throw error
+    await this.cleanup(session)
+    signal.throwIfAborted()
+    session.cleanup=undefined;session.child=undefined;session.temporary=undefined;session.failure=undefined;session.log=''
+    excluded.push('CUDA')
+   }
+  }
+ }
+ private async prepareBackend(session:Launch,{help,entry,device}:Awaited<ReturnType<RuntimeSupervisor['probe']>>,deadline:number) {
+  const signal=session.abort.signal
   signal.throwIfAborted()
   const port=await new Promise<number>((resolve,reject)=>{const s=createServer();s.on('error',reject);s.listen(0,'127.0.0.1',()=>{const p=(s.address() as {port:number}).port;s.close(()=>resolve(p))})})
   signal.throwIfAborted()
@@ -92,30 +127,29 @@ export class RuntimeSupervisor {
   session.token=randomBytes(32).toString('hex');const key=join(session.temporary,'auth')
   await writeFile(key,session.token,{mode:0o600,flag:'wx'})
   signal.throwIfAborted();session.url=`http://127.0.0.1:${port}`
-  const args=['--model',session.model,'--host','127.0.0.1','--port',String(port),'--api-key-file',key,'--ctx-size','8192','--parallel','1','--n-gpu-layers','999','--cache-type-k','f16','--cache-type-v','f16','--flash-attn','on','--batch-size','512','--ubatch-size','512','--jinja','--reasoning','off','--reasoning-budget','0','--reasoning-format','deepseek','--ctx-checkpoints','1','--no-context-shift','--cache-ram','0','--fit','off','--offline','--no-webui','--no-webui-mcp-proxy','--slots','--verbosity','4']
+  const args=['--model',session.model,...(device.backend==='Metal'?[]:['--device',device.id]),'--host','127.0.0.1','--port',String(port),'--api-key-file',key,'--ctx-size','8192','--parallel','1','--n-gpu-layers','999','--cache-type-k','f16','--cache-type-v','f16','--flash-attn','on','--batch-size','512','--ubatch-size','512','--jinja','--reasoning','off','--reasoning-budget','0','--reasoning-format','deepseek','--ctx-checkpoints','1','--no-context-shift','--cache-ram','0','--fit','off','--offline','--no-webui','--no-webui-mcp-proxy','--slots','--verbosity','4']
   for(const flag of args.filter(a=>a.startsWith('--')))if(!help.includes(flag))throw Error('런타임이 필수 옵션을 지원하지 않습니다.')
   signal.throwIfAborted()
-  const executable=entry.launcher?join(dirname(this.binary),entry.launcher):this.binary
-  const child=session.child=spawn(executable,args,{stdio:[entry.launcher?'pipe':'ignore','pipe','pipe'],windowsHide:true,shell:false,cwd:dirname(this.binary),env:runtimeEnvironment(dirname(this.binary))})
+  const executable=join(dirname(this.binary),entry.launcher||entry.backends?.[device.backend]||entry.executable)
+  const child=session.child=spawn(executable,runtimeArguments(entry,device.backend,args),{stdio:[entry.launcher?'pipe':'ignore','pipe','pipe'],windowsHide:true,shell:false,cwd:dirname(this.binary),env:runtimeEnvironment(dirname(this.binary))})
   child.on('error',e=>{session.failure=e})
   const append=(b:Buffer)=>{session.log=(session.log+String(b)).slice(-128000)}
   child.stderr?.on('data',append);child.stdout?.on('data',append)
   while(performance.now()<deadline) {
    signal.throwIfAborted()
-   if(session.failure || child.exitCode!==null || child.signalCode!==null)throw Error('추론 서버를 시작하지 못했습니다. 메모리와 런타임을 확인해 주세요.')
+   if(session.failure || child.exitCode!==null || child.signalCode!==null)throw new RuntimeStartError('추론 서버를 시작하지 못했습니다. 메모리와 런타임을 확인해 주세요.')
    let health:any
    try{health=await this.sessionApi(session,'/health',undefined,Math.min(1000,deadline-performance.now()))}catch{signal.throwIfAborted()}
    if(health?.status==='ok') {
     const props=await this.sessionApi(session,'/props',undefined,Math.min(10000,deadline-performance.now()))
     signal.throwIfAborted()
     const off=/offloaded (\d+)\/(\d+) layers/.exec(session.log)
-    const backend=entry.backend==='Metal'?/Metal|MTL0/:/CUDA0/
-    if(props.total_slots!==1 || props.default_generation_settings?.n_ctx!==8192 || !off || Number(off[1])<=0 || off[1]!==off[2] || !backend.test(session.log) || !session.log.includes('context checkpoints enabled, max = 1'))throw Error('런타임 설정 적용을 확인하지 못했습니다.')
+    if(props.total_slots!==1 || props.default_generation_settings?.n_ctx!==8192 || !off || Number(off[1])<=0 || off[1]!==off[2] || !runtimeBackendLoaded(session.log,device) || !session.log.includes('context checkpoints enabled, max = 1'))throw new RuntimeStartError('런타임 설정 적용을 확인하지 못했습니다.')
     session.ready=true;return
    }
    await delay(Math.min(150,Math.max(1,deadline-performance.now())),undefined,{signal})
   }
-  throw Error('모델 준비 시간이 초과되었습니다.')
+  throw new RuntimeStartError('모델 준비 시간이 초과되었습니다.')
  }
  private requireSession(){const session=this.current;if(!session || !session.ready || session.abort.signal.aborted || session.failure || session.child?.exitCode!==null || session.child.signalCode)throw Error('추론 서버가 준비되지 않았습니다.');return session}
  private async sessionApi(session:Launch,endpoint:string,data?:unknown,timeout=10000):Promise<any> {

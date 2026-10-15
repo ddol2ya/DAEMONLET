@@ -19,7 +19,7 @@ it.each([
 ] as const)('selects runtime controls for %s / %s only', (engine,executionProfile,id,title)=>{
  const value={...state,engine,executionProfile,availableProfiles:[executionProfile],ggufRuntimeInstall:ids.map(other=>({...runtime(other),available:other===id}))}
  const html=card(value);expect(html).toContain(title);expect(html).toContain('<button>실행 환경 자동 준비</button>');expect(html).toContain('CUDA SDK나 새 GPU 드라이버를 설치하지 않습니다.')
- if(id.endsWith('cuda'))expect(html).toContain('compute capability 8.9와 R580 이상')
+ if(id.endsWith('cuda'))expect(html).toContain('R580 이상 NVIDIA 드라이버')
  else expect(html).toContain('AMD·Intel GPU는 아직 검증하지 않았습니다.')
 })
 it.each([
@@ -52,7 +52,7 @@ it.each([
  ['GGUF_RUNTIME_DOWNLOAD_RANGE','실행 환경 다운로드를 이어 받지 못했습니다. 다시 준비해 주세요.'],
  ['GGUF_RUNTIME_DOWNLOAD_SIZE','실행 환경 설치 파일의 크기가 맞지 않습니다. 다시 준비해 주세요.'],
  ['GGUF_RUNTIME_FILESYSTEM_FAILED','실행 환경 파일을 저장하지 못했습니다. 저장 폴더와 여유 공간을 확인해 주세요.'],
- ['GGUF_MANAGED_GPU_UNSUPPORTED','현재 GGUF CUDA 빌드는 compute capability 8.9 GPU가 필요합니다. RTX 4090에서 검증했습니다.'],
+ ['GGUF_MANAGED_GPU_UNSUPPORTED','CUDA GPU를 확인하지 못했습니다. NVIDIA GPU와 그래픽 드라이버 상태를 확인해 주세요.'],
  ['GGUF_MANAGED_DRIVER_UNSUPPORTED','현재 GGUF CUDA 빌드는 CUDA 13을 지원하는 R580 이상 NVIDIA 드라이버가 필요합니다. GPU 드라이버를 확인해 주세요.']
 ])('%s provides translated guidance without diagnostic paths',(error,message)=>{
  expect(card({...state,ggufRuntimeInstall:[{...runtime('qwen-cuda'),error}]})).toContain(message);expect(ENGLISH_MESSAGES[message]).toBeTruthy()

@@ -1,4 +1,4 @@
-// Daemonlet's Windows-only owner for a fixed sibling llama-server.exe.
+// Daemonlet's Windows-only owner for fixed sibling CUDA/Vulkan servers.
 // The non-inherited job handle kills the server on host death; a pipe watches
 // Electron's lifetime even when Electron cannot run shutdown handlers.
 #define WIN32_LEAN_AND_MEAN
@@ -39,9 +39,18 @@ int wmain(int argc, wchar_t **argv) {
     if (!length || length == 32768) return fail("module path");
     std::wstring directory(module, length);
     directory.resize(directory.find_last_of(L"\\/"));
-    const std::wstring executable = directory + L"\\llama-server.exe";
+    int firstArgument = 1;
+    const wchar_t *server = L"\\llama-server.exe";
+    if (argc > 1 && std::wstring(argv[1]) == L"--daemonlet-backend") {
+        if (argc < 3) return fail("backend selection");
+        const std::wstring backend(argv[2]);
+        if (backend == L"Vulkan") server = L"\\llama-server-vulkan.exe";
+        else if (backend != L"CUDA") return fail("backend selection");
+        firstArgument = 3;
+    }
+    const std::wstring executable = directory + server;
     std::wstring command = quote(executable);
-    for (int i = 1; i < argc; ++i) command += L" " + quote(argv[i]);
+    for (int i = firstArgument; i < argc; ++i) command += L" " + quote(argv[i]);
     if (command.size() >= 32767) return fail("command length");
     HANDLE job = CreateJobObjectW(nullptr, nullptr);
     if (!job) return fail("create job");

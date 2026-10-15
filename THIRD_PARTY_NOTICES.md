@@ -58,7 +58,12 @@ Their complete NVIDIA license and third-party notices are preserved in
 `distribution/licenses/character-chat/CUDA-13.0-EULA.txt` and the Windows
 runtime's `licenses` directory. Redistribution is described by Attachment A of
 https://docs.nvidia.com/cuda/archive/13.0.0/eula/index.html . The NVIDIA driver
-and full CUDA Toolkit are not bundled. Model weights are not bundled. The two catalogued
+and full CUDA Toolkit are not bundled. The Windows Vulkan chat engine uses
+Vulkan-Headers and SPIRV-Headers from Vulkan SDK 1.4.363.0. The original
+Khronos notices and license texts accompany it in the runtime `licenses`
+directory. The Vulkan loader and driver are supplied by the operating system
+and GPU vendor; the SDK is not shipped.
+Model weights are not bundled. The two catalogued
 Google Gemma 4 QAT Q4_0 GGUF repositories declare Apache-2.0; the license
 text accompanies the model installation information. Character artwork and
 source material retain their separate rights and are not covered by these

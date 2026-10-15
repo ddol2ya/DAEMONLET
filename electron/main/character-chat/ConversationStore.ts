@@ -1,16 +1,18 @@
 import {replaceFile} from './replaceFile'
+import {isGpuBackendPreference,type GpuBackendPreference} from '../../shared/gpu-backend'
 import {mkdir,readFile,writeFile,copyFile,stat,rm} from 'node:fs/promises'
 import {join} from 'node:path'
 import {randomUUID} from 'node:crypto'
 import type {ChatConversation,ChatMessage,LocalModelId} from '../../shared/character-chat-contract'
 export type ExplicitMemory={id:string;text:string}
-export type StoredChats={version:2;model:LocalModelId;characterId:string;current?:string;conversations:ChatConversation[];memories:Record<string,ExplicitMemory[]>}
+export type StoredChats={version:2;gpuBackend?:GpuBackendPreference;model:LocalModelId;characterId:string;current?:string;conversations:ChatConversation[];memories:Record<string,ExplicitMemory[]>}
 export const CHAT_STORAGE_LIMITS={conversations:500,messages:4000,bytes:32*1024*1024} as const
 const uuid=(v:unknown):v is string=>typeof v==='string'&&/^[a-f0-9-]{36}$/.test(v)
 const safeText=(v:unknown,max:number):v is string=>typeof v==='string'&&v.length<=max&&!/[\u0000-\u0008\u000b-\u001f]/.test(v)
 export function validateStoredChats(v:unknown):StoredChats{const x=v as StoredChats;if(!x||![1,2].includes(x.version)||!['E4B','12B'].includes(x.model)||!Array.isArray(x.conversations)||x.conversations.length>CHAT_STORAGE_LIMITS.conversations||!safeText(x.characterId,64))throw Error('CHAT_STORAGE_INVALID');const ids=new Set<string>();for(const c of x.conversations){if(!uuid(c.id)||ids.has(c.id)||!safeText(c.characterId,64)||!safeText(c.title,100)||!Array.isArray(c.messages)||c.messages.length>CHAT_STORAGE_LIMITS.messages)throw Error('CHAT_STORAGE_INVALID');ids.add(c.id);const mids=new Set<string>();for(const m of c.messages){if(!uuid(m.id)||mids.has(m.id)||!['user','assistant'].includes(m.role)||!['complete','streaming','stopped','error'].includes(m.status)||!safeText(m.text,32000)||!Number.isFinite(Date.parse(m.createdAt)))throw Error('CHAT_STORAGE_INVALID');mids.add(m.id);if(m.binding&&(m.binding.characterId!==c.characterId||m.binding.conversationId!==c.id))throw Error('CHAT_STORAGE_OWNER');if(m.semanticDiagnostics&&(!Array.isArray(m.semanticDiagnostics)||m.semanticDiagnostics.length>8||m.semanticDiagnostics.some(d=>!safeText(d,80))))throw Error('CHAT_STORAGE_INVALID')}if(c.summary&&(!safeText(c.summary.text,1600)||c.summary.algorithm!=='extractive-v1'))throw Error('CHAT_STORAGE_INVALID')}
  if(x.current!==undefined&&!x.conversations.some(c=>c.id===x.current&&c.characterId===x.characterId))throw Error('CHAT_STORAGE_OWNER');
  const memories=x.memories??{};if(typeof memories!=='object'||Array.isArray(memories)||Object.keys(memories).length>100)throw Error('CHAT_STORAGE_INVALID');for(const [key,items] of Object.entries(memories)){if(!/^[a-z0-9-]{1,64}$/.test(key)||!Array.isArray(items)||items.length>64||items.some(m=>!uuid(m.id)||!safeText(m.text,500)))throw Error('CHAT_STORAGE_INVALID')}
+ if(x.gpuBackend!==undefined&&!isGpuBackendPreference(x.gpuBackend))throw Error('CHAT_STORAGE_INVALID');
  return {...x,version:2,memories}}
 export function encodeStoredChats(data:StoredChats):string {
  const bytes=JSON.stringify(validateStoredChats(structuredClone(data)))

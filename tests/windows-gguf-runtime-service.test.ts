@@ -49,6 +49,48 @@ it('connects the current backend with verified managed model paths without enabl
  expect(f.models.verify).toHaveBeenCalledWith('qwen3-tts-06b-gguf');expect(f.service.snapshot()).toMatchObject({engine:'qwen3-tts-06b-gguf',enabled:false,qwenGgufConfigured:true,runtimeConfigured:true,status:'off',ggufRuntimeSetup:{busy:false,application:'connected'}})
  expect(f.make).not.toHaveBeenCalled();expect((await f.saved()).qwenGgufBackends.cuda).toMatchObject({python:f.python,model:f.qwenModel,ggufRuntime:f.connections['qwen-cuda'].runtimeDir,managedRuntime:f.connections['qwen-cuda'].managedRuntime})
 })
+it('auto prepares both backend connections with one shared model download',async()=>{
+ const f=await fixture(false);await f.selectQwen();await f.service.gpuBackend('auto')
+ await f.service.prepareVoiceFiles()
+ expect(f.models.install).toHaveBeenCalledTimes(1)
+ expect(f.installer.install.mock.calls.map(([id])=>id)).toEqual(['qwen-cuda','qwen-vulkan'])
+ const saved=await f.saved();expect(saved.gpuBackend).toBe('auto')
+ expect(saved.qwenGgufBackends.cuda.model).toBe(saved.qwenGgufBackends.vulkan.model)
+ expect(f.service.snapshot()).toMatchObject({gpuBackend:'auto',executionProfile:'qwen-gguf',enabled:false,filePreparation:{busy:false,phase:'connected'}})
+ expect(f.make).not.toHaveBeenCalled()
+})
+it('auto detects Vulkan independently of the chat preference and preserves complete playback',async()=>{
+ const f=await fixture();await f.selectQwen();await f.service.executionProfile('qwen-gguf-complete')
+ f.service.attachGpuDetector(async()=> 'vulkan');await f.service.gpuBackend('auto')
+ expect(f.service.snapshot()).toMatchObject({gpuBackend:'auto',resolvedGpuBackend:'vulkan',executionProfile:'qwen-gguf-vulkan-complete'})
+ await f.service.prepareVoiceFiles()
+ expect(f.installer.install.mock.calls.map(([id])=>id)).toEqual(['qwen-vulkan','qwen-cuda'])
+ expect((await f.saved()).gpuBackend).toBe('auto')
+})
+it('auto retries a failed CUDA initialization with an already connected Vulkan runtime',async()=>{
+ const f=await fixture();await f.selectQwen();await f.service.gpuBackend('auto');await f.service.prepareVoiceFiles();await f.service.enabled(true)
+ const cuda=(f.service as any).getRuntime();cuda.start.mockRejectedValueOnce(Error('GGUF_MANAGED_DRIVER_UNSUPPORTED'))
+ await f.service.prepare(true)
+ expect(cuda.stop).toHaveBeenCalled();expect(f.runtimes).toHaveLength(2)
+ expect(f.runtimes[1].config.executionProfile).toBe('qwen-gguf-vulkan')
+ expect(f.service.snapshot()).toMatchObject({gpuBackend:'auto',gpuFallback:true,executionProfile:'qwen-gguf-vulkan',engineReady:true,status:'idle',error:null})
+ expect(f.installer.install).toHaveBeenCalledTimes(2) // Only the explicit file preparation installed anything.
+})
+it('explicit CUDA never falls back and asset-integrity failures never trigger automatic fallback',async()=>{
+ for(const [preference,error] of [['cuda','GGUF_MANAGED_DRIVER_UNSUPPORTED'],['auto','QWEN_GGUF_ASSET_CHANGED']] as const){
+  const f=await fixture();await f.selectQwen();await f.service.gpuBackend('auto');await f.service.prepareVoiceFiles();await f.service.gpuBackend(preference);await f.service.enabled(true)
+  const cuda=(f.service as any).getRuntime();cuda.start.mockRejectedValueOnce(Error(error))
+  await f.service.prepare(true)
+  expect(f.runtimes).toHaveLength(1);expect(f.service.snapshot()).toMatchObject({executionProfile:'qwen-gguf',status:'error',error})
+ }
+})
+it('keeps an older explicitly selected Vulkan mode after settings migration',async()=>{
+ const f=await fixture();await f.selectQwen();await f.service.executionProfile('qwen-gguf-vulkan-complete');await f.service.close()
+ const saved=await f.saved();delete saved.gpuBackend;await writeFile(join(f.root,'settings.json'),JSON.stringify(saved))
+ const reopened=f.create();const detect=vi.fn(async()=> 'cuda' as const);reopened.attachGpuDetector(detect);await reopened.initialize()
+ expect(reopened.snapshot()).toMatchObject({gpuBackend:'vulkan',executionProfile:'qwen-gguf-vulkan-complete'})
+ expect(detect).not.toHaveBeenCalled()
+})
 it('retains runtime-first model-required state and connects on a single later runtime check after model download',async()=>{
  const f=await fixture(false);await f.selectQwen();await f.service.setupGgufRuntime('qwen-cuda','install');expect(f.service.snapshot()).toMatchObject({qwenGgufConfigured:false,ggufRuntimeSetup:{application:'model-required'}})
  await f.service.installGgufModel('qwen3-tts-06b-gguf');expect(f.service.snapshot().engine).toBe('qwen3-tts-06b-gguf');expect(f.service.snapshot().qwenGgufConfigured).toBe(false)

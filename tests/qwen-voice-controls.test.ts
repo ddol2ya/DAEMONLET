@@ -60,7 +60,7 @@ const gguf:VoiceSnapshot={...state,platform:'win32',arch:'x64',engine:'qwen3-tts
 it('GGUF is separately selectable with manual setup and no PyTorch installation action',()=>{
  const html=renderToStaticMarkup(createElement(VoiceSettings,{state:gguf,act:()=>{},playbackReady:true,characterId:'test'}))
  expect(html).toMatch(/<input(?=[^>]*value="qwen-gguf")(?=[^>]*checked="")[^>]*>/)
- for(const text of ['Base Q8','Qwen GGUF Python·DLL·모델 연결','보유한 GGUF 실행 환경 수동 연결','CUDA SDK나 새 GPU 드라이버를 설치하지 않습니다.','compute capability 8.9와 R580 이상','커뮤니티 MIT','Apache-2.0','Qwen GGUF CUDA · 청크 재생','Qwen GGUF CUDA · 완성 후 재생'])expect(html).toContain(text)
+ for(const text of ['Base Q8','Qwen GGUF Python·DLL·모델 연결','보유한 GGUF 실행 환경 수동 연결','CUDA SDK나 새 GPU 드라이버를 설치하지 않습니다.','R580 이상 NVIDIA 드라이버','커뮤니티 MIT','Apache-2.0','Qwen GGUF CUDA · 청크 재생','Qwen GGUF CUDA · 완성 후 재생'])expect(html).toContain(text)
  expect(html).not.toContain('Qwen 다운로드 및 설치');expect(html).not.toContain('Qwen 다운로드·설치 후 적용');expect(html).not.toContain('Qwen MLX · 청크 재생')
  expect(html).not.toContain('Qwen GGUF 런타임 다시 연결') // An existing PyTorch connection does not configure GGUF.
  const connected=renderToStaticMarkup(createElement(VoiceSettings,{state:{...gguf,qwenGgufConfigured:true},act:()=>{},playbackReady:true}));expect(connected).toContain('Qwen GGUF 런타임 다시 연결')

@@ -10,25 +10,26 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
 <img src="docs/images/gpichan.png" width="360" alt="Daemonlet for Codex에서 실행 중인 지피쨩">
 
-## 다운로드 — v0.8.4
+## 다운로드 — v0.8.5
 
 | 환경 | 다운로드 | 안내 |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-for-Codex-0.8.4-macOS-arm64.zip) | macOS 13 이상 · Developer ID 서명·Apple 공증 완료 |
-| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-for-Codex-0.8.4-windows-x64-Setup.exe) | Windows 10 build 19045 이상 · 현재 사용자용 · 미서명 |
-| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-for-Codex-0.8.4-windows-x64.zip) | 설치 없이 폴더 전체를 압축 해제 후 실행 · 미서명 |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-for-Codex-0.8.5-macOS-arm64.zip) | macOS 13 이상 · Developer ID 서명·Apple 공증 완료 |
+| Windows · x64 | [설치 프로그램](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-for-Codex-0.8.5-windows-x64-Setup.exe) | Windows 10 build 19045 이상 · 현재 사용자용 · 미서명 |
+| Windows · x64 | [압축판 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-for-Codex-0.8.5-windows-x64.zip) | 설치 없이 폴더 전체를 압축 해제 후 실행 · 미서명 |
 
-[릴리즈 안내·검증 범위](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/SHA256SUMS.txt) · [빌드 출처](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/SOURCE-PROVENANCE.json)
+[릴리즈 안내·검증 범위](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5) · [파일 확인용 SHA-256](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/SHA256SUMS.txt) · [빌드 출처](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/SOURCE-PROVENANCE.json)
 
 일반 앱 실행에는 별도 Node.js, Python, ComfyUI 또는 수동 서버 설치가 필요하지 않습니다. **로컬 캐릭터챗과 음성 TTS의 모델은 앱에서 각각 별도로 설치합니다.** Windows GGUF 실행 환경은 배포본에 포함되며, 선택한 모델은 별도로 다운로드합니다. Mac Qwen과 기존 Windows PyTorch 설치는 전용 Python 환경도 준비합니다. 작업 상태 표시와 기존 클릭 반응에는 모델이 필요하지 않습니다. **Dots 연결만 별도 Node.js·공식 tunnel-client·계정 설정이 필요합니다.** Windows 파일은 게시자 서명을 검증할 수 없는 미서명 배포이며, SHA-256은 배포 파일의 일치 여부를 확인합니다.
 
-## v0.8.4 주요 변경
+## v0.8.5 주요 변경
 
-- **Windows GGUF 음성:** Qwen 0.6B Base Q8·VoxCPM2 F16을 CUDA/Vulkan 경로로 준비하며, 모델 다운로드·검사·취소·삭제를 지원합니다.
-- **음성 설정 4단계:** 엔진 선택, 필요한 파일 준비, 목소리 선택, 시험 재생 순서로 정리했습니다. 기존 PyTorch 연결은 레거시 관리에 보존합니다.
-- **반복 발화 준비 개선:** 정상 Dots 발화 후 준비된 음성 엔진을 재사용하고, Mac Vox 준비의 중복 파일 해시 읽기를 줄였습니다.
+- **Windows 로컬챗 CUDA·Vulkan:** 하나의 앱에 두 실행기를 포함하고, `자동 / CUDA / Vulkan`을 선택할 수 있습니다. 자동 모드는 CUDA를 우선 확인하고 필요하면 Vulkan을 사용합니다.
+- **음성 GPU 자동 선택:** Qwen·Vox GGUF에서 대화와 별도로 실행 방식을 선택합니다. 자동 파일 준비는 두 런타임을 함께 준비하고 모델을 공유합니다.
+- **GPU 세대 제한 제거:** GGUF CUDA 음성의 compute capability 8.9 고정 검사를 제거했습니다. 드라이버·파일 무결성·실제 GPU 로딩 검사는 유지합니다.
+- 기존 대화, 목소리, 수동 실행 방식과 외부 모델 연결을 보존합니다. Windows 실기 검증 장치는 RTX 4090이며 다른 GPU의 정상 동작을 보장하지 않습니다.
 
-[릴리즈 상세·검증 범위](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4)
+[릴리즈 상세·검증 범위](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5)
 
 ## 빠르게 시작하기
 
@@ -81,20 +82,22 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 3. 말풍선 상단 **···**에는 **캐릭터 선택과 저장된 대화 불러오기**만 있습니다. 새 대화·다시 답하기·삭제, 모델·음성·기억 관리는 **설정 → 대화·음성**에서 합니다. 빈 새 대화는 첫 메시지를 보낼 때 저장됩니다.
 4. 말풍선 상단을 끌어 위치를 옮기고 오른쪽 아래 손잡이로 크기를 조절합니다. 위치와 크기는 재실행 후에도 유지됩니다.
 
+**설정 → 대화·음성 → 대화 GPU 실행 방식**에서 자동·CUDA·Vulkan을 선택합니다. 음성의 실행 방식은 별도로 선택하며, Vulkan에는 NVIDIA R580 드라이버 조건을 적용하지 않습니다.
+
 모델 설치 후 **대사 생성은 로컬에서 실행**됩니다. 유료 외부 평가·채팅 API를 사용하지 않으며, 파일 수정·셸·MCP 도구 실행 권한을 제공하지 않습니다. 음성 TTS를 켜면 확정된 답변을 별도 로컬 음성 엔진으로 읽습니다.
 
 | 실행 환경 | 로컬 캐릭터챗 경로 |
 |---|---|
 | Mac · Apple Silicon | Metal |
-| Windows · x64 + NVIDIA GPU | CUDA |
+| Windows · x64 | CUDA / Vulkan · 자동 또는 직접 선택 |
 
-두 플랫폼에서 E4B·12B 런타임의 연속 대화·중단·복구를 확인했습니다. 이전 [0.8.2 검증](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.2)에는 Mac 공증본과 Windows 정식 설치 프로그램의 실제 업그레이드·설정·대화 보존·음성 동작이 포함됩니다. **최소 메모리·VRAM 사양은 확정하지 않았으며**, Intel Mac이나 Windows AMD/Intel GPU를 검증된 경로로 안내하지 않습니다. 최신 앱의 검증 범위와 남은 점은 [0.8.4 릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4)를 확인하세요.
+두 플랫폼에서 E4B·12B 런타임의 연속 대화·중단·복구를 확인했습니다. 이전 [0.8.2 검증](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.2)에는 Mac 공증본과 Windows 정식 설치 프로그램의 실제 업그레이드·설정·대화 보존·음성 동작이 포함됩니다. **최소 메모리·VRAM 사양은 확정하지 않았으며**, Intel Mac이나 Windows AMD/Intel GPU를 검증된 경로로 안내하지 않습니다. 최신 앱의 검증 범위와 남은 점은 [0.8.5 릴리즈 안내](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5)를 확인하세요.
 
 캐릭터의 대화 이름·말투·감정 포즈는 팩의 선언을 사용합니다. 대화 설정이 없는 기존 팩도 기본 자세로 대화할 수 있습니다. 빠른 응답에서는 준비 포즈를 생략하고, 답변 후 자세는 다음 요청 전까지 유지합니다. 새 대화·중단·오류·캐릭터 또는 모델 변경 시에는 해당 상태를 해제합니다.
 
 [상세 사용법·모델·저장 방식](docs/local-character-chat.md) · [Windows 런타임 안내](docs/windows-character-chat.md)
 
-## 음성 TTS — v0.8.4 시험기능
+## 음성 TTS — v0.8.5 시험기능
 
 **설정 → 대화·음성 → 캐릭터 음성**에서 **① 음성 엔진 선택 → ② 필요한 파일 받기·연결 → ③ 목소리 선택·추가 → ④ 시험 재생·적용** 순서로 준비합니다. 새 Windows x64 설치는 **Qwen GGUF**, Apple Silicon은 **VoxCPM2 Metal**을 권장·기본 경로로 사용합니다. 기존 사용자의 엔진·모델·목소리 선택은 자동 변경하지 않습니다.
 
@@ -110,7 +113,7 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 | Windows · Qwen GGUF | 커뮤니티 변환 0.6B Base Q8 + codec Q8 모델 약 1.28GB · 앱에 포함된 전용 실행 환경을 별도 준비 | CUDA / Vulkan · 청크 / 완성 후 재생 |
 | Windows · VoxCPM2 GGUF | 커뮤니티 변환 BaseLM F16 + Acoustic F16 모델 약 5.07GB · 앱에 포함된 전용 실행 환경을 별도 준비 | CUDA / Vulkan · 청크 / 완성 후 재생 |
 
-**Windows GGUF CUDA 빌드는 compute capability 8.9와 R580 이상 NVIDIA 드라이버가 필요합니다.** CUDA·Vulkan의 GPU 검증은 RTX 4090 개발 환경에 한정되며, AMD·Intel GPU나 다른 NVIDIA GPU의 정상 동작을 보장하지 않습니다. GGUF 음성 경로 추가가 로컬 캐릭터챗의 GPU 지원 범위를 넓히는 것은 아닙니다. 앱은 CUDA SDK나 GPU 드라이버를 자동 설치하지 않습니다.
+**Windows GGUF CUDA 실행에는 R580 이상 NVIDIA 드라이버가 필요합니다.** 앱은 GPU 모델명이나 compute capability로 실행을 차단하지 않습니다. 현재 배포 바이너리는 8.9 대상으로 빌드되었으므로, 사전 검사를 통과해도 다른 GPU에서 실제 모델 로딩·발화가 성공한다는 뜻은 아닙니다. CUDA·Vulkan의 GPU 검증은 RTX 4090 개발 환경에 한정되며, AMD·Intel GPU나 다른 NVIDIA GPU의 정상 동작을 보장하지 않습니다. GGUF 음성 경로 추가가 로컬 캐릭터챗의 GPU 지원 범위를 넓히는 것은 아닙니다. 앱은 CUDA SDK나 GPU 드라이버를 자동 설치하지 않습니다.
 
 모델은 버튼을 눌렀을 때만 다운로드하며 진행률·중단·이어받기·SHA-256 검증을 제공합니다. Windows GGUF 모델은 Qwen·OpenBMB가 직접 배포한 공식 GGUF가 아닌 **커뮤니티 변환본**입니다. 모델 다운로드만으로 엔진이나 목소리를 바꾸지 않습니다. 실행 환경 파일 검사, 모델 연결과 실제 GPU 모델 로딩은 별도 단계이며, 처음 로딩·기준 음성 분석에는 시간이 걸립니다.
 
@@ -167,7 +170,7 @@ OpenAI의 공식 제품이나 제휴 제품이 아닙니다.
 
 **연결·재연결 때 Dots 음성은 기본 음소거입니다.** 음성을 들으려면 기존 엔진·모델·선택 음성 준비, **음성 사용** ON과 0보다 큰 음량을 확인하고, 트레이의 **dot 표현 · 현재 세션 → 음소거**를 직접 해제하세요. 도구에서 음소거를 해제할 수 없습니다. `speak:true`로 시험하고 실제 소리를 확인하세요. `voice:requested`는 재생 완료를 보장하지 않습니다. Dots 출력을 시험할 때는 캐릭터 화면을 사용하는 로컬/작업 대화창·실험창을 닫으세요. 숨긴 캐릭터나 다른 대화가 사용 중인 화면에는 출력을 쌓아 나중에 재생하지 않습니다.
 
-[마법사·상태 확인 상세](docs/belle-connection-wizard.md) · [출력 도구와 제한](docs/dot-presentation-bridge.md) · [v0.8.4 공개 검증 범위](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4)
+[마법사·상태 확인 상세](docs/belle-connection-wizard.md) · [출력 도구와 제한](docs/dot-presentation-bridge.md) · [v0.8.5 공개 검증 범위](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5)
 
 ## 캐릭터 추가하기
 
@@ -239,7 +242,7 @@ Windows는 **CMD와 PowerShell**을 지원합니다. Hook 실행에 별도 Node.
 
 ## 캐릭터 제작과 개발
 
-[**캐릭터 제작 스킬 0.8.4 ZIP 다운로드**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-creator-skill-0.8.4.zip) — 제작 지침과 독립 실행용 런타임 소스를 함께 포함합니다. ComfyUI·See-through·모델은 포함하지 않습니다.
+[**캐릭터 제작 스킬 0.8.5 ZIP 다운로드**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-creator-skill-0.8.5.zip) — 제작 지침과 독립 실행용 런타임 소스를 함께 포함합니다. ComfyUI·See-through·모델은 포함하지 않습니다.
 
 확인된 감정·제스처 의미 정보를 팩 내보내기에 자동 포함하고, `upgrade-chat`으로 기존 팩의 시각 자산을 유지한 대화 설정 후보를 만들 수 있습니다. [캐릭터챗 제작 지침](skills/create-pet-character/references/character-chat.md)을 참고하세요.
 
@@ -280,7 +283,7 @@ Electron 준비에는 lockfile에 고정된 로컬 설치 스크립트를 사용
 
 </details>
 
-Windows GGUF 실행 환경을 포함한 배포 빌드는 고정 런타임 아카이브도 별도로 배치해야 합니다. CI의 소스 전용 검증은 실제 설치 패키지 검증을 대신하지 않습니다. v0.8.4의 앱·런타임 대응은 [빌드 출처](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/SOURCE-PROVENANCE.json), 런타임 재빌드·LGPL 교체 안내는 [재빌드 소스 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/daemonlet-0.8.4-runtime-rebuild-source.zip)을 확인하세요.
+Windows GGUF 실행 환경을 포함한 배포 빌드는 고정 런타임 아카이브도 별도로 배치해야 합니다. CI의 소스 전용 검증은 실제 설치 패키지 검증을 대신하지 않습니다. v0.8.5의 앱·런타임 대응은 [빌드 출처](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/SOURCE-PROVENANCE.json), 런타임 재빌드·LGPL 교체 안내는 [재빌드 소스 ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/daemonlet-0.8.5-runtime-rebuild-source.zip)을 확인하세요.
 
 ## 라이선스와 출처
 

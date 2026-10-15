@@ -1,3 +1,5 @@
+import {isGpuBackendPreference,type GpuBackendPreference} from '../../shared/gpu-backend'
+import {voiceProfileBackend,voiceBackendProfile,canRetryVoiceWithVulkan} from '../../shared/voice-gpu-backend'
 import {defaultVoiceSetup,voiceSetupPaths,currentVoiceSetupPath,isLegacyVoiceModel,type VoiceSetupPathId} from '../../shared/voice-setup-paths'
 import type {WindowsGgufModelInstallation} from './WindowsGgufModelInstaller'
 import type {WindowsGgufRuntimeInstallation} from './WindowsGgufRuntimeInstaller'
@@ -28,7 +30,10 @@ type QwenGgufConnection={python:string;model:string;ggufRuntime:string}&ManagedR
 type VoiceOutputOwner='local'|'presentation'
 
 export class CharacterVoiceService {
- private state:VoiceSnapshot={seedSettings:{...DEFAULT_VOICE_SEED},seedError:false,engine:defaultVoiceSetup(process.platform,process.arch).engine,qwenClone:{mode:'x-vector',transcript:''},epoch:0,enabled:false,autoRead:true,volume:0.8,profiles:[],bindings:{},status:'off',error:null,runtimeConfigured:false,availableProfiles:voiceCapabilities(process.platform,process.arch),executionProfile:process.platform==='darwin'?'gguf-metal-f16':process.platform==='win32'&&process.arch==='x64'?'gguf-cuda-f16':'baseline'}
+ private state:VoiceSnapshot={gpuBackend:'auto',seedSettings:{...DEFAULT_VOICE_SEED},seedError:false,engine:defaultVoiceSetup(process.platform,process.arch).engine,qwenClone:{mode:'x-vector',transcript:''},epoch:0,enabled:false,autoRead:true,volume:0.8,profiles:[],bindings:{},status:'off',error:null,runtimeConfigured:false,availableProfiles:voiceCapabilities(process.platform,process.arch),executionProfile:process.platform==='darwin'?'gguf-metal-f16':process.platform==='win32'&&process.arch==='x64'?'gguf-cuda-f16':'baseline'}
+ private automaticBackend:'cuda'|'vulkan'='cuda'
+ private detectGpu:(()=>Promise<'cuda'|'vulkan'>)|undefined
+ attachGpuDetector(detect:()=>Promise<'cuda'|'vulkan'>){this.detectGpu=detect}
  private replay=new VoiceReplayCache()
  readonly references:ReferenceProfileStore
  private referenceOperation:{controller:AbortController;task:Promise<void>}|null=null
@@ -65,7 +70,7 @@ export class CharacterVoiceService {
  private qwenGgufBackends:Partial<Record<'cuda'|'vulkan',QwenGgufConnection>>={}
  private qwenGgufExecutionProfile:ExecutionProfile='qwen-gguf'
  private qwenGgufSupported(){return process.platform==='win32'&&process.arch==='x64'}
- private qwenConnection(){if(this.state.engine!=='qwen3-tts-06b-gguf')return this.qwenConfig;const c=this.qwenGgufConfig,vulkan=this.qwenGgufExecutionProfile.includes('-vulkan'),cached=this.qwenGgufBackends[vulkan?'vulkan':'cuda'],runtime=vulkan?c?.ggufVulkanRuntime:c?.ggufRuntime;return cached??(c&&runtime?{python:c.python,model:c.model,ggufRuntime:runtime,...(vulkan?{managedRuntime:c.ggufVulkanManagedRuntime,dependencyDirs:c.ggufVulkanDependencyDirs}:{managedRuntime:c.managedRuntime,dependencyDirs:c.dependencyDirs})}:null)}
+ private qwenConnection(){if(this.state.engine!=='qwen3-tts-06b-gguf')return this.qwenConfig;const c=this.qwenGgufConfig,vulkan=this.activeProfile().includes('-vulkan'),cached=this.qwenGgufBackends[vulkan?'vulkan':'cuda'],runtime=vulkan?c?.ggufVulkanRuntime:c?.ggufRuntime;return cached??(c&&runtime?{python:c.python,model:c.model,ggufRuntime:runtime,...(vulkan?{managedRuntime:c.ggufVulkanManagedRuntime,dependencyDirs:c.ggufVulkanDependencyDirs}:{managedRuntime:c.managedRuntime,dependencyDirs:c.dependencyDirs})}:null)}
  private voxGgufConfig:VoxGgufConnection|null=null
  private voxTrainedGgufBackends:Partial<Record<'cuda'|'vulkan',VoxGgufConnection>>={}
  private voxPublicGgufConfig:VoxGgufConnection|null=null
@@ -226,6 +231,14 @@ export class CharacterVoiceService {
    this.state.filePreparation={busy:true,id,phase:'runtime',error:null};this.emit()
    await this.setupGgufRuntime(id,'install',valid)
    if(!valid())return
+   if(this.state.gpuBackend==='auto'){
+    const other=(id.endsWith('cuda')?id.replace('cuda','vulkan'):id.replace('vulkan','cuda')) as GgufRuntimeId
+    if(this.ggufRuntimeInstaller?.snapshot().some(value=>value.id===other&&value.available)){
+     this.state.filePreparation={busy:true,id:other,phase:'runtime',error:null};this.emit()
+     await this.setupGgufRuntime(other,'install',valid)
+    }
+   }
+   if(!valid())return
    this.state.filePreparation={busy:true,id,phase:this.state.ggufRuntimeSetup?.application==='connected'?'connected':'deferred',error:null}
   }).catch(error=>{
    if(!valid())return
@@ -245,7 +258,7 @@ export class CharacterVoiceService {
   if(this.runtimeCancelTask)return Promise.reject(Error('GGUF_RUNTIME_BUSY'))
   if(this.runtimeSetupTask)return this.runtimeSetupId===id?this.runtimeSetupTask:Promise.reject(Error('GGUF_RUNTIME_BUSY'))
   if(!this.ggufRuntimeInstaller||!this.qwenGgufSupported())return Promise.reject(Error('GGUF_RUNTIME_ARTIFACT_PENDING'))
-  if(this.selectedGgufRuntimeId()!==id)return Promise.reject(Error('VOICE_ACTION'))
+  if(this.selectedGgufRuntimeId()!==id&&!(this.state.gpuBackend==='auto'&&id.split('-')[0]===this.selectedGgufRuntimeId()?.split('-')[0]))return Promise.reject(Error('VOICE_ACTION'))
   const epoch=this.runtimeSetupEpoch,engine=this.state.engine,execution=this.activeProfile(),fingerprint=this.selectedProfile()?.fingerprint
   let operation:number|undefined
   const valid=()=>!this.disposed&&epoch===this.runtimeSetupEpoch&&current()&&this.state.engine===engine&&this.activeProfile()===execution&&this.selectedProfile()?.fingerprint===fingerprint&&(operation===undefined||operation===this.operation)
@@ -297,6 +310,7 @@ export class CharacterVoiceService {
   if(this.qwenInstaller){s.qwenInstall=this.qwenInstaller.snapshot();s.qwenInstall.applied=s.engine==='qwen3-tts-06b'&&!!this.qwenConfig;s.qwenInstall.applicationDeferred=this.qwenApplicationDeferred}
   s.engineCapabilities={synthesisStreaming:isStreamingProfile(this.activeProfile()),cancellation:s.engine==='qwen3-tts-06b'?'owned-process-termination':'cooperative-with-process-fallback'}
   s.results=this.replay.infos()
+  s.resolvedGpuBackend=voiceProfileBackend(this.activeProfile());s.gpuBackend=this.state.gpuBackend==='auto'?'auto':s.resolvedGpuBackend??this.state.gpuBackend;s.gpuFallback=this.state.gpuBackend==='auto'&&this.automaticBackend==='vulkan';
   s.executionProfile=this.activeProfile();s.runtimeConfigured=!!this.configured();s.referenceImport={busy:!!this.referenceOperation,error:this.referenceImportError}
   const termsRuntime=this.selectedGgufRuntimeId();if(termsRuntime&&this.ggufRuntimeTerms)s.ggufRuntimeTerms=this.ggufRuntimeTerms.snapshot(termsRuntime)
   if(this.base){s.baseInstall=this.base.snapshot();if(s.baseInstall.supported){s.defaultProfile=this.baseKey();if(!this.base.native)s.availableProfiles=managed?['cuda-compiled','cuda-compiled-complete',...(this.qwenGgufSupported()?['gguf-cuda-f16','gguf-cuda-f16-complete','gguf-vulkan-f16','gguf-vulkan-f16-complete'] as ExecutionProfile[]:[])]:['baseline','cached','compiled',...(this.qwenGgufSupported()?['gguf-cuda-f16','gguf-cuda-f16-complete','gguf-vulkan-f16','gguf-vulkan-f16-complete'] as ExecutionProfile[]:[])]}}
@@ -310,7 +324,10 @@ export class CharacterVoiceService {
   return s
  }
  private baseKey(){return this.base?profileKey(this.base.profile):BASE_KEY}
- private activeProfile():ExecutionProfile{if(this.state.engine==='qwen3-tts-06b-gguf')return this.qwenGgufExecutionProfile;if(this.state.engine==='qwen3-tts-06b')return process.platform==='darwin'?this.qwenExecutionProfile:'qwen-complete';return isManagedVoice(this.selectedProfile())&&this.base&&!this.base.native?this.baseExecutionProfile:this.state.executionProfile||'baseline'}
+ private activeProfile():ExecutionProfile{
+  const profile=this.state.engine==='qwen3-tts-06b-gguf'?this.qwenGgufExecutionProfile:this.state.engine==='qwen3-tts-06b'?process.platform==='darwin'?this.qwenExecutionProfile:'qwen-complete':isManagedVoice(this.selectedProfile())&&this.base&&!this.base.native?this.baseExecutionProfile:this.state.executionProfile||'baseline'
+  return voiceProfileBackend(profile)&&this.state.gpuBackend==='auto'?voiceBackendProfile(profile,this.automaticBackend):profile
+ }
  private bindingKey(id:string){return this.state.bindings[id]??(this.base?.snapshot().supported?this.baseKey():'')}
  refreshBase(){this.emit()}
  installQwen(current=()=>true):Promise<void>{
@@ -407,11 +424,15 @@ export class CharacterVoiceService {
     if(supported.includes(selected))this.state.executionProfile=selected
     else {this.state.executionProfile=supported[0];this.state.enabled=false;this.state.error='VOICE_PLATFORM_PROFILE'}
     this.baseExecutionProfile=['cuda-compiled','cuda-compiled-complete','gguf-cuda-f16','gguf-cuda-f16-complete','gguf-vulkan-f16','gguf-vulkan-f16-complete'].includes(saved.baseExecutionProfile)?saved.baseExecutionProfile:saved.executionProfile==='cuda-compiled-complete'?'cuda-compiled-complete':'cuda-compiled'
+    const savedVoiceKey=saved.bindings[this.chat().character?.id||'']??this.baseKey()
+    const savedManaged=!!this.base&&!this.base.native&&(savedVoiceKey===this.baseKey()||!!referenceKey(savedVoiceKey))
+    this.state.gpuBackend=isGpuBackendPreference(saved.gpuBackend)?saved.gpuBackend:voiceProfileBackend(this.state.engine==='qwen3-tts-06b-gguf'?this.qwenGgufExecutionProfile:savedManaged?this.baseExecutionProfile:this.state.executionProfile)??'auto'
     // Migrate only the new managed-mode names; preserve every legacy external mode.
     if(this.state.executionProfile?.startsWith('cuda-compiled'))this.state.executionProfile='compiled'
     this.state.bindings=Object.fromEntries(Object.entries(saved.bindings).filter(([k,v])=>k.length<=80&&typeof v==='string'&&v.length<=170)) as Record<string,string>
     if(saved.runtime&&typeof saved.runtime.python==='string'&&typeof saved.runtime.model==='string'){this.config=saved.runtime;this.state.runtimeConfigured=true}
    }catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw Error('VOICE_SETTINGS')}
+   if(this.qwenGgufSupported()&&this.state.gpuBackend==='auto'&&this.detectGpu)this.automaticBackend=await this.detectGpu().catch(()=>this.automaticBackend)
    await this.references.initialize().catch(()=>{this.referenceImportError='VOICE_REFERENCE_STORAGE'})
    for(const key of this.pendingRemoval)await this.removeFiles(key).catch(()=>{this.state.error='VOICE_CLEANUP_PENDING'})
    for(const entry of await readdir(join(this.root,'profiles'),{withFileTypes:true}))if(entry.isDirectory()&&!entry.name.startsWith('.')){
@@ -432,10 +453,10 @@ export class CharacterVoiceService {
  }
  private async save(){
   await mkdir(this.root,{recursive:true});const temp=join(this.root,'settings-'+randomUUID()+'.tmp')
-  try{await writeFile(temp,JSON.stringify({version:1,...(process.platform==='win32'?{modelVerification:this.modelVerification}:{}),engine:this.state.engine,qwenRuntime:this.qwenConfig,qwenGgufRuntime:this.qwenGgufConfig,qwenGgufBackends:this.qwenGgufBackends,voxGgufRuntime:this.voxGgufConfig,voxTrainedGgufBackends:this.voxTrainedGgufBackends,voxPublicGgufRuntime:this.voxPublicGgufConfig,voxPublicGgufBackends:this.voxPublicGgufBackends,qwenGgufExecutionProfile:this.qwenGgufExecutionProfile,qwenExecutionProfile:this.qwenExecutionProfile,qwenClone:this.state.qwenClone,enabled:this.state.enabled,autoRead:this.state.autoRead,volume:this.state.volume,bindings:this.state.bindings,runtime:this.config,pendingRemoval:[...this.pendingRemoval],executionProfile:this.state.executionProfile||'baseline',baseExecutionProfile:this.baseExecutionProfile,seedSettings:this.state.seedError?{invalid:true}:this.state.seedSettings})+'\n',{flag:'wx'});await replaceFile(temp,join(this.root,'settings.json'))}
+  try{await writeFile(temp,JSON.stringify({version:1,gpuBackend:this.state.gpuBackend==='auto'?'auto':voiceProfileBackend(this.activeProfile())??this.state.gpuBackend,...(process.platform==='win32'?{modelVerification:this.modelVerification}:{}),engine:this.state.engine,qwenRuntime:this.qwenConfig,qwenGgufRuntime:this.qwenGgufConfig,qwenGgufBackends:this.qwenGgufBackends,voxGgufRuntime:this.voxGgufConfig,voxTrainedGgufBackends:this.voxTrainedGgufBackends,voxPublicGgufRuntime:this.voxPublicGgufConfig,voxPublicGgufBackends:this.voxPublicGgufBackends,qwenGgufExecutionProfile:this.qwenGgufExecutionProfile,qwenExecutionProfile:this.qwenExecutionProfile,qwenClone:this.state.qwenClone,enabled:this.state.enabled,autoRead:this.state.autoRead,volume:this.state.volume,bindings:this.state.bindings,runtime:this.config,pendingRemoval:[...this.pendingRemoval],executionProfile:this.state.executionProfile||'baseline',baseExecutionProfile:this.baseExecutionProfile,seedSettings:this.state.seedError?{invalid:true}:this.state.seedSettings})+'\n',{flag:'wx'});await replaceFile(temp,join(this.root,'settings.json'))}
   finally{await rm(temp,{force:true}).catch(()=>{})}
  }
- private mutate(work:()=>Promise<void>,runtimeOwner=false){this.assertModelsAvailable(runtimeOwner);const task=this.serial.then(async()=>{if(this.disposed)return;const previous=structuredClone(this.state),config=this.config,qwenConfig=this.qwenConfig,ggufConfig=this.qwenGgufConfig,qwenGgufBackends={...this.qwenGgufBackends},voxGgufConfig=this.voxGgufConfig,voxTrainedGgufBackends={...this.voxTrainedGgufBackends},voxPublicGgufConfig=this.voxPublicGgufConfig,voxPublicGgufBackends={...this.voxPublicGgufBackends},ggufMode=this.qwenGgufExecutionProfile,qwenMode=this.qwenExecutionProfile,baseMode=this.baseExecutionProfile,modelVerification=this.modelVerification,removals=new Set(this.pendingRemoval);try{await work();await this.save();this.emit()}catch(e){this.state={...previous,epoch:this.state.epoch};this.config=config;this.qwenConfig=qwenConfig;this.qwenGgufConfig=ggufConfig;this.qwenGgufBackends=qwenGgufBackends;this.voxGgufConfig=voxGgufConfig;this.voxTrainedGgufBackends=voxTrainedGgufBackends;this.voxPublicGgufConfig=voxPublicGgufConfig;this.voxPublicGgufBackends=voxPublicGgufBackends;this.qwenGgufExecutionProfile=ggufMode;this.qwenExecutionProfile=qwenMode;this.baseExecutionProfile=baseMode;this.modelVerification=modelVerification;this.pendingRemoval=removals;this.error(e)}});this.serial=task.catch(()=>{});return task}
+ private mutate(work:()=>Promise<void>,runtimeOwner=false){this.assertModelsAvailable(runtimeOwner);const task=this.serial.then(async()=>{if(this.disposed)return;const previous=structuredClone(this.state),config=this.config,qwenConfig=this.qwenConfig,ggufConfig=this.qwenGgufConfig,qwenGgufBackends={...this.qwenGgufBackends},voxGgufConfig=this.voxGgufConfig,voxTrainedGgufBackends={...this.voxTrainedGgufBackends},voxPublicGgufConfig=this.voxPublicGgufConfig,voxPublicGgufBackends={...this.voxPublicGgufBackends},ggufMode=this.qwenGgufExecutionProfile,qwenMode=this.qwenExecutionProfile,baseMode=this.baseExecutionProfile,modelVerification=this.modelVerification,automaticBackend=this.automaticBackend,removals=new Set(this.pendingRemoval);try{await work();await this.save();this.emit()}catch(e){this.state={...previous,epoch:this.state.epoch};this.config=config;this.qwenConfig=qwenConfig;this.qwenGgufConfig=ggufConfig;this.qwenGgufBackends=qwenGgufBackends;this.voxGgufConfig=voxGgufConfig;this.voxTrainedGgufBackends=voxTrainedGgufBackends;this.voxPublicGgufConfig=voxPublicGgufConfig;this.voxPublicGgufBackends=voxPublicGgufBackends;this.qwenGgufExecutionProfile=ggufMode;this.qwenExecutionProfile=qwenMode;this.baseExecutionProfile=baseMode;this.modelVerification=modelVerification;this.automaticBackend=automaticBackend;this.pendingRemoval=removals;this.error(e)}});this.serial=task.catch(()=>{});return task}
  error(e:unknown){this.state.error=e instanceof Error&&/^[A-Z_]{1,80}$/.test(e.message)?e.message:'VOICE_ERROR';this.state.status='error';this.emit()}
  async importPackage(path:string){return this.mutate(async()=>{const p=await importVoicePackage(path,join(this.root,'profiles'),process.platform==='darwin'?undefined:SELECTED_VOICE);if(!this.state.profiles.some(v=>profileKey(v)===profileKey(p.profile)))this.state.profiles.push(p.profile);this.pendingRemoval.delete(profileKey(p.profile));this.state.error=null})}
  importReference(path:string,name:string,current=()=>true):Promise<void>{
@@ -473,6 +494,24 @@ export class CharacterVoiceService {
   if(removed(this.voxPublicGgufConfig))this.voxPublicGgufConfig=null
  }
  modelRemovalContext(){return createHash('sha256').update(JSON.stringify({engine:this.state.engine,executionProfile:this.activeProfile(),bindings:this.state.bindings,config:this.config,qwen:this.qwenConfig,qwenGguf:this.qwenGgufConfig,qwenBackends:this.qwenGgufBackends,vox:this.voxGgufConfig,voxBackends:this.voxTrainedGgufBackends,voxPublic:this.voxPublicGgufConfig,voxPublicBackends:this.voxPublicGgufBackends})).digest('hex')}
+ gpuBackend(value:GpuBackendPreference,current=()=>true){
+  if(!this.qwenGgufSupported()||!isGpuBackendPreference(value)||!voiceProfileBackend(this.activeProfile()))throw Error('VOICE_ACTION')
+  ++this.qwenSettingsEpoch;void this.stop().catch(()=>{})
+  return this.mutate(async()=>{
+   await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED')
+   const detected=value==='auto'&&this.detectGpu?await this.detectGpu():this.automaticBackend
+   if(!current())throw Error('CHAT_SETTINGS_EXPIRED')
+   if(value!=='auto'){
+    const profile=voiceBackendProfile(this.activeProfile(),value)
+    if(this.state.engine==='qwen3-tts-06b-gguf')this.qwenGgufExecutionProfile=profile
+    else if(isManagedVoice(this.selectedProfile())&&this.base&&!this.base.native)this.baseExecutionProfile=profile
+    else this.state.executionProfile=profile
+   }
+   this.state.gpuBackend=value;this.automaticBackend=detected
+   this.runtime=null;this.verifiedBase=null;this.state.error=null
+   this.state.status=this.state.enabled?'idle':'off'
+  }).then(()=>this.prepare())
+ }
  selectVoicePath(id:VoiceSetupPathId,current=()=>true){
   const path=voiceSetupPaths(process.platform,process.arch).find(path=>path.id===id)
   if(!path)throw Error('VOICE_ACTION')
@@ -492,7 +531,7 @@ export class CharacterVoiceService {
  engine(value:import('../../shared/character-voice-contract').VoiceEngine,current=()=>true){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');if(!['voxcpm2','qwen3-tts-06b','qwen3-tts-06b-gguf'].includes(value)||value==='qwen3-tts-06b'&&!this.qwenSupported()||value==='qwen3-tts-06b-gguf'&&!this.qwenGgufSupported())throw Error('VOICE_ACTION');this.state.engine=value;this.runtime=null;this.state.error=null}).then(()=>this.prepare())}
  qwenClone(value:import('../../shared/character-voice-contract').QwenCloneSettings,current=()=>true){if(!this.validQwenClone(value))throw Error('QWEN_TRANSCRIPT_REQUIRED');void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');this.state.qwenClone={mode:value.mode,transcript:value.mode==='x-vector'?'':value.transcript};this.runtime=null;this.state.error=null})}
  configureQwen(python:string,model:string,current=()=>true){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');if(!this.qwenSupported())throw Error('VOICE_ACTION');this.qwenConfig={python,model};this.runtime=null;this.state.error=null})}
- configureQwenGguf(python:string,model:string,ggufRuntime:string,current=()=>true){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');if(!this.qwenGgufSupported())throw Error('QWEN_GGUF_UNSUPPORTED');const prior=this.qwenGgufConfig??{python,model,ggufRuntime:''};this.qwenGgufConfig=this.qwenGgufExecutionProfile.includes('-vulkan')?{...prior,python,model,ggufVulkanRuntime:ggufRuntime,ggufVulkanManagedRuntime:undefined,ggufVulkanDependencyDirs:undefined}:{...prior,python,model,ggufRuntime,managedRuntime:undefined,dependencyDirs:undefined};this.qwenGgufBackends[this.qwenGgufExecutionProfile.includes('-vulkan')?'vulkan':'cuda']={python,model,ggufRuntime};this.runtime=null;this.state.error=null})}
+ configureQwenGguf(python:string,model:string,ggufRuntime:string,current=()=>true){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');if(!this.qwenGgufSupported())throw Error('QWEN_GGUF_UNSUPPORTED');const prior=this.qwenGgufConfig??{python,model,ggufRuntime:''};this.qwenGgufConfig=this.activeProfile().includes('-vulkan')?{...prior,python,model,ggufVulkanRuntime:ggufRuntime,ggufVulkanManagedRuntime:undefined,ggufVulkanDependencyDirs:undefined}:{...prior,python,model,ggufRuntime,managedRuntime:undefined,dependencyDirs:undefined};this.qwenGgufBackends[this.activeProfile().includes('-vulkan')?'vulkan':'cuda']={python,model,ggufRuntime};this.runtime=null;this.state.error=null})}
  configureVoxGguf(python:string,model:string,gguf:{runtimeDir:string;derivativeDir:string;receipt:string},current=()=>true){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');if(!this.qwenGgufSupported())throw Error('VOX_GGUF_PLATFORM');this.voxGgufConfig={python,model,gguf:{...gguf}};this.voxTrainedGgufBackends[this.activeProfile().includes('vulkan')?'vulkan':'cuda']=this.voxGgufConfig;this.runtime=null;this.state.error=null})}
  configureVoxPublicGguf(python:string,model:string,gguf:{runtimeDir:string;derivativeDir:string;receipt:string},current=()=>true){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');if(!this.qwenGgufSupported())throw Error('VOX_GGUF_PLATFORM');if(model!==gguf.derivativeDir)throw Error('VOX_GGUF_RUNTIME_CONFIG');this.voxPublicGgufConfig={python,model,gguf:{...gguf}};this.voxPublicGgufBackends[this.activeProfile().includes('vulkan')?'vulkan':'cuda']=this.voxPublicGgufConfig;this.runtime=null;this.state.error=null})}
  configure(python:string,model:string){++this.qwenSettingsEpoch;void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(this.state.executionProfile?.startsWith('mps-')||this.state.executionProfile?.startsWith('gguf-metal-'))await verifyMacInterpreter(python,this.state.executionProfile);this.config={python,model};this.state.runtimeConfigured=true;this.runtime=null;this.state.error=null})}
@@ -500,7 +539,7 @@ export class CharacterVoiceService {
  seedSettings(value:VoiceSeedSettings,current=()=>true){if(!validSeedSettings(value))throw Error('VOICE_SEED_INVALID');return this.mutate(async()=>{if(!current())throw Error('CHAT_SETTINGS_EXPIRED');this.state.seedSettings={...value};this.state.seedError=false;if(this.state.error==='VOICE_SEED_SETTINGS')this.state.error=null})}
  auto(value:boolean){return this.mutate(async()=>{this.state.autoRead=value})}
  volume(value:number){return this.mutate(async()=>{this.state.volume=value})}
- executionProfile(value:ExecutionProfile){void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(isWindowsVoxGgufProfile(value)&&!this.snapshot().availableProfiles?.includes(value))throw Error('VOICE_PLATFORM_PROFILE');if(this.state.engine==='qwen3-tts-06b-gguf'){if(!['qwen-gguf','qwen-gguf-complete','qwen-gguf-vulkan','qwen-gguf-vulkan-complete'].includes(value))throw Error('VOICE_PLATFORM_PROFILE');this.qwenGgufExecutionProfile=value;}else if(this.state.engine==='qwen3-tts-06b'){if(!(process.platform==='darwin'?['qwen-mlx','qwen-mlx-complete']:['qwen-complete']).includes(value))throw Error('VOICE_PLATFORM_PROFILE');this.qwenExecutionProfile=value;}else if(isManagedVoice(this.selectedProfile())&&this.base&&!this.base.native)this.baseExecutionProfile=value;else this.state.executionProfile=value;this.runtime=null;this.state.error=null}).then(()=>this.prepare())}
+ executionProfile(value:ExecutionProfile){void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();const backend=voiceProfileBackend(value);if(backend)this.state.gpuBackend=backend;if(isWindowsVoxGgufProfile(value)&&!this.snapshot().availableProfiles?.includes(value))throw Error('VOICE_PLATFORM_PROFILE');if(this.state.engine==='qwen3-tts-06b-gguf'){if(!['qwen-gguf','qwen-gguf-complete','qwen-gguf-vulkan','qwen-gguf-vulkan-complete'].includes(value))throw Error('VOICE_PLATFORM_PROFILE');this.qwenGgufExecutionProfile=value;}else if(this.state.engine==='qwen3-tts-06b'){if(!(process.platform==='darwin'?['qwen-mlx','qwen-mlx-complete']:['qwen-complete']).includes(value))throw Error('VOICE_PLATFORM_PROFILE');this.qwenExecutionProfile=value;}else if(isManagedVoice(this.selectedProfile())&&this.base&&!this.base.native)this.baseExecutionProfile=value;else this.state.executionProfile=value;this.runtime=null;this.state.error=null}).then(()=>this.prepare())}
  modelVerificationPolicy(value:'full'|'installed',current=()=>true){if(process.platform!=='win32'||!['full','installed'].includes(value)||(this.state.engine==='qwen3-tts-06b-gguf'||isWindowsVoxGgufProfile(this.activeProfile()))&&value!=='full')throw Error('VOICE_ACTION');void this.stop().catch(()=>{});return this.mutate(async()=>{await this.stop();if(!current())throw Error('CHAT_SETTINGS_EXPIRED');this.modelVerification=value;this.runtime=null;this.verifiedBase=null}).then(()=>this.prepare())}
  checkModel(current=()=>true){
   this.assertModelsAvailable()
@@ -525,10 +564,26 @@ export class CharacterVoiceService {
    if(!current())throw Error('VOICE_CANCELLED')
    if(this.runtimeOwners?.runtime!==runtime||this.runtimeOwners.session!==runtime.sessionId||!runtime.running)this.runtimeOwners={runtime,session:runtime.sessionId,owners:new Set()}
    const ownership=this.runtimeOwners;ownership.owners.add(owner)
-   await this.loadRuntime(profile,runtime,current)
+   try{await this.loadRuntime(profile,runtime,current)}catch(error){
+    if(!current()||this.state.gpuBackend!=='auto'||voiceProfileBackend(this.activeProfile())!=='cuda'||!canRetryVoiceWithVulkan(error))throw error
+    const alternative=this.state.engine==='qwen3-tts-06b-gguf'?this.qwenGgufBackends.vulkan||this.qwenGgufConfig?.ggufVulkanRuntime:isManagedVoice(profile)?this.voxPublicGgufBackends.vulkan:this.voxTrainedGgufBackends.vulkan
+    // Loading may select an already connected fallback, but never downloads,
+    // extracts runtimes, changes voices, or bypasses managed admission.
+    if(!alternative)throw error
+    await runtime.stop();if(!current())throw Error('VOICE_CANCELLED')
+    this.automaticBackend='vulkan';this.runtime=null;this.verifiedBase=null
+    runtime=this.getRuntime()
+    this.runtimeOwners={runtime,session:runtime.sessionId,owners:new Set([owner])}
+    this.diagnose({type:'gpu-backend-fallback',from:'cuda',to:'vulkan',reason:(error as Error).message})
+    await this.loadRuntime(profile,runtime,current)
+    if(this.runtimeOwners.runtime===runtime)this.runtimeOwners.session=runtime.sessionId
+    this.emit()
+    return runtime
+   }
    if(this.runtimeOwners===ownership){if(ownership.session!==runtime.sessionId)ownership.owners=new Set([owner]);ownership.session=runtime.sessionId}
+   return runtime
   })
-  this.runtimeStartTask=task.catch(()=>{});return task
+  this.runtimeStartTask=task.then(()=>{},()=>{});return task
  }
  private async loadRuntime(profile:VoiceSnapshot['profiles'][number],runtime:TtsRuntimeSupervisor,current:()=>boolean){
   if(process.platform==='win32'&&!isWindowsVoxGgufProfile(this.activeProfile())&&this.blockedModels.size>0&&this.blockedModels.has(runtime.config.model.toLowerCase()))throw Error('VOICE_MODEL_CHECK_FAILED')
@@ -586,11 +641,11 @@ export class CharacterVoiceService {
   const profile=this.selectedProfile()
   if(this.disposed||(manual&&!this.chat().character)||this.state.seedError||(!manual&&(!this.outputReady||this.outputOwner==='presentation'&&this.presentationMuted))||!this.state.enabled||!this.configured()||!profile||(!isStreamingProfile(this.activeProfile())&&!this.activeProfile().endsWith('-complete'))||this.currentSpeech||this.modelCheckTask){if(manual)return Promise.reject(Error('VOICE_PREPARATION_UNAVAILABLE'));return Promise.resolve()}
   try{this.assertConfiguredRuntimeTerms()}catch(error){this.error(error);return manual?Promise.reject(error):Promise.resolve()}
-  const operation=this.operation,runtime=this.getRuntime(),character=this.chat().character,characterId=character?.id,revision=character?.revision,fingerprint=profile.fingerprint,engine=this.state.engine,execution=this.activeProfile()
-  const current=()=>operation===this.operation&&!this.disposed&&this.state.enabled&&(manual||this.outputReady)&&this.chat().character?.id===characterId&&this.chat().character?.revision===revision&&this.selectedProfile()?.fingerprint===fingerprint&&this.state.engine===engine&&this.activeProfile()===execution
+  const operation=this.operation,runtime=this.getRuntime(),character=this.chat().character,characterId=character?.id,revision=character?.revision,fingerprint=profile.fingerprint,engine=this.state.engine,execution=this.activeProfile(),gpuPreference=this.state.gpuBackend
+  const current=()=>operation===this.operation&&!this.disposed&&this.state.enabled&&(manual||this.outputReady)&&this.chat().character?.id===characterId&&this.chat().character?.revision===revision&&this.selectedProfile()?.fingerprint===fingerprint&&this.state.engine===engine&&(this.activeProfile()===execution||gpuPreference==='auto'&&this.state.gpuBackend==='auto')
   this.preparationCurrent=current
   this.state.status='loading';this.state.error=null;this.emit()
-  const task=this.startRuntime(profile,runtime,current).then(async()=>{
+  const task=this.startRuntime(profile,runtime,current).then(async(runtime)=>{
    if(!current())return
    if(isQwenEngine(this.state.engine)&&!runtime.audit?.warmed)await runtime.prewarm()
    if(current()){this.state.status='idle';this.state.error=null;this.emit();this.diagnose({type:'preparation-ready',at:Date.now(),session:runtime.sessionId,audit:runtime.audit})}
@@ -661,7 +716,8 @@ export class CharacterVoiceService {
   if(message.role!=='assistant'||message.status!=='complete'||!message.binding)throw Error('VOICE_MESSAGE')
   if(this.state.seedError&&mode!=='replay')throw Error('VOICE_SEED_SETTINGS')
   this.syncReplayScope()
-  const seedSettings={...(this.state.seedSettings||DEFAULT_VOICE_SEED)},executionProfile=this.activeProfile()
+  const seedSettings={...(this.state.seedSettings||DEFAULT_VOICE_SEED)}
+  let executionProfile=this.activeProfile()
   const before=this.chat(),source=structuredClone(message),profile=this.selectedProfile()
   if(!profile)throw Error(referenceKey(this.bindingKey(before.character?.id||''))?'VOICE_REFERENCE_UNAVAILABLE':'VOICE_NOT_INSTALLED');if(isReferenceProfile(profile)&&profile.error)throw Error(profile.error);if(mode!=='replay'&&!this.configured())throw Error(isManagedVoice(profile)?'VOICE_BASE_NOT_INSTALLED':'VOICE_RUNTIME_MISSING')
   const op=++this.operation
@@ -679,7 +735,7 @@ export class CharacterVoiceService {
    const plan=planSpeech(source.text,this.speechPolicy),segments=plan.segments
    this.diagnose({type:'speech-plan',policy:plan.policy,preferredLength:plan.preferredLength,segments:segments.map(({start,end,index,cutReason,readableGraphemes,tinyReason})=>({start,end,index,cutReason,readableGraphemes,tinyReason}))})
    const speechPlanFingerprint=createHash('sha256').update(JSON.stringify(plan)).digest('hex')
-   const identity=await this.replayIdentity(source,profile,speechPlanFingerprint,executionProfile)
+   let identity=await this.replayIdentity(source,profile,speechPlanFingerprint,executionProfile)
    if(!current())return
    const previousResult=this.replay.previous(source.id,identity)
    if(mode==='replay'){
@@ -708,12 +764,17 @@ export class CharacterVoiceService {
    if(!validVoiceSeed(effectiveSeed))throw Error('VOICE_SEED_INVALID')
    const generation:VoiceGenerationPlan=Object.freeze({generationId:randomUUID(),effectiveSeed,seedPolicy:mode==='reroll'?'reroll':mode==='reproduce'?'reproduce':seedSettings.mode,messageId:source.id,voiceFingerprint:profile.fingerprint,speechPlanFingerprint})
    this.diagnose({type:'voice-generation',...generation,cache:'miss'})
-   const runtime=this.getRuntime()
+   let runtime=this.getRuntime()
    this.speechStartedAt=requestedAt;this.spokenRequestAt=automatic?(this.requestTimes.get(source.binding!.requestId)||this.speechStartedAt):0;this.firstPlayback=false;this.lastPlaybackEndAt=0
    this.state.error=null;this.state.status=runtime.running?'synthesizing':'loading';this.emit()
    if(!current())return
-   await this.startRuntime(profile,runtime,current,owner)
+   runtime=await this.startRuntime(profile,runtime,current,owner)
    if(!current())return
+   if(executionProfile!==this.activeProfile()){
+    if(mode==='reproduce')throw Error('VOICE_REPRODUCE_CHANGED')
+    executionProfile=this.activeProfile();identity=await this.replayIdentity(source,profile,speechPlanFingerprint,executionProfile)
+    if(!current())return
+   }
    this.diagnose({type:'runtime-ready',at:Date.now(),session:runtime.sessionId,audit:runtime.audit})
    candidate=this.replay.begin(identity,generation,{runtimeFingerprint:runtime.audit?.runtimeFingerprint,modelRevision:runtime.audit?.modelRevision,sourceCommit:runtime.audit?.sourceCommit,adapterSha256:runtime.audit?.adapterSha256,referenceSha256:runtime.audit?.referenceSha256,executionProfile})
    const binding:SpeechBinding={engine:this.state.engine||'voxcpm2',effectiveSeed:generation.effectiveSeed,generationId:generation.generationId,...source.binding!,messageId:source.id,speechEpoch:epoch,voiceProfileId:profile.id,voiceProfileVersion:profile.version,voiceFingerprint:profile.fingerprint,runtimeSessionId:runtime.sessionId,executionProfile,...(isReferenceProfile(profile)?{conditioningFingerprint:String(runtime.audit?.conditioningFingerprint||'')}: {})}

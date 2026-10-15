@@ -1,4 +1,5 @@
 import {ChatDraftStore,chatDraftKey} from './ChatDraftStore'
+import {isGpuBackendPreference,type GpuBackendPreference} from '../../shared/gpu-backend'
 import {ConversationStore, completeContext, CHAT_STORAGE_LIMITS, encodeStoredChats, type StoredChats} from './ConversationStore'
 import {validateChatDefinition, emptyChat, type CharacterChatDefinition} from '../../shared/character-chat-semantics'
 import {join} from 'node:path'
@@ -61,7 +62,7 @@ export class CharacterChatService {
   private notifyVoiceStart(id:string){for(const fn of this.voiceStartListeners){try{fn(id)}catch{/* Voice cannot fail text admission. */}}}
   subscribeVoice(fn:(message:ChatMessage|null)=>void){this.voiceListeners.add(fn);return()=>this.voiceListeners.delete(fn)}
   private notifyVoice(message:ChatMessage|null){for(const fn of this.voiceListeners){try{fn(message?structuredClone(message):null)}catch{/* TTS must never fail text chat. */}}}
-  snapshot() {const accepted=this.acceptedDraft;return structuredClone({...this.state,draft:this.drafts.get(this.draftKey()),acceptedDraft:accepted?.characterId===this.data.characterId&&accepted.conversationId===this.data.current?{key:accepted.key,revision:accepted.revision}:undefined})}
+  snapshot():LocalChatSnapshot {const accepted=this.acceptedDraft;return structuredClone({...this.state,gpuBackend:this.runtime.backendPreference,availableGpuBackends:process.platform==='win32'?['auto','cuda','vulkan']:['auto'],runtimeDevice:this.runtime.selectedDevice,runtimeFallback:this.runtime.backendFallback,draft:this.drafts.get(this.draftKey()),acceptedDraft:accepted?.characterId===this.data.characterId&&accepted.conversationId===this.data.current?{key:accepted.key,revision:accepted.revision}:undefined})}
   private emit() {
     this.state.memories = this.data.memories[this.state.character?.id || ''] || []
     this.state.conversations = this.data.conversations.map(c => ({id:c.id,title:c.title,characterId:c.characterId}))
@@ -73,6 +74,7 @@ export class CharacterChatService {
     this.lastConversation.set(data.characterId,data.current)
     this.data=data
     this.state.model=data.model
+    this.runtime.backendPreference=process.platform==='win32'?data.gpuBackend??'auto':'auto'
     this.state.conversation=data.conversations.find(c=>c.id===data.current) || null
     if (prepared) {
       this.prepared=prepared
@@ -95,6 +97,7 @@ export class CharacterChatService {
         const prepared=await this.prepareCharacter(await this.registry.ensureReady(entry))
         const installed=await this.models.installed()
         if (this.lifecycle !== 'initializing') return
+        this.runtime.backendPreference=process.platform==='win32'?data.gpuBackend??'auto':'auto'
         const available=await this.runtime.available()
         // A close that overlaps reading must never persist partially initialized defaults.
         if (this.lifecycle !== 'initializing') return
@@ -255,6 +258,14 @@ export class CharacterChatService {
     })
   }
   attention(active: boolean) {if (this.lifecycle==='loaded' && !this.pendingChanges && ['idle','attentive'].includes(this.state.phase)) {this.state.phase=active?'attentive':'idle';this.emit()}}
+  selectGpuBackend(value:GpuBackendPreference) {
+    if(!isGpuBackendPreference(value)||(process.platform!=='win32'&&value!=='auto'))throw Error('지원하지 않는 실행 환경입니다.')
+    return this.change(async data=>{data.gpuBackend=value}).then(async()=>{
+      this.state.runtimeAvailable=await this.runtime.available()
+      this.state.runtimeIssue=this.state.runtimeAvailable?undefined:this.runtime.availabilityError||'로컬 추론 런타임을 사용할 수 없습니다.'
+      this.emit()
+    })
+  }
   selectModel(id: LocalModelId) {return this.change(async data=>{data.model=id})}
   newChat() {return this.change(async data=>{data.current=undefined}).then(()=>{const old=this.draftKey();this.newDraftKeys.set(this.data.characterId,++this.newDraftSequence);this.drafts.delete(old);this.emit()})}
   selectConversation(id: string) {return this.change(async data=>{

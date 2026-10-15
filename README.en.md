@@ -10,25 +10,26 @@ This is not an official OpenAI product and is not affiliated with OpenAI.
 
 <img src="docs/images/gpichan.png" width="360" alt="Gpichan running in Daemonlet for Codex">
 
-## Downloads — v0.8.4
+## Downloads — v0.8.5
 
 | Platform | Download | Notes |
 |---|---|---|
-| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-for-Codex-0.8.4-macOS-arm64.zip) | macOS 13+ · Developer ID signed and notarized by Apple |
-| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-for-Codex-0.8.4-windows-x64-Setup.exe) | Windows 10 build 19045+ · Per-user installation · Unsigned |
-| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-for-Codex-0.8.4-windows-x64.zip) | Extract the entire folder and run · Unsigned |
+| macOS · Apple Silicon | [Mac ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-for-Codex-0.8.5-macOS-arm64.zip) | macOS 13+ · Developer ID signed and notarized by Apple |
+| Windows · x64 | [Installer](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-for-Codex-0.8.5-windows-x64-Setup.exe) | Windows 10 build 19045+ · Per-user installation · Unsigned |
+| Windows · x64 | [Portable ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-for-Codex-0.8.5-windows-x64.zip) | Extract the entire folder and run · Unsigned |
 
-[Release notes and verification limits](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/SHA256SUMS.txt) · [Build provenance](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/SOURCE-PROVENANCE.json)
+[Release notes and verification limits](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5) · [SHA-256 checksums](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/SHA256SUMS.txt) · [Build provenance](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/SOURCE-PROVENANCE.json)
 
 The core app needs no separate Node.js, Python, ComfyUI or manual server installation. **Local chat and voice TTS each need a model installed separately through the app.** Windows GGUF runtimes are bundled with the release; their models download separately. Mac Qwen and legacy Windows PyTorch installers also prepare dedicated Python environments. Task status and authored click reactions do not need model weights. **Dots connection separately requires Node.js, the official tunnel-client and account setup.** Both Windows packages are unsigned: their publisher signature cannot be verified. SHA-256 checks that a file matches the published download.
 
-## What's new in v0.8.4
+## What's new in v0.8.5
 
-- **Windows GGUF voice:** Prepare Qwen 0.6B Base Q8 or VoxCPM2 F16 with CUDA/Vulkan, including model download, verification, cancellation and removal.
-- **Four-step voice setup:** Choose an engine, prepare its files, select a voice and test playback. Existing PyTorch connections remain in legacy management.
-- **Repeated speech preparation:** Retain prepared workers after normal Dots speech and reduce duplicate file hashing during Mac Vox preparation.
+- **Windows CUDA and Vulkan chat:** One app includes both runtimes, with Automatic, CUDA and Vulkan choices. Automatic prefers CUDA and uses Vulkan when needed.
+- **Automatic voice GPU selection:** Qwen and Vox GGUF select their backend independently of chat. Automatic file preparation sets up both runtimes with shared models.
+- **GPU generation gate removed:** GGUF CUDA voice no longer requires an exact compute capability of 8.9. Driver, file-integrity and actual GPU-loading checks remain.
+- Existing conversations, voices, manual backend choices and external model connections are preserved. Windows hardware validation uses RTX 4090; other GPUs are not established as working.
 
-[Release details and verification limits](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4)
+[Release details and verification limits](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5)
 
 ## Quick start
 
@@ -86,15 +87,15 @@ After model installation, **reply generation runs locally**. It uses no paid ext
 | Environment | Local chat runtime |
 |---|---|
 | Mac · Apple Silicon | Metal |
-| Windows · x64 + NVIDIA GPU | CUDA |
+| Windows · x64 | CUDA / Vulkan · automatic or explicit selection |
 
-E4B/12B multi-turn generation, cancellation and recovery were checked on both platforms. The earlier [0.8.2 verification](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.2) included actual upgrades with the notarized Mac app and official Windows installer, settings/conversation preservation and voice behavior. **Minimum RAM/VRAM requirements have not been established.** Intel Mac and Windows AMD/Intel GPU paths are not presented as verified. See the [0.8.4 release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4) for the latest verification scope and remaining limitations.
+E4B/12B multi-turn generation, cancellation and recovery were checked on both platforms. The earlier [0.8.2 verification](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.2) included actual upgrades with the notarized Mac app and official Windows installer, settings/conversation preservation and voice behavior. **Minimum RAM/VRAM requirements have not been established.** Intel Mac and Windows AMD/Intel GPU paths are not presented as verified. See the [0.8.5 release notes](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5) for the latest verification scope and remaining limitations.
 
 Chat names, persona and emotional poses come from the pack. Legacy packs without chat metadata can still chat in their default pose. Fast replies skip the preparation pose, and the final reply pose remains until the next request. New conversations, cancellation, errors and character/model changes clear that state.
 
 [Usage, models and storage](docs/local-character-chat.md) · [Windows runtime guide](docs/windows-character-chat.md)
 
-## Voice TTS — experimental in v0.8.4
+## Voice TTS — experimental in v0.8.5
 
 Under **Settings → Chat & voice → Character voice**, follow **① Choose a voice engine → ② Get and connect the required files → ③ Choose or add a voice → ④ Test and enable voice**. New Windows x64 installations use **Qwen GGUF** as the recommended default; Apple Silicon uses **VoxCPM2 Metal**. Existing engine, model and voice choices are preserved.
 
@@ -110,7 +111,7 @@ Under **Settings → Chat & voice → Character voice**, follow **① Choose a v
 | Windows · Qwen GGUF | Community-converted 0.6B Base Q8 + codec Q8 models, about 1.28GB · Separately prepare the bundled app-local runtime | CUDA / Vulkan · chunk / complete |
 | Windows · VoxCPM2 GGUF | Community-converted BaseLM F16 + Acoustic F16 models, about 5.07GB · Separately prepare the bundled app-local runtime | CUDA / Vulkan · chunk / complete |
 
-**The Windows GGUF CUDA builds require compute capability 8.9 and an R580 or newer NVIDIA driver.** GPU validation of CUDA and Vulkan is limited to the RTX 4090 development environment. AMD/Intel GPUs and other NVIDIA GPUs are not established as working. Adding GGUF voice paths does not broaden the verified GPU support of local character chat. The app does not install a CUDA SDK or GPU driver.
+**Windows GGUF CUDA execution requires an R580 or newer NVIDIA driver.** The app does not block execution by GPU model name or compute capability. The current binaries were built targeting 8.9, so passing preflight does not establish successful model loading or speech on other GPUs. GPU validation of CUDA and Vulkan is limited to the RTX 4090 development environment. AMD/Intel GPUs and other NVIDIA GPUs are not established as working. Adding GGUF voice paths does not broaden the verified GPU support of local character chat. The app does not install a CUDA SDK or GPU driver.
 
 Model downloads start only from an explicit button and support progress, cancellation, resume and SHA-256 verification. The Windows GGUF models are **community conversions**, not official GGUF releases from Qwen or OpenBMB. Downloading a model alone does not change the engine or voice. Runtime-file verification, model connection and actual GPU loading are separate stages; initial loading and reference conditioning still take time.
 
@@ -167,7 +168,7 @@ Keys are stored in **Mac Keychain / Windows Credential Manager**, with no plaint
 
 **Dots voice starts muted on connection/reconnection.** To hear it, prepare the existing engine/model/selected voice, enable voice and set volume above zero, then locally uncheck **dot presentation · this session → Mute** in the tray. Remote tools cannot unmute. Test `speak:true` and check the actual sound; `voice:requested` does not guarantee playback completion. Close local/task chat and lab windows using the character surface before testing Dots. Output blocked by a hidden character or another chat is not queued for later playback.
 
-[Wizard and status details](docs/belle-connection-wizard.md) · [Output tools and limits](docs/dot-presentation-bridge.md) · [v0.8.4 public verification scope](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.4)
+[Wizard and status details](docs/belle-connection-wizard.md) · [Output tools and limits](docs/dot-presentation-bridge.md) · [v0.8.5 public verification scope](https://github.com/ddol2ya/DAEMONLET/releases/tag/v0.8.5)
 
 ## Add a character
 
@@ -240,7 +241,7 @@ Import a `.petchar` file from the [public character packs](https://huggingface.c
 
 ## Character creation and development
 
-[**Download the character creation skill 0.8.4 ZIP**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/Daemonlet-creator-skill-0.8.4.zip) — includes authoring instructions and standalone runtime source. ComfyUI, See-through and models are not included.
+[**Download the character creation skill 0.8.5 ZIP**](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/Daemonlet-creator-skill-0.8.5.zip) — includes authoring instructions and standalone runtime source. ComfyUI, See-through and models are not included.
 
 Export includes confirmed emotion/gesture meaning metadata. Use `upgrade-chat` to prepare a chat metadata update while preserving an existing pack's visual assets. See the [character chat authoring guide](skills/create-pet-character/references/character-chat.md).
 
@@ -281,7 +282,7 @@ Electron setup uses the local installation script from the lockfile-pinned depen
 
 </details>
 
-Distribution builds that include Windows GGUF runtimes also require separately staged, pinned runtime archives. CI source-only verification does not replace actual installer validation. See [build provenance](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/SOURCE-PROVENANCE.json) for v0.8.4 app/runtime identities, and the [runtime rebuild source ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.4/daemonlet-0.8.4-runtime-rebuild-source.zip) for rebuild and LGPL replacement guidance.
+Distribution builds that include Windows GGUF runtimes also require separately staged, pinned runtime archives. CI source-only verification does not replace actual installer validation. See [build provenance](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/SOURCE-PROVENANCE.json) for v0.8.5 app/runtime identities, and the [runtime rebuild source ZIP](https://github.com/ddol2ya/DAEMONLET/releases/download/v0.8.5/daemonlet-0.8.5-runtime-rebuild-source.zip) for rebuild and LGPL replacement guidance.
 
 ## Licenses and attribution
 
