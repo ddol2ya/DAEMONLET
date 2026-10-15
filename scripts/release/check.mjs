@@ -39,6 +39,9 @@ async function checkProduction(asar, sourceOnlyRuntime) {
   for (const name of ['managed_gguf_runtime.py', managedRuntimeCatalogName]) {
     if (!extract('dist-electron/voice/' + name).equals(await readFile(resolve(root, 'electron/voice', name)))) throw Error('Managed GGUF runtime resource differs from source: ' + name)
   }
+  if (digest(extract('dist-electron/voice/base-voice-defaults.json')) !== json('dist-electron/voice/runtime-gguf-windows-voxcpm2.json').baseVoiceDefaultsSha256) {
+    throw Error('Default voice settings differ from the pinned runtime policy')
+  }
   const managedRuntimeBuild = json('dist-electron/managed-gguf-runtime-build.json')
   verifyManagedRuntimeBuildReport(managedRuntimeBuild, extract('dist-electron/voice/' + managedRuntimeCatalogName), { sourceOnlyRuntime })
   const update = json('dist-electron/app-update.yml')
